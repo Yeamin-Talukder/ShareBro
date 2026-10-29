@@ -14,6 +14,19 @@ class KeepAlive {
 
   static bool get _supported => Platform.isAndroid;
 
+  /// What the background notice says right now (to skip repeat updates).
+  static String? _shown;
+
+  static String _activity(String key) => switch (key) {
+        'scan' => 'scanning',
+        'send' => 'sending',
+        'receive' => 'receiving',
+        'receive-ask' => 'waiting for your answer',
+        'ready' => 'ready to receive',
+        _ when key.startsWith('web-') => 'sharing a link',
+        _ => 'working',
+      };
+
   static bool holding(String key) => _reasons.containsKey(key);
 
   static Future<void> hold(String key, String title, String text) {
@@ -38,13 +51,18 @@ class KeepAlive {
       if (running) await FlutterForegroundTask.stopService();
       return;
     }
-    // A scan is the most interesting thing to show; otherwise the newest.
-    final (title, text) = _reasons['scan'] ?? _reasons.values.last;
-    final extra = _reasons.length > 1 ? ' (+${_reasons.length - 1} more)' : '';
+    // Just a short summary: the rich notifications (share/notify.dart)
+    // carry the live details, so this one doesn't repeat them.
+    const title = 'ShareBro is working';
+    final doing = <String>{for (final key in _reasons.keys) _activity(key)}.join(' · ');
+    final text = doing[0].toUpperCase() + doing.substring(1);
     if (running) {
-      await FlutterForegroundTask.updateService(notificationTitle: title, notificationText: '$text$extra');
+      if (text == _shown) return;
+      _shown = text;
+      await FlutterForegroundTask.updateService(notificationTitle: title, notificationText: text);
       return;
     }
+    _shown = text;
     if (!_initialized) {
       FlutterForegroundTask.init(
         androidNotificationOptions: AndroidNotificationOptions(
@@ -74,7 +92,7 @@ class KeepAlive {
     await FlutterForegroundTask.startService(
       serviceTypes: [ForegroundServiceTypes.dataSync],
       notificationTitle: title,
-      notificationText: '$text$extra',
+      notificationText: text,
     );
   }
 }
