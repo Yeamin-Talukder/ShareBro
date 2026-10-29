@@ -3,11 +3,17 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 
+import 'tls.dart';
+
 /// HTTP(S) client for talking to LocalSend devices. LocalSend devices use
 /// self-made certificates; we accept one only if its SHA-256 matches the
 /// fingerprint the device announced (when the fingerprint is a hash).
-HttpClient lsHttpClient({String? fingerprint}) {
-  final client = HttpClient()
+///
+/// With [identity], we show our own certificate too (mutual TLS): current
+/// LocalSend versions require it, hang up on senders without one, and check
+/// that its fingerprint matches the one we claim.
+HttpClient lsHttpClient({String? fingerprint, TlsIdentity? identity}) {
+  final client = HttpClient(context: identity?.context())
     ..connectionTimeout = const Duration(seconds: 4)
     ..idleTimeout = const Duration(seconds: 20);
   client.badCertificateCallback = (cert, host, port) {

@@ -116,7 +116,7 @@ class Discovery extends ChangeNotifier {
   }
 
   Future<bool> _register(LsDevice device) async {
-    final client = lsHttpClient(fingerprint: device.fingerprint);
+    final client = lsHttpClient(fingerprint: device.fingerprint, identity: identity.tls);
     try {
       final res = await postJson(client, device.uri('/register'), identity.info(download: true).toJson(),
           timeout: const Duration(seconds: 3));
@@ -131,7 +131,7 @@ class Discovery extends ChangeNotifier {
   /// Tries `POST /register` on one address (HTTPS first, then HTTP).
   Future<LsDevice?> probe(String ip, {int port = lsPort}) async {
     for (final scheme in ['https', 'http']) {
-      final client = lsHttpClient();
+      final client = lsHttpClient(identity: identity.tls);
       try {
         final res = await postJson(
           client,

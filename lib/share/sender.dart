@@ -74,7 +74,7 @@ class LsSender {
     void Function(int sentBytes, int totalBytes, int filesDone)? onProgress,
     void Function()? onAccepted,
   }) async {
-    final client = lsHttpClient(fingerprint: device.fingerprint)..connectionTimeout = const Duration(seconds: 8);
+    final client = lsHttpClient(fingerprint: device.fingerprint, identity: identity.tls)..connectionTimeout = const Duration(seconds: 8);
     final byId = {for (var i = 0; i < files.length; i++) 'p$i': files[i]};
     try {
       final request = {
@@ -149,7 +149,7 @@ class LsSender {
             // Retries get a fresh connection: the old one may be dead.
             final http = attempt == 0
                 ? client
-                : (lsHttpClient(fingerprint: device.fingerprint)..connectionTimeout = const Duration(seconds: 8));
+                : (lsHttpClient(fingerprint: device.fingerprint, identity: identity.tls)..connectionTimeout = const Duration(seconds: 8));
             try {
               final req = await http.postUrl(
                 device.uri('/upload', {'sessionId': sessionId, 'fileId': entry.key, 'token': entry.value}),
