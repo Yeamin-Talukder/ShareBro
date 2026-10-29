@@ -113,6 +113,9 @@ class Receiver extends ChangeNotifier {
   /// The latest message, until it's been shown.
   final message = ValueNotifier<IncomingMessage?>(null);
 
+  /// Someone tried to send while Receive was off and the app wasn't open.
+  final missed = ValueNotifier<IncomingRequest?>(null);
+
   IncomingRequest? pending;
   ReceiveSession? session;
   final List<ReceiveSession> history = [];

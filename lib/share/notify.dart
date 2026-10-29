@@ -86,6 +86,7 @@ class NotifyBridge with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     c.sharing.addListener(_onSharing);
     c.sharing.receiver.addListener(_onReceiver);
+    c.sharing.receiver.missed.addListener(_onMissed);
     c.addListener(_onScan);
     Notify.onAction = _onAction;
     _settled.addAll([
@@ -96,7 +97,7 @@ class NotifyBridge with WidgetsBindingObserver {
 
   final ScanController c;
 
-  static const _request = 2000, _receive = 3000, _received = 3001, _scan = 4000;
+  static const _request = 2000, _missed = 2001, _receive = 3000, _received = 3001, _scan = 4000;
   static int _progressId(SendJob j) => 10000 + j.id;
   static int _doneId(SendJob j) => 20000 + j.id;
 
@@ -112,7 +113,20 @@ class NotifyBridge with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     c.sharing.removeListener(_onSharing);
     c.sharing.receiver.removeListener(_onReceiver);
+    c.sharing.receiver.missed.removeListener(_onMissed);
     c.removeListener(_onScan);
+  }
+
+  /// A send we turned away because Receive was off: say so on this phone.
+  Future<void> _onMissed() async {
+    final req = c.sharing.receiver.missed.value;
+    if (req == null) return;
+    await Notify.show(
+      id: _missed,
+      kind: 'request',
+      title: '${req.from} tried to send you ${req.summary}',
+      text: 'Receive is off. Open ShareBro (or turn on Receive) and ask them to send again.',
+    );
   }
 
   @override

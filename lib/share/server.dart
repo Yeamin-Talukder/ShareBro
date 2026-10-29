@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleState, WidgetsBinding;
 import 'package:photo_manager/photo_manager.dart';
 
 import '../scan/background.dart';
@@ -155,7 +156,6 @@ class ShareServer extends ChangeNotifier {
   }
 
   Future<void> _prepareUpload(HttpRequest req, HttpResponse res, Map<String, String> q, String? ip) async {
-    if (!receiver.enabled) return _status(res, HttpStatus.forbidden);
     if (receiver.pin != null && q['pin'] != receiver.pin) return _status(res, HttpStatus.unauthorized);
     if (receiver.busy || receiver.pending != null) return _status(res, HttpStatus.conflict);
     final body = jsonDecode(await utf8.decodeStream(req)) as Map<String, dynamic>;
@@ -173,6 +173,18 @@ class ShareServer extends ChangeNotifier {
     };
     if (files.isEmpty) return _status(res, HttpStatus.noContent);
     final request = IncomingRequest(info.alias, files.values.toList(), 'Wi-Fi');
+    // Like LocalSend: while the app is on screen we always ask, even with
+    // Receive switched off. Closed or in the background with Receive off,
+    // we say no, but tell both sides why.
+    final onScreen = WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    if (!receiver.enabled && !onScreen) {
+      receiver.missed.value = request;
+      res
+        ..statusCode = HttpStatus.forbidden
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode({'message': 'Receiving is off'}));
+      return res.close();
+    }
     final accepted = await receiver.ask(request, fingerprint: info.fingerprint);
     if (accepted == null) return _status(res, HttpStatus.forbidden);
     if (accepted.isEmpty) return _status(res, HttpStatus.noContent);

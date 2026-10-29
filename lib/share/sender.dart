@@ -117,7 +117,14 @@ class LsSender {
         case 401:
           return SendResult(SendOutcome.needsPin);
         case 403:
-          return SendResult(SendOutcome.declined, message: '${device.alias} declined');
+          // ShareBro says why when it's not a "no" from the person.
+          final why = '${prep.json?['message'] ?? ''}'.toLowerCase();
+          return SendResult(
+            SendOutcome.declined,
+            message: why.contains('off')
+                ? '${device.alias} isn\'t receiving right now. Ask them to open ShareBro or turn on Receive, then retry.'
+                : '${device.alias} declined',
+          );
         case 409:
         case 429:
           return SendResult(SendOutcome.busy, message: '${device.alias} is busy with another transfer');
