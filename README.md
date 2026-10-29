@@ -6,6 +6,8 @@
 
 **Your trip photos, sorted by face — and sent to every friend in a tap.**
 
+<sub>Made by <a href="https://github.com/Yeamin-Talukder"><b>Md Yeamin Talukder</b></a></sub>
+
 [![Latest release](https://img.shields.io/github/v/release/Yeamin-Talukder/ShareBro?color=FF8A6B&label=release)](https://github.com/Yeamin-Talukder/ShareBro/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Yeamin-Talukder/ShareBro/total?color=7B61FF&label=downloads)](https://github.com/Yeamin-Talukder/ShareBro/releases)
 [![Visitors](https://visitor-badge.laobi.icu/badge?page_id=Yeamin-Talukder.ShareBro&left_text=views)](https://github.com/Yeamin-Talukder/ShareBro)
@@ -215,6 +217,25 @@ ShareBro is a personal project and is developed and tested on **Android**
 (Pixel 7 Pro). The iOS and Windows folders are Flutter scaffolding and are
 not tested yet.
 
+## Developer
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://github.com/Yeamin-Talukder">
+        <img src="https://github.com/Yeamin-Talukder.png?size=160" width="96" height="96" alt="Md Yeamin Talukder"><br>
+        <b>Md Yeamin Talukder</b>
+      </a>
+    </td>
+    <td>
+      Designed and built ShareBro.<br><br>
+      🧑‍💻 GitHub: <a href="https://github.com/Yeamin-Talukder">@Yeamin-Talukder</a><br>
+      📦 Repository: <a href="https://github.com/Yeamin-Talukder/ShareBro">github.com/Yeamin-Talukder/ShareBro</a><br>
+      🐞 Found a bug or have an idea? <a href="https://github.com/Yeamin-Talukder/ShareBro/issues">Open an issue</a>
+    </td>
+  </tr>
+</table>
+
 ## Credits
 
 - **[LocalSend](https://github.com/localsend/localsend):** ShareBro
@@ -231,5 +252,6 @@ not tested yet.
 
 ## License
 
-No license has been chosen yet, so all rights are reserved by the author.
+No license has been chosen yet, so all rights are reserved by
+**Md Yeamin Talukder**.
 If you'd like to use or contribute to this code, please open an issue.

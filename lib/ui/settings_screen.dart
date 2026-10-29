@@ -11,6 +11,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../data/backup.dart';
 import '../data/db.dart';
 import '../scan/scan_controller.dart';
+import '../share/native_files.dart';
 import '../share/net.dart';
 import '../share/prepare.dart';
 import 'app_lock.dart';
@@ -468,9 +469,59 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: c.running ? null : _confirmClear,
               ),
             ),
+            const SizedBox(height: 16),
+            const _AboutCard(),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Who made ShareBro, with links to the developer's GitHub and the code.
+class _AboutCard extends StatelessWidget {
+  const _AboutCard();
+
+  static const _profile = 'https://github.com/Yeamin-Talukder';
+  static const _repo = 'https://github.com/Yeamin-Talukder/ShareBro';
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
+          child: Row(children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.asset('assets/icon/app_icon_1024.png', width: 52, height: 52),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('ShareBro', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                Text('Made by Md Yeamin Talukder', style: text.bodyMedium),
+              ]),
+            ),
+          ]),
+        ),
+        ListTile(
+          leading: const Icon(Icons.person_outline_rounded),
+          title: const Text('Developer'),
+          subtitle: const Text('github.com/Yeamin-Talukder'),
+          trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+          onTap: () => NativeFiles.open(_profile),
+        ),
+        ListTile(
+          leading: const Icon(Icons.code_rounded),
+          title: const Text('Source code'),
+          subtitle: const Text('github.com/Yeamin-Talukder/ShareBro'),
+          trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+          onTap: () => NativeFiles.open(_repo),
+        ),
+      ]),
     );
   }
 }

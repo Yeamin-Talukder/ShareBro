@@ -71,8 +71,11 @@ class MainActivity : FlutterFragmentActivity() {
                         } else {
                             Uri.parse(target)
                         }
+                        val web = uri.scheme == "http" || uri.scheme == "https"
                         val intent = Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(uri, mime ?: contentResolver.getType(uri) ?: "*/*")
+                            // Web links open in the browser as plain links;
+                            // a file type would stop browsers matching them.
+                            if (web) data = uri else setDataAndType(uri, mime ?: contentResolver.getType(uri) ?: "*/*")
                             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
                         startActivity(Intent.createChooser(intent, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
