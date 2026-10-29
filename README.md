@@ -1,20 +1,52 @@
 <div align="center">
 
-# ✈️ ShareBro
+<img src="docs/logo.png" alt="ShareBro logo" width="128" height="128">
+
+# ShareBro
 
 **Your trip photos, sorted by face — and sent to every friend in a tap.**
+
+[![Latest release](https://img.shields.io/github/v/release/Yeamin-Talukder/ShareBro?color=FF8A6B&label=release)](https://github.com/Yeamin-Talukder/ShareBro/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Yeamin-Talukder/ShareBro/total?color=7B61FF&label=downloads)](https://github.com/Yeamin-Talukder/ShareBro/releases)
+[![Visitors](https://visitor-badge.laobi.icu/badge?page_id=Yeamin-Talukder.ShareBro&left_text=views)](https://github.com/Yeamin-Talukder/ShareBro)
+[![Stars](https://img.shields.io/github/stars/Yeamin-Talukder/ShareBro?color=E8457A)](https://github.com/Yeamin-Talukder/ShareBro/stargazers)
+<br>
+![Android 9+](https://img.shields.io/badge/Android-9%2B-3DDC84?logo=android&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter)
+![Offline](https://img.shields.io/badge/works-100%25%20offline-FF8A6B)
+![LocalSend compatible](https://img.shields.io/badge/LocalSend-compatible-7B61FF)
 
 ShareBro is an offline Android app for the friend who takes all the photos.
 It finds every face in your gallery, groups the photos by person, and sends
 each friend their own photos straight to their phone. No cloud, no uploads,
 no accounts.
 
-![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter)
-![Android](https://img.shields.io/badge/Android-9%2B-3DDC84?logo=android)
-![Offline](https://img.shields.io/badge/works-100%25%20offline-FF8A6B)
-![LocalSend compatible](https://img.shields.io/badge/LocalSend-compatible-7B61FF)
+### [⬇️ Download the latest APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest)
+
+<sub>Most phones: <code>ShareBro-…-arm64-v8a.apk</code> · Android 9 or newer</sub>
 
 </div>
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/screenshots/share.png" alt="Share: pick photos, files, folders, text or apps, then tap a nearby device" width="23%">
+  &nbsp;
+  <img src="docs/screenshots/receive.png" alt="Receive: be findable, with quick save, auto-accept and a PIN" width="23%">
+  &nbsp;
+  <img src="docs/screenshots/sending.png" alt="Sending: send every friend their new photos in one tap" width="23%">
+  &nbsp;
+  <img src="docs/screenshots/settings.png" alt="Settings: grouping strictness, send quality, auto-scan, app lock, island" width="23%">
+</p>
+
+<p align="center">
+  <sub><b>Share</b> — photos, files, folders, text or apps to any nearby device &nbsp;·&nbsp;
+  <b>Receive</b> — quick save, auto-accept, PIN &nbsp;·&nbsp;
+  <b>Sending</b> — everyone gets their own photos &nbsp;·&nbsp;
+  <b>Settings</b> — grouping strictness and more</sub>
+</p>
+
+<p align="center"><sub>The People and Photos screens aren't shown here because they'd show real people's faces.</sub></p>
 
 ---
 
@@ -158,6 +190,7 @@ lib/
 android/app/src/main/kotlin/…   native helpers: files, trash, notifications
 assets/models/  MobileFaceNet face-recognition model (TensorFlow Lite)
 design/         HTML design demos (backgrounds, notifications, premium look)
+docs/           logo and screenshots for this README
 test/           unit and widget tests
 tool/           app-icon generator
 ```
