@@ -1,0 +1,8 @@
+# Same line endings for everyone, whatever their OS.
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.tflite binary
+*.jar binary

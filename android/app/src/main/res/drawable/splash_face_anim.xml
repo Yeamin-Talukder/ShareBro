@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ splash icon: the ShareBro plane swoops in from the lower
+     left, its trail appears dot by dot, and the friends pop in. -->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt">
+    <aapt:attr name="android:drawable">
+        <vector
+            android:width="108dp"
+            android:height="108dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <path android:pathData="M18,54 a36,36 0 1,0 72,0 a36,36 0 1,0 -72,0">
+                <aapt:attr name="android:fillColor">
+                    <gradient
+                        android:type="linear"
+                        android:startX="24"
+                        android:startY="20"
+                        android:endX="86"
+                        android:endY="92">
+                        <item android:offset="0" android:color="#FFFF8A5C" />
+                        <item android:offset="0.5" android:color="#FFE8457A" />
+                        <item android:offset="1" android:color="#FF6E5BFF" />
+                    </gradient>
+                </aapt:attr>
+            </path>
+            <group
+                android:pivotX="50"
+                android:pivotY="50"
+                android:scaleX="0.74"
+                android:scaleY="0.74"
+                android:translateX="4"
+                android:translateY="4">
+                <group
+                    android:name="friends"
+                    android:pivotX="29"
+                    android:pivotY="32"
+                    android:scaleX="0"
+                    android:scaleY="0">
+                    <path
+                        android:fillColor="#FFFFFF"
+                        android:fillAlpha="0.5"
+                        android:pathData="M16,30 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+                    <path
+                        android:fillColor="#FFFFFF"
+                        android:fillAlpha="0.5"
+                        android:pathData="M30,24 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+                    <path
+                        android:fillColor="#FFFFFF"
+                        android:pathData="M22.5,40 a6.5,6.5 0 1,0 13,0 a6.5,6.5 0 1,0 -13,0" />
+                </group>
+                <path
+                    android:name="dot1"
+                    android:fillColor="#FFFFFF"
+                    android:fillAlpha="0"
+                    android:pathData="M42,72 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+                <path
+                    android:name="dot2"
+                    android:fillColor="#FFFFFF"
+                    android:fillAlpha="0"
+                    android:pathData="M34.2,77 a1.8,1.8 0 1,0 3.6,0 a1.8,1.8 0 1,0 -3.6,0" />
+                <path
+                    android:name="dot3"
+                    android:fillColor="#FFFFFF"
+                    android:fillAlpha="0"
+                    android:pathData="M26.4,79 a1.6,1.6 0 1,0 3.2,0 a1.6,1.6 0 1,0 -3.2,0" />
+                <group
+                    android:name="plane"
+                    android:translateX="-36"
+                    android:translateY="30">
+                    <path
+                        android:fillColor="#FFFFFF"
+                        android:pathData="M30,58 L80,34 L55,62 Z" />
+                    <path
+                        android:fillColor="#FFFFFF"
+                        android:fillAlpha="0.72"
+                        android:pathData="M55,62 L80,34 L66,74 Z" />
+                </group>
+            </group>
+        </vector>
+    </aapt:attr>
+    <!-- The plane swoops in and settles with a little overshoot. -->
+    <target android:name="plane">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator
+                    android:propertyName="translateX"
+                    android:duration="520"
+                    android:valueFrom="-36"
+                    android:valueTo="0"
+                    android:interpolator="@android:interpolator/overshoot" />
+                <objectAnimator
+                    android:propertyName="translateY"
+                    android:duration="520"
+                    android:valueFrom="30"
+                    android:valueTo="0"
+                    android:interpolator="@android:interpolator/decelerate_cubic" />
+            </set>
+        </aapt:attr>
+    </target>
+    <!-- The trail appears behind it, nearest dot first. -->
+    <target android:name="dot1">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="fillAlpha" android:startOffset="360"
+                android:duration="160" android:valueFrom="0" android:valueTo="0.75" />
+        </aapt:attr>
+    </target>
+    <target android:name="dot2">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="fillAlpha" android:startOffset="440"
+                android:duration="160" android:valueFrom="0" android:valueTo="0.55" />
+        </aapt:attr>
+    </target>
+    <target android:name="dot3">
+        <aapt:attr name="android:animation">
+            <objectAnimator android:propertyName="fillAlpha" android:startOffset="520"
+                android:duration="160" android:valueFrom="0" android:valueTo="0.35" />
+        </aapt:attr>
+    </target>
+    <!-- Friends pop in last. -->
+    <target android:name="friends">
+        <aapt:attr name="android:animation">
+            <set>
+                <objectAnimator android:propertyName="scaleX" android:startOffset="560"
+                    android:duration="380" android:valueFrom="0" android:valueTo="1"
+                    android:interpolator="@android:interpolator/overshoot" />
+                <objectAnimator android:propertyName="scaleY" android:startOffset="560"
+                    android:duration="380" android:valueFrom="0" android:valueTo="1"
+                    android:interpolator="@android:interpolator/overshoot" />
+            </set>
+        </aapt:attr>
+    </target>
+</animated-vector>

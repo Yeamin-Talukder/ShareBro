@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ShareBro icon: a paper plane taking off, friends gathered behind it,
+     its trail fading away. Drawn on a 100-unit grid and scaled into the
+     adaptive icon's safe zone. Also used as the themed (monochrome) icon.
+     Same geometry as tool/make_icon.dart. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="50"
+        android:pivotY="50"
+        android:scaleX="0.74"
+        android:scaleY="0.74"
+        android:translateX="4"
+        android:translateY="4">
+        <!-- Friends -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillAlpha="0.5"
+            android:pathData="M16,30 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillAlpha="0.5"
+            android:pathData="M30,24 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M22.5,40 a6.5,6.5 0 1,0 13,0 a6.5,6.5 0 1,0 -13,0" />
+        <!-- Trail -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillAlpha="0.75"
+            android:pathData="M42,72 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillAlpha="0.55"
+            android:pathData="M34.2,77 a1.8,1.8 0 1,0 3.6,0 a1.8,1.8 0 1,0 -3.6,0" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillAlpha="0.35"
+            android:pathData="M26.4,79 a1.6,1.6 0 1,0 3.2,0 a1.6,1.6 0 1,0 -3.2,0" />
+        <!-- Paper plane: top wing, then the folded lower wing -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M30,58 L80,34 L55,62 Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillAlpha="0.72"
+            android:pathData="M55,62 L80,34 L66,74 Z" />
+    </group>
+</vector>

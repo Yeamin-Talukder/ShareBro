@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShareBro notifications demo</title>
+<style>
+  :root { --ink: #F1EEF8; --muted: #A9A3BC; --line: rgba(255,255,255,.12); --accent: #FF8A6B; --ok: #4ADE80; --violet: #7B61FF; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #05050A; color: var(--ink); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 26px 16px 60px; }
+  header { text-align: center; max-width: 680px; margin: 0 auto 18px; }
+  header h1 { font-size: 26px; font-weight: 600; }
+  header p { color: var(--muted); font-size: 14px; line-height: 1.6; margin-top: 6px; }
+  h2 { font-size: 15px; font-weight: 600; letter-spacing: .3px; color: var(--muted); text-transform: uppercase; margin: 0 0 12px; text-align: center; }
+  .wrap { display: flex; flex-wrap: wrap; gap: 40px; justify-content: center; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 380px; }
+  .row button { border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--ink); font: 500 12.5px inherit; padding: 8px 13px; border-radius: 999px; cursor: pointer; }
+  .row button.on { background: var(--ink); color: #111; }
+  .row button.play { background: var(--accent); color: #2A120C; border-color: var(--accent); font-weight: 700; }
+
+  /* ---------- Phone with the app ---------- */
+  .phone { width: 360px; aspect-ratio: 412 / 892; border-radius: 48px; position: relative; overflow: hidden;
+           box-shadow: 0 40px 120px rgba(80,60,160,.28), inset 0 0 0 1px rgba(255,255,255,.10); }
+  .app { position: absolute; inset: 0; background:
+           radial-gradient(60% 40% at 25% 15%, rgba(255,122,80,.55), transparent 70%),
+           radial-gradient(55% 40% at 85% 30%, rgba(232,69,122,.45), transparent 70%),
+           radial-gradient(60% 45% at 20% 62%, rgba(123,97,255,.5), transparent 70%),
+           radial-gradient(55% 40% at 85% 85%, rgba(34,195,176,.4), transparent 70%), #0B0816; filter: saturate(1.1); }
+  .app::after { content: ''; position: absolute; inset: 0; background: linear-gradient(rgba(6,4,12,.55), rgba(6,4,12,.35) 30%, rgba(6,4,12,.45) 65%, rgba(6,4,12,.6)); }
+  .appui { position: absolute; inset: 0; z-index: 2; }
+  .status { height: 46px; display: flex; justify-content: space-between; align-items: end; padding: 0 28px 4px; font-size: 12.5px; font-weight: 600; }
+  .title { font-size: 40px; font-weight: 700; letter-spacing: -1px; padding: 52px 22px 0; }
+  .sub { color: var(--muted); font-size: 12.5px; padding: 4px 22px 0; }
+  .people { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px 8px; padding: 24px 18px 0; }
+  .person { display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; }
+  .person i { width: 76px; height: 76px; border-radius: 50%; display: block; box-shadow: 0 0 0 2px rgba(255,255,255,.18); }
+  .dock { position: absolute; left: 14px; right: 14px; bottom: 22px; height: 68px; border-radius: 28px; background: rgba(20,18,32,.55);
+          backdrop-filter: blur(18px); border: 1px solid var(--line); display: flex; justify-content: space-around; align-items: center; font-size: 11px; color: var(--muted); }
+  .dock div { text-align: center; } .dock div.on { color: var(--accent); }
+  .p1 { background: linear-gradient(160deg,#E8B48A,#8C4A3B); } .p2 { background: linear-gradient(200deg,#9FB7C8,#3E5A73); }
+  .p3 { background: linear-gradient(140deg,#F2D6A2,#C08552); } .p4 { background: linear-gradient(180deg,#B9C7A5,#5D7550); }
+  .p5 { background: linear-gradient(120deg,#D9A7B0,#8A4E62); } .p6 { background: linear-gradient(170deg,#C5B5E0,#6B5A94); }
+
+  /* ---------- The island ---------- */
+  .camera { position: absolute; top: 12px; left: 50%; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%; background: #000; z-index: 21; box-shadow: inset 0 0 0 4px #111; }
+  .island { position: absolute; top: 9px; left: 50%; transform: translateX(-50%); z-index: 20; background: #000; color: #fff; overflow: hidden;
+            width: 36px; height: 28px; border-radius: 20px; opacity: 0;
+            transition: width .55s cubic-bezier(.2,1.25,.3,1), height .55s cubic-bezier(.2,1.25,.3,1), border-radius .55s cubic-bezier(.2,1.2,.3,1), opacity .3s, top .55s cubic-bezier(.2,1.2,.3,1);
+            box-shadow: 0 10px 40px rgba(0,0,0,.45), inset 0 0 0 1px rgba(255,255,255,.06); cursor: pointer; }
+  .island.on { opacity: 1; }
+  .island.compact { width: 250px; height: 38px; border-radius: 20px; }
+  .island.wide { width: 270px; height: 38px; }
+  .island.expanded { width: 340px; height: 176px; border-radius: 34px; top: 8px; }
+  .island.ask { width: 340px; height: 194px; border-radius: 34px; }
+  .island.toast { width: 250px; height: 38px; }
+  .island.bump { animation: bump .35s; }
+  @keyframes bump { 50% { transform: translateX(-50%) scale(1.06); } }
+  .view { position: absolute; inset: 0; opacity: 0; transition: opacity .25s; pointer-events: none; }
+  .view.show { opacity: 1; transition: opacity .35s .18s; pointer-events: auto; }
+
+  .cmp { display: flex; align-items: center; justify-content: space-between; height: 38px; padding: 0 12px 0 8px; font-size: 12.5px; font-weight: 600; }
+  .cmp .l, .cmp .r { display: flex; align-items: center; gap: 7px; max-width: calc(50% - 20px); white-space: nowrap; }
+  .cmp .l span, .cmp .r span { overflow: hidden; text-overflow: ellipsis; }
+  /* The middle stays clear for the phone's camera hole. */
+  .thumb { width: 24px; height: 24px; border-radius: 7px; flex: none; }
+  .ring { width: 22px; height: 22px; }
+  .ring circle { fill: none; stroke-width: 3; }
+  .ring .bg { stroke: rgba(255,255,255,.18); }
+  .ring .fg { stroke: var(--accent); stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; transition: stroke-dashoffset .3s; }
+  .pct { font-variant-numeric: tabular-nums; color: var(--accent); }
+
+  .exp { padding: 16px 18px; }
+  .exp .top { display: flex; gap: 12px; align-items: center; }
+  .exp .big { width: 52px; height: 52px; border-radius: 14px; position: relative; overflow: hidden; flex: none; }
+  .exp .big::after { content: ''; position: absolute; inset: 0; background: linear-gradient(120deg, transparent 40%, rgba(255,255,255,.35), transparent 60%); animation: sheen 2.2s infinite; }
+  @keyframes sheen { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+  .exp h3 { font-size: 15px; font-weight: 600; }
+  .exp small { color: #B9B4C8; font-size: 12px; }
+  .bar { height: 6px; border-radius: 6px; background: rgba(255,255,255,.14); margin: 14px 0 8px; overflow: hidden; }
+  .bar div { height: 100%; background: linear-gradient(90deg, var(--accent), #FFB478); border-radius: 6px; transition: width .3s; }
+  .stats { display: flex; justify-content: space-between; font-size: 11.5px; color: #B9B4C8; font-variant-numeric: tabular-nums; }
+  .btns { display: flex; gap: 8px; margin-top: 12px; }
+  .btns span { flex: 1; text-align: center; padding: 9px 0; border-radius: 999px; font-size: 13px; font-weight: 600; background: rgba(255,255,255,.12); }
+  .btns span.main { background: var(--accent); color: #2A120C; }
+  .btns span.ok { background: #fff; color: #111; }
+  .av { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 22px; font-weight: 700; flex: none;
+        background: linear-gradient(135deg, var(--accent), var(--violet)); position: relative; }
+  .av::before { content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--accent); opacity: .7; animation: pulse 1.6s infinite; }
+  @keyframes pulse { from { transform: scale(.95); opacity: .8; } to { transform: scale(1.25); opacity: 0; } }
+  .files { display: flex; gap: 6px; margin-top: 12px; }
+  .files i { width: 30px; height: 30px; border-radius: 8px; display: block; }
+  .files em { font-style: normal; color: #B9B4C8; font-size: 12px; align-self: center; margin-left: 4px; }
+  .check { width: 22px; height: 22px; border-radius: 50%; background: var(--ok); display: grid; place-items: center; color: #062; font-size: 13px; font-weight: 900; animation: pop .5s cubic-bezier(.2,1.6,.4,1); }
+  @keyframes pop { from { transform: scale(0); } }
+  .face { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, #22C3B0, var(--violet)); display: grid; place-items: center; font-size: 12px; }
+  .spin { animation: spin 2.4s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- Android notifications ---------- */
+  .shade { width: 380px; border-radius: 36px; padding: 18px 14px 20px; background: linear-gradient(#1A1824, #121019); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+  .sbar { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; font-weight: 600; padding: 0 10px 14px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; background: #2A1F18; color: #FFB89E; border-radius: 999px; padding: 4px 10px 4px 6px; font-size: 11.5px; font-weight: 700; }
+  .chip .mini { width: 14px; height: 14px; }
+  .clock { font-size: 13px; }
+  .n { background: #24212F; border-radius: 24px; padding: 14px 14px 12px; margin-top: 8px; }
+  .n.heads { background: #2E2A3B; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+  .nh { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #B9B4C8; }
+  .appicon { width: 18px; height: 18px; border-radius: 6px; background: linear-gradient(135deg,#FF8A5C,#E8457A,#6E5BFF); display: grid; place-items: center; font-size: 10px; }
+  .nb { display: flex; gap: 12px; margin-top: 8px; }
+  .nb .t { flex: 1; min-width: 0; }
+  .nb b { font-size: 14px; font-weight: 600; display: block; }
+  .nb span { font-size: 13px; color: #CFCADB; }
+  .nb .pic { width: 46px; height: 46px; border-radius: 12px; flex: none; }
+  .npbar { height: 5px; border-radius: 5px; background: rgba(255,255,255,.12); margin-top: 10px; overflow: hidden; }
+  .npbar div { height: 100%; width: 64%; background: linear-gradient(90deg, var(--accent), #FFB478); }
+  .npbar.scan div { width: 25%; background: linear-gradient(90deg, #22C3B0, var(--violet)); }
+  .na { display: flex; gap: 8px; margin-top: 12px; }
+  .na span { padding: 8px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; background: rgba(255,255,255,.08); color: #FFB89E; }
+  .na span.fill { background: var(--accent); color: #2A120C; }
+  .bigpic { height: 120px; border-radius: 16px; margin-top: 10px; display: grid; grid-template-columns: 2fr 1fr; gap: 3px; overflow: hidden; }
+  .bigpic div:first-child { grid-row: span 2; }
+  .tag { font-size: 10.5px; color: #8E89A0; text-align: center; margin-top: 6px; }
+  .legend { max-width: 760px; margin: 34px auto 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .legend div { background: rgba(255,255,255,.04); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; font-size: 13px; color: var(--muted); line-height: 1.55; }
+  .legend b { color: var(--ink); display: block; margin-bottom: 4px; font-size: 14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>ShareBro notifications · demo</h1>
+  <p>Left: the <b>island</b> inside the app — it morphs between states. Press <b>▶ Play the whole story</b>, or pick a state. Tap the island to expand it.
+     Right: how the same moments look as <b>Android notifications</b> when the app is in the background.</p>
+</header>
+
+<div class="wrap">
+  <div class="col">
+    <h2>In the app · island</h2>
+    <div class="phone">
+      <div class="app"></div>
+      <div class="appui">
+        <div class="status"><span>9:41</span><span>▲ ◔ 82%</span></div>
+        <div class="title">People</div>
+        <div class="sub">Goa, March 2026 · 4,812 photos</div>
+        <div class="people">
+          <div class="person"><i class="p1"></i>Maya</div><div class="person"><i class="p2"></i>Rahim</div><div class="person"><i class="p3"></i>Nila</div>
+          <div class="person"><i class="p5"></i>Arif</div><div class="person"><i class="p6"></i>Tanvir</div><div class="person"><i class="p4"></i>Sara</div>
+        </div>
+        <div class="dock"><div class="on">People</div><div>Photos</div><div>Albums</div><div>Explore</div><div>Share</div></div>
+      </div>
+      <div class="camera"></div>
+
+      <div class="island" id="island">
+        <!-- Compact: sending -->
+        <div class="view" data-v="send">
+          <div class="cmp">
+            <div class="l"><i class="thumb p1"></i><span id="sendName">To Maya</span></div>
+            <div class="r"><span class="pct" id="sendPct">0%</span>
+              <svg class="ring" viewBox="0 0 24 24"><circle class="bg" cx="12" cy="12" r="9"/><circle class="fg" id="sendRing" cx="12" cy="12" r="9" stroke-dasharray="56.5" stroke-dashoffset="56.5"/></svg></div>
+          </div>
+        </div>
+        <!-- Expanded: sending -->
+        <div class="view" data-v="sendx">
+          <div class="exp">
+            <div class="top"><i class="big p1"></i>
+              <div><h3>Sending to Maya's Pixel</h3><small id="xFile">IMG_2041.jpg · 8 of 24</small></div></div>
+            <div class="bar"><div id="xBar" style="width:0%"></div></div>
+            <div class="stats"><span id="xSent">0 MB of 312 MB</span><span>6.2 MB/s</span><span id="xLeft">48 s left</span></div>
+            <div class="btns"><span>Cancel</span><span class="main">Hide</span></div>
+          </div>
+        </div>
+        <!-- Incoming request -->
+        <div class="view" data-v="ask">
+          <div class="exp">
+            <div class="top"><div class="av">R</div>
+              <div><h3>Rahim wants to send you</h3><small>24 photos · 312 MB · Wi-Fi</small></div></div>
+            <div class="files"><i class="p2"></i><i class="p3"></i><i class="p5"></i><i class="p6"></i><i class="p4"></i><em>+19</em></div>
+            <div class="btns"><span>Decline</span><span class="main">Accept</span></div>
+          </div>
+        </div>
+        <!-- Compact: receiving -->
+        <div class="view" data-v="recv">
+          <div class="cmp">
+            <div class="l"><i class="thumb p2"></i><span>Rahim</span></div>
+            <div class="r"><span class="pct" id="recvPct">0%</span>
+              <svg class="ring" viewBox="0 0 24 24"><circle class="bg" cx="12" cy="12" r="9"/><circle class="fg" id="recvRing" cx="12" cy="12" r="9" stroke-dasharray="56.5" stroke-dashoffset="56.5" style="stroke:#22C3B0"/></svg></div>
+          </div>
+        </div>
+        <!-- Done -->
+        <div class="view" data-v="done">
+          <div class="cmp"><div class="l"><span class="check">✓</span><span id="doneL">Received</span></div><div class="r"><span id="doneR">24 from Rahim</span><i class="thumb p2"></i></div></div>
+        </div>
+        <!-- Scanning -->
+        <div class="view" data-v="scan">
+          <div class="cmp"><div class="l"><span class="face spin">☺</span><span>Scanning</span></div><div class="r"><span class="pct" style="color:#22C3B0" id="scanN">1,204 / 4,812</span></div></div>
+        </div>
+        <!-- Toast -->
+        <div class="view" data-v="toast">
+          <div class="cmp"><div class="l"><span>🗑</span><span>3 to trash</span></div><div class="r"><span style="color:var(--accent)">Undo</span></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="row" id="states">
+      <button class="play" data-s="story">▶ Play the whole story</button>
+      <button data-s="send">Sending</button><button data-s="sendx">Expanded</button><button data-s="ask">Incoming</button>
+      <button data-s="recv">Receiving</button><button data-s="done">Done</button><button data-s="scan">Scanning</button>
+      <button data-s="toast">Quick message</button><button data-s="off">Hide</button>
+    </div>
+  </div>
+
+  <div class="col">
+    <h2>In the background · Android notifications</h2>
+    <div class="shade">
+      <div class="sbar">
+        <span class="clock">9:41</span>
+        <span class="chip"><svg class="mini" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="rgba(255,184,158,.3)" stroke-width="4"/><circle cx="12" cy="12" r="9" fill="none" stroke="#FFB89E" stroke-width="4" stroke-dasharray="56.5" stroke-dashoffset="20" transform="rotate(-90 12 12)"/></svg>64% · Maya</span>
+        <span>▲ ◔ 82%</span>
+      </div>
+      <div class="tag" style="margin:-8px 0 6px">↑ Android 16 "Live Update" chip in the status bar, next to the clock</div>
+
+      <div class="n heads">
+        <div class="nh"><span class="appicon">✈</span>ShareBro · Incoming · now</div>
+        <div class="nb"><div class="t"><b>Rahim wants to send you 24 photos</b><span>312 MB over Wi-Fi · from Rahim's iPhone</span></div><i class="pic p2"></i></div>
+        <div class="na"><span>Decline</span><span class="fill">Accept</span></div>
+      </div>
+      <div class="tag">Pops up on top of any app — answer without opening ShareBro</div>
+
+      <div class="n">
+        <div class="nh"><span class="appicon">✈</span>ShareBro · Sending · 6.2 MB/s</div>
+        <div class="nb"><div class="t"><b>Sending to Maya's Pixel</b><span>8 of 24 photos · 14 s left</span></div><i class="pic p1"></i></div>
+        <div class="npbar"><div></div></div>
+        <div class="na"><span>Cancel</span><span>Open</span></div>
+      </div>
+
+      <div class="n">
+        <div class="nh"><span class="appicon">✈</span>ShareBro · Received · 2 min ago</div>
+        <div class="nb"><div class="t"><b>Got 24 photos from Rahim ✓</b><span>Saved to the ShareBro album · faces will be found</span></div></div>
+        <div class="bigpic"><div class="p2"></div><div class="p3"></div><div class="p5"></div></div>
+        <div class="na"><span class="fill">Open</span><span>Share</span></div>
+      </div>
+
+      <div class="n">
+        <div class="nh"><span class="appicon">✈</span>ShareBro · Scanning</div>
+        <div class="nb"><div class="t"><b>Finding faces · 1,204 of 4,812</b><span>23 people so far · about 6 min left</span></div></div>
+        <div class="npbar scan"><div></div></div>
+        <div class="na"><span>Pause</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="legend">
+  <div><b>One island, many moments</b>Sending, receiving, incoming requests, scanning and quick messages all appear in the same pill at the top, so you always know where to look.</div>
+  <div><b>Answer from anywhere</b>Incoming requests drop down with Accept and Decline inside the island — or as a pop-up notification when you're in another app.</div>
+  <div><b>Live, not just text</b>Progress rings, speed, time left and a thumbnail of what's being sent, updated live. A ✓ and a photo preview when it's done.</div>
+  <div><b>Calm by design</b>Separate notification categories (requests, progress, finished, scanning) so you can silence one without losing the others.</div>
+</div>
+
+<script>
+(() => {
+  const island = document.getElementById('island');
+  const views = [...island.querySelectorAll('.view')];
+  const sizes = { send: 'compact', sendx: 'expanded', ask: 'ask', recv: 'compact', done: 'wide', scan: 'compact', toast: 'toast' };
+  let state = 'off', progress = 0, timer = null, story = [];
+
+  function show(s) {
+    state = s;
+    island.className = 'island' + (s === 'off' ? '' : ' on ' + sizes[s]);
+    views.forEach(v => v.classList.toggle('show', v.dataset.v === s));
+    document.querySelectorAll('#states button').forEach(b => b.classList.toggle('on', b.dataset.s === s));
+  }
+  function bump() { island.classList.remove('bump'); void island.offsetWidth; island.classList.add('bump'); }
+  function setProgress(p) {
+    progress = p;
+    const off = 56.5 * (1 - p);
+    document.getElementById('sendRing').style.strokeDashoffset = off;
+    document.getElementById('recvRing').style.strokeDashoffset = off;
+    const pct = Math.round(p * 100) + '%';
+    document.getElementById('sendPct').textContent = pct;
+    document.getElementById('recvPct').textContent = pct;
+    document.getElementById('xBar').style.width = pct;
+    document.getElementById('xSent').textContent = Math.round(312 * p) + ' MB of 312 MB';
+    document.getElementById('xLeft').textContent = Math.max(0, Math.round(50 * (1 - p))) + ' s left';
+    document.getElementById('xFile').textContent = `IMG_${2033 + Math.floor(p * 24)}.jpg · ${Math.min(24, Math.floor(p * 24) + 1)} of 24`;
+  }
+  // Progress ticks along while sending/receiving; the island "gulps" as files land.
+  setInterval(() => {
+    if (!['send', 'sendx', 'recv'].includes(state)) return;
+    const before = Math.floor(progress * 24);
+    setProgress(Math.min(1, progress + .012));
+    if (Math.floor(progress * 24) > before && state !== 'sendx') bump();
+  }, 120);
+  let scanned = 1204;
+  setInterval(() => { if (state === 'scan') { scanned = Math.min(4812, scanned + 17); document.getElementById('scanN').textContent = scanned.toLocaleString() + ' / 4,812'; } }, 120);
+
+  island.onclick = () => {
+    if (state === 'send') show('sendx'); else if (state === 'sendx') show('send');
+    else if (state === 'ask') { show('recv'); setProgress(0); }
+  };
+
+  function clearStory() { story.forEach(clearTimeout); story = []; }
+  function at(ms, f) { story.push(setTimeout(f, ms)); }
+  function playStory() {
+    clearStory(); setProgress(0); show('off');
+    at(600, () => show('ask'));
+    at(3200, () => { setProgress(0); show('recv'); });
+    at(7000, () => { setProgress(1); document.getElementById('doneL').textContent = 'Received'; document.getElementById('doneR').textContent = '24 from Rahim'; show('done'); });
+    at(9500, () => show('off'));
+    at(10400, () => { setProgress(0); show('send'); });
+    at(12500, () => show('sendx'));
+    at(15500, () => show('send'));
+    at(18200, () => { setProgress(1); document.getElementById('doneL').textContent = 'Sent'; document.getElementById('doneR').textContent = '24 to Maya'; show('done'); });
+    at(20700, () => show('toast'));
+    at(23000, () => show('scan'));
+    at(26500, () => show('off'));
+  }
+
+  document.querySelectorAll('#states button').forEach(b => b.onclick = () => {
+    const s = b.dataset.s;
+    if (s === 'story') { playStory(); return; }
+    clearStory();
+    if (s === 'send' || s === 'recv' || s === 'sendx') { if (progress >= 1) setProgress(0); }
+    if (s === 'done') document.getElementById('doneL').textContent = 'Received'; document.getElementById('doneR').textContent = '24 from Rahim';
+    show(s);
+  });
+  playStory();
+})();
+</script>
+</body>
+</html>

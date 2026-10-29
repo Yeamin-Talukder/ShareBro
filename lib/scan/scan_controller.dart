@@ -1,0 +1,646 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:isolate';
+import 'dart:math' as math;
+import 'dart:ui' show Rect;
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show AppLifecycleListener;
+import 'package:image/image.dart' as img;
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:photo_manager/photo_manager.dart';
+
+import '../data/dates.dart';
+import '../data/db.dart';
+import '../data/gallery.dart';
+import '../face/clustering.dart';
+import '../face/face_engine.dart';
+import '../face/tags.dart';
+import '../share/receive.dart' show receivedAlbum;
+import '../share/send_center.dart';
+import 'background.dart';
+
+/// Longest side of the image the face finder looks at. Bigger finds smaller
+/// faces in group shots but is slower.
+const _scanSize = 1600;
+const _pageSize = 200;
+
+/// How many of the latest faces the scan screen shows.
+const _recentLimit = 60;
+
+/// Counts worth a little celebration on the scan screen.
+const _photoMilestones = [100, 250, 500, 1000, 2000, 3000, 5000, 10000];
+const _faceMilestones = [50, 100, 250, 500, 1000, 2500, 5000];
+
+/// Faces at least this similar to a named person are offered in review.
+const _suggestMin = 0.33;
+
+const _strictnessKey = 'strictness';
+const _autoScanKey = 'auto_scan';
+const _appLockKey = 'app_lock';
+
+/// People this much below the auto-merge level are offered as "same person?".
+const _mergeHintRange = 0.12;
+const _maxMergeHints = 15;
+
+/// Similarity where the app is least sure whether a lone face is someone.
+const _unsure = 0.42;
+
+/// Something to decide on the review screen.
+sealed class ReviewItem {}
+
+/// An unnamed group: "Who is this?"
+class GroupReview extends ReviewItem {
+  GroupReview(this.person, this.faces);
+
+  final PersonSummary person;
+  final List<FaceThumb> faces;
+}
+
+/// Two people who look alike: "Same person?"
+class MergeReview extends ReviewItem {
+  MergeReview(this.a, this.b, this.facesA, this.facesB, this.similarity);
+
+  final PersonSummary a, b;
+  final List<FaceThumb> facesA, facesB;
+  final double similarity;
+}
+
+/// A lone face that looks like someone already named: "Is this Rahim?"
+class FaceReview extends ReviewItem {
+  FaceReview(this.faceId, this.thumb, this.person, this.similarity);
+
+  final int faceId;
+  final Uint8List thumb;
+  final PersonSummary person;
+  final double similarity;
+}
+
+/// Runs scans and grouping, and tells the UI what's happening.
+class ScanController extends ChangeNotifier {
+  ScanController(this.db);
+
+  final AppDb db;
+  FaceEngine? _engine;
+
+  bool running = false;
+  bool _cancel = false;
+  String? albumName;
+  int? tripId;
+  int total = 0;
+  int done = 0;
+  int skipped = 0;
+  int facesFound = 0;
+  String? error;
+  DateTime? _startedAt;
+
+  /// Newest first; drives the live face stream on the scan screen.
+  final List<Uint8List> recentFaces = [];
+
+  /// The photo being scanned right now, with the faces found in it, for the
+  /// live preview. [previewId] changes with every photo.
+  Uint8List? preview;
+  double previewAspect = 1;
+  List<Rect> previewFaces = const [];
+  List<Uint8List> previewThumbs = const [];
+  int previewId = 0;
+
+  /// Rough count of different people seen during this scan (groups of 2+
+  /// similar faces), for the live counter. The real grouping runs at the end.
+  int peopleSoFar = 0;
+  final List<Float32List> _liveSums = [];
+  final List<int> _liveCounts = [];
+
+  final _milestones = StreamController<String>.broadcast();
+
+  /// "1,000 photos scanned!" and similar, as they happen.
+  Stream<String> get milestones => _milestones.stream;
+
+  /// People in the trip once the last scan finished (null while scanning).
+  int? peopleFound;
+
+  double strictness = GroupingThresholds.defaultStrictness;
+
+  /// Bumped whenever the people list may have changed.
+  int revision = 0;
+
+  /// Scan new photos in already-scanned albums by themselves.
+  bool autoScanEnabled = true;
+
+  /// Ask for fingerprint / face / screen lock when opening the app.
+  bool appLock = false;
+
+  Timer? _autoScanTimer;
+  AppLifecycleListener? _lifecycle;
+
+  /// Sending to friends' phones and web galleries (LocalSend protocol).
+  late final SendCenter sharing;
+
+  Future<void> load() async {
+    sharing = await SendCenter.create(db);
+    // Photos friends send us get scanned like any other album.
+    sharing.receiver.onSaved = (_) => scanReceived();
+    final s = await db.setting(_strictnessKey);
+    strictness = double.tryParse(s ?? '') ?? GroupingThresholds.defaultStrictness;
+    autoScanEnabled = (await db.setting(_autoScanKey)) != '0';
+    appLock = (await db.setting(_appLockKey)) == '1';
+    backfillDates();
+    _watchForNewPhotos();
+  }
+
+  Future<void> setAutoScan(bool on) async {
+    autoScanEnabled = on;
+    await db.setSetting(_autoScanKey, on ? '1' : '0');
+    notifyListeners();
+    if (on) _queueAutoScan();
+  }
+
+  Future<void> setAppLock(bool on) async {
+    appLock = on;
+    await db.setSetting(_appLockKey, on ? '1' : '0');
+    notifyListeners();
+  }
+
+  /// New photos (or coming back to the app) trigger a quiet scan of trips
+  /// whose album has grown, a few seconds later.
+  void _watchForNewPhotos() {
+    _lifecycle = AppLifecycleListener(onResume: _queueAutoScan);
+    _queueAutoScan(const Duration(seconds: 4));
+    try {
+      PhotoManager.addChangeCallback((_) => _queueAutoScan());
+      PhotoManager.startChangeNotify();
+    } catch (e) {
+      debugPrint('Photo change notifications unavailable: $e');
+    }
+  }
+
+  void _queueAutoScan([Duration delay = const Duration(seconds: 8)]) {
+    _autoScanTimer?.cancel();
+    _autoScanTimer = Timer(delay, autoScan);
+  }
+
+  bool _receivedPending = false;
+
+  /// Scans the album received photos are saved in (after the current scan,
+  /// if one is running).
+  Future<void> scanReceived() async {
+    if (running) {
+      _receivedPending = true;
+      return;
+    }
+    // The gallery takes a moment to list newly saved photos.
+    await Future<void>.delayed(const Duration(seconds: 2));
+    final albums = await Gallery.albums();
+    final album = albums.where((a) => a.name == receivedAlbum).firstOrNull;
+    if (album != null) await scan(album);
+  }
+
+  /// Scans the first trip album that has photos the app hasn't seen yet.
+  /// Date-limited trips are left alone: their range is fixed.
+  Future<void> autoScan() async {
+    if (!autoScanEnabled || running) return;
+    try {
+      final ps = await PhotoManager.getPermissionState(
+          requestOption: const PermissionRequestOption());
+      if (!ps.hasAccess) return;
+      final scanned = await db.scannedAssetIds();
+      for (final trip in await db.trips()) {
+        if (trip.albumId.contains('@')) continue;
+        final album = await Gallery.albumById(trip.albumId);
+        if (album == null) continue;
+        final count = await album.assetCountAsync;
+        if (count == 0) continue;
+        // Only the newest few are checked; new photos arrive at the top.
+        final newest = await album.getAssetListRange(start: 0, end: count.clamp(1, 60));
+        if (newest.any((a) => !scanned.contains(a.id))) {
+          debugPrint('Auto-scanning ${trip.name}');
+          await scan(album);
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Auto-scan skipped: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _autoScanTimer?.cancel();
+    _lifecycle?.dispose();
+    super.dispose();
+  }
+
+  /// Reads "date taken" for photos scanned before dates were stored, so the
+  /// date filter works for them too. Runs quietly after startup.
+  Future<void> backfillDates() async {
+    try {
+      final ids = await db.photosWithoutDate();
+      if (ids.isEmpty) return;
+      final dates = <String, DateTime>{};
+      for (final id in ids) {
+        final asset = await AssetEntity.fromId(id);
+        if (asset != null) dates[id] = asset.createDateTime;
+        if (dates.length == 200) {
+          await db.setTakenAt(dates);
+          dates.clear();
+        }
+      }
+      await db.setTakenAt(dates);
+      changed();
+    } catch (e) {
+      debugPrint('Date backfill failed: $e');
+    }
+  }
+
+  GroupingThresholds get thresholds =>
+      GroupingThresholds.fromStrictness(strictness);
+
+  Duration? get eta {
+    final start = _startedAt;
+    final work = done - skipped;
+    if (start == null || work < 5) return null;
+    final perPhoto = DateTime.now().difference(start) ~/ work;
+    return perPhoto * (total - done);
+  }
+
+  void cancel() => _cancel = true;
+
+  /// Scans [album], or only its photos taken within [dates].
+  Future<void> scan(AssetPathEntity album, {DaySpan? dates}) async {
+    if (running) return;
+    final base = album.isAll ? 'All photos' : album.name;
+    if (dates != null) album = await Gallery.inRange(album, dates);
+    final source = album;
+    // A date-limited scan is its own trip.
+    final key = dates == null
+        ? album.id
+        : '${album.id}@${dates.start.millisecondsSinceEpoch}-${dates.end.millisecondsSinceEpoch}';
+    await _scanSource(
+      name: dates == null ? base : '$base · ${formatSpan(dates)}',
+      key: key,
+      total: await source.assetCountAsync,
+      page: (start, end) => source.getAssetListRange(start: start, end: end),
+    );
+  }
+
+  /// Scans every photo inside a folder on the phone (and its subfolders),
+  /// e.g. one picked with the folder picker. [folder] is a path like
+  /// `/storage/emulated/0/DCIM/Trip` or a relative one like `DCIM/Trip`.
+  Future<int> scanFolder(String folder) async {
+    if (running) return 0;
+    final relative = folderToRelative(folder);
+    final all = await Gallery.allPhotos();
+    if (all == null) return 0;
+    final count = await all.assetCountAsync;
+    final matches = <AssetEntity>[];
+    for (var i = 0; i < count; i += 500) {
+      for (final a in await all.getAssetListRange(start: i, end: (i + 500).clamp(0, count))) {
+        final path = (a.relativePath ?? '').toLowerCase();
+        if (path.startsWith(relative.toLowerCase())) matches.add(a);
+      }
+    }
+    if (matches.isEmpty) return 0;
+    final name = relative.split('/').where((part) => part.isNotEmpty).lastOrNull ?? 'Folder';
+    unawaited(_scanSource(
+      name: name,
+      key: 'folder:${relative.toLowerCase()}',
+      total: matches.length,
+      page: (start, end) async => matches.sublist(start, end),
+    ));
+    return matches.length;
+  }
+
+  Future<void> _scanSource({
+    required String name,
+    required String key,
+    required int total,
+    required Future<List<AssetEntity>> Function(int start, int end) page,
+  }) async {
+    if (running) return;
+    running = true;
+    _cancel = false;
+    error = null;
+    albumName = name;
+    done = skipped = facesFound = 0;
+    peopleFound = null;
+    recentFaces.clear();
+    preview = null;
+    peopleSoFar = 0;
+    _liveSums.clear();
+    _liveCounts.clear();
+    this.total = total;
+    tripId = await db.tripForAlbum(key, name);
+    notifyListeners();
+    await ScanNotification.start('Starting…');
+
+    final tmp = File(p.join((await getTemporaryDirectory()).path, 'scan.jpg'));
+    try {
+      _engine ??= await FaceEngine.load();
+      final scanned = await db.scannedAssetIds();
+      final tagged = await db.taggedAssetIds(tagVersion);
+      _startedAt = DateTime.now();
+
+      for (var start = 0; start < total && !_cancel; start += _pageSize) {
+        final assets = await page(start, (start + _pageSize).clamp(0, total));
+        await db.addToTrip(tripId!, assets.map((a) => a.id));
+        for (final asset in assets) {
+          if (_cancel) break;
+          if (tagged.contains(asset.id)) {
+            skipped++;
+          } else {
+            // Already-scanned photos only need categorising, not faces.
+            await _scanOne(asset, tmp, facesDone: scanned.contains(asset.id));
+          }
+          final facesBefore = facesFound;
+          done++;
+          _celebrate(facesBefore);
+          // Every photo when scanning (live preview), less often when skipping.
+          if (!tagged.contains(asset.id) || done % 20 == 0) notifyListeners();
+          if (done % 5 == 0) {
+            ScanNotification.update('$done of $total photos · $facesFound faces');
+          }
+        }
+      }
+      final took = DateTime.now().difference(_startedAt!);
+      final work = done - skipped;
+      // Kept in release builds: the one line that tells how fast scanning is.
+      debugPrint('Scan done: $work photos scanned ($skipped skipped), $facesFound faces '
+          'in ${took.inSeconds}s'
+          '${work > 0 ? ' = ${(took.inMilliseconds / work).round()} ms/photo' : ''}');
+      ScanNotification.update('Grouping faces…');
+      await regroup();
+      peopleFound = (await db.people(tripId: tripId)).length;
+    } catch (e, st) {
+      debugPrint('Scan failed: $e\n$st');
+      error = '$e';
+    } finally {
+      if (await tmp.exists()) await tmp.delete();
+      await ScanNotification.stop();
+      running = false;
+      if (_receivedPending) {
+        _receivedPending = false;
+        unawaited(scanReceived());
+      }
+      _startedAt = null;
+      revision++;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _scanOne(AssetEntity asset, File tmp,
+      {required bool facesDone}) async {
+    try {
+      // A downscaled, already-rotated JPEG from the photo library. The
+      // original photo is never touched.
+      final w = asset.width, h = asset.height;
+      final size = (w <= 0 || h <= 0)
+          ? const ThumbnailSize.square(_scanSize)
+          : w >= h
+              ? ThumbnailSize(_scanSize, _scanSize * h ~/ w)
+              : ThumbnailSize(_scanSize * w ~/ h, _scanSize);
+      final bytes = await asset.thumbnailDataWithSize(size, quality: 90);
+      if (bytes == null) return;
+      await tmp.writeAsBytes(bytes, flush: true);
+      preview = bytes;
+      final shown = asset.orientatedSize;
+      previewAspect =
+          shown.width > 0 && shown.height > 0 ? shown.width / shown.height : 1;
+      previewFaces = const [];
+      previewThumbs = const [];
+      previewId++;
+      if (!facesDone) {
+        final faces = await _engine!.analyze(tmp.path);
+        previewFaces = [
+          for (final f in faces) Rect.fromLTWH(f.left, f.top, f.width, f.height),
+        ];
+        previewThumbs = [for (final f in faces) f.thumb];
+        facesFound += faces.length;
+        for (final f in faces) {
+          _countLive(f.embedding);
+        }
+        for (final f in faces) {
+          recentFaces.insert(0, f.thumb);
+        }
+        if (recentFaces.length > _recentLimit) {
+          recentFaces.removeRange(_recentLimit, recentFaces.length);
+        }
+        await db.savePhoto(asset.id, faces, takenAt: asset.createDateTime);
+      }
+      await _tag(asset, tmp.path);
+    } catch (e) {
+      // One broken photo shouldn't stop a 5,000-photo scan.
+      debugPrint('Skipping ${asset.id}: $e');
+    }
+  }
+
+  /// Quick leader clustering, only for the "≈ N people so far" estimate.
+  void _countLive(Float32List v) {
+    final limit = thresholds.cluster;
+    var best = -1;
+    var bestSim = limit;
+    for (var c = 0; c < _liveSums.length; c++) {
+      final sum = _liveSums[c];
+      var dot = 0.0, norm = 0.0;
+      for (var i = 0; i < v.length; i++) {
+        dot += sum[i] * v[i];
+        norm += sum[i] * sum[i];
+      }
+      final sim = norm == 0 ? 0 : dot / math.sqrt(norm);
+      if (sim >= bestSim) {
+        bestSim = sim.toDouble();
+        best = c;
+      }
+    }
+    if (best < 0) {
+      _liveSums.add(Float32List.fromList(v));
+      _liveCounts.add(1);
+      return;
+    }
+    final sum = _liveSums[best];
+    for (var i = 0; i < v.length; i++) {
+      sum[i] += v[i];
+    }
+    if (++_liveCounts[best] == 2) peopleSoFar++;
+  }
+
+  void _celebrate(int facesBefore) {
+    if (_photoMilestones.contains(done)) {
+      _milestones.add('${_thousands(done)} photos scanned!');
+    }
+    for (final m in _faceMilestones) {
+      if (facesBefore < m && facesFound >= m) {
+        _milestones.add('${_thousands(m)} faces found!');
+      }
+    }
+  }
+
+  static String _thousands(int n) => n >= 1000
+      ? '${n ~/ 1000},${(n % 1000).toString().padLeft(3, '0')}'
+      : '$n';
+
+  /// Works out the photo's categories (selfie, beach, screenshot, …).
+  Future<void> _tag(AssetEntity asset, String imagePath) async {
+    final stats = await db.faceStats(asset.id);
+    final labels = await _engine!.labels(imagePath);
+    final ll = await asset.latlngAsync();
+    final hasLocation = ll != null && (ll.latitude != 0 || ll.longitude != 0);
+    final size = asset.orientatedSize;
+    await db.savePhotoMeta(
+      asset.id,
+      hash: await _hash(asset),
+      lat: hasLocation ? ll.latitude : null,
+      lng: hasLocation ? ll.longitude : null,
+      quality: photoQuality(
+        faceCount: stats.count,
+        avgSharpness: stats.avgSharpness,
+        minEyesOpen: stats.minEyes,
+        maxSmile: stats.maxSmile,
+      ),
+    );
+    final tags = tagsFor(PhotoFacts(
+      faceCount: stats.count,
+      maxFaceArea: stats.maxArea,
+      minFaceSharpness: stats.minSharpness,
+      width: size.width.round(),
+      height: size.height.round(),
+      folder: asset.relativePath ?? '',
+      title: asset.title ?? '',
+      hasLocation: hasLocation,
+      labels: labels,
+      minEyesOpen: stats.minEyes,
+      maxSmile: stats.maxSmile,
+      maxYaw: stats.maxYaw,
+    ));
+    await db.saveTags(asset.id, tags, tagVersion);
+  }
+
+  /// Duplicate fingerprint from a tiny thumbnail (cheap to decode).
+  Future<int?> _hash(AssetEntity asset) async {
+    final bytes = await asset.thumbnailDataWithSize(
+        const ThumbnailSize.square(48), quality: 80);
+    if (bytes == null) return null;
+    final small = img.decodeImage(bytes);
+    if (small == null) return null;
+    final tiny = img.copyResize(small, width: 9, height: 8,
+        interpolation: img.Interpolation.average);
+    return differenceHash([
+      for (var y = 0; y < 8; y++)
+        for (var x = 0; x < 9; x++) tiny.getPixel(x, y).luminance.toInt(),
+    ]);
+  }
+
+  /// Groups every face that isn't in a person yet.
+  Future<void> regroup({bool fromScratch = false}) async {
+    if (fromScratch) await db.resetAutoGroups();
+    final input = await _groupingInput(thresholds, fromScratch: false);
+    final result = await Isolate.run(() => groupFaces(input));
+    await db.applyGrouping(result.assignToExisting, result.newGroups);
+    changed();
+  }
+
+  /// How many people regrouping from scratch at [value] would give.
+  Future<int> previewStrictness(double value) async {
+    final input = await _groupingInput(
+        GroupingThresholds.fromStrictness(value),
+        fromScratch: true);
+    return Isolate.run(() => previewGroupCount(input));
+  }
+
+  Future<void> setStrictness(double value) async {
+    strictness = value;
+    await db.setSetting(_strictnessKey, '$value');
+    await regroup(fromScratch: true);
+  }
+
+  Future<GroupingInput> _groupingInput(GroupingThresholds t,
+      {required bool fromScratch}) async {
+    final faces = await db.allFaces();
+    final named = fromScratch ? await db.namedPersonIds() : const <int>{};
+    // In a from-scratch preview, only named people and hand-placed faces
+    // keep their person; everything else is regrouped.
+    int? keep(FaceRecord f) => !fromScratch ||
+            f.locked ||
+            (f.personId != null && named.contains(f.personId))
+        ? f.personId
+        : null;
+    return GroupingInput(
+      [for (final f in faces) f.id],
+      [for (final f in faces) f.embedding],
+      [for (final f in faces) keep(f)],
+      [for (final f in faces) f.locked],
+      t,
+    );
+  }
+
+  /// Everything waiting for a decision: unnamed groups first, then lone
+  /// faces that resemble someone already named.
+  Future<List<ReviewItem>> reviewQueue() async {
+    final items = <ReviewItem>[];
+    final people = {for (final p in await db.people()) p.id: p};
+    final allFaces = await db.allFaces();
+
+    // 1. "Same person?" pairs — one answer fixes many photos at once.
+    final everyone = <int, List<Float32List>>{};
+    for (final f in allFaces) {
+      if (f.personId != null && people.containsKey(f.personId)) {
+        everyone.putIfAbsent(f.personId!, () => []).add(f.embedding);
+      }
+    }
+    final mergeInput = MergeInput(everyone, await db.dismissedPairs(),
+        thresholds.merge - _mergeHintRange, thresholds.merge);
+    final merges = await Isolate.run(() => suggestMerges(mergeInput));
+    for (final m in merges.take(_maxMergeHints)) {
+      final a = people[m.a]!, b = people[m.b]!;
+      items.add(MergeReview(a, b, await db.facesOf(a.id, limit: 3),
+          await db.facesOf(b.id, limit: 3), m.similarity));
+    }
+
+    // 2. Unnamed groups, biggest first.
+    final groups = await db.unreviewedGroups()
+      ..sort((x, y) => y.photoCount.compareTo(x.photoCount));
+    for (final g in groups) {
+      items.add(GroupReview(g, await db.facesOf(g.id, limit: 6)));
+    }
+
+    final named = await db.namedPersonIds();
+    if (named.isEmpty) return items;
+    final byPerson = <int, List<Float32List>>{};
+    for (final f in allFaces) {
+      if (f.personId != null && named.contains(f.personId)) {
+        byPerson.putIfAbsent(f.personId!, () => []).add(f.embedding);
+      }
+    }
+    final unsorted = await db.unsortedFaces();
+    final thumbs = {for (final u in unsorted) u.id: u.thumb};
+    final input = SuggestInput(
+        byPerson, {for (final u in unsorted) u.id: u.embedding}, _suggestMin);
+    // 3. Lone faces, least certain first: those answers teach the most.
+    final matches = await Isolate.run(() => suggestMatches(input))
+      ..sort((x, y) => (x.similarity - _unsure).abs().compareTo((y.similarity - _unsure).abs()));
+    for (final m in matches) {
+      final person = people[m.personId];
+      if (person == null) continue;
+      items.add(FaceReview(m.faceId, thumbs[m.faceId]!, person, m.similarity));
+    }
+    return items;
+  }
+
+  /// Call after any manual edit (rename, merge, remove) so screens refresh.
+  void changed() {
+    revision++;
+    notifyListeners();
+  }
+}
+
+/// `DCIM/Trip/` from `/storage/emulated/0/DCIM/Trip` (or a picker's
+/// `primary:DCIM/Trip`), which is how the gallery names folders.
+String folderToRelative(String folder) {
+  var f = folder.replaceAll('\\', '/');
+  final colon = f.indexOf(':');
+  if (colon >= 0 && !f.startsWith('/')) f = f.substring(colon + 1);
+  final m = RegExp(r'^/storage/(emulated/\d+|[^/]+)/').firstMatch(f);
+  if (m != null) f = f.substring(m.end);
+  f = f.replaceAll(RegExp(r'^/+'), '');
+  return f.endsWith('/') || f.isEmpty ? f : '$f/';
+}

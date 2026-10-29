@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Galaxy background demo</title>
+<style>
+  :root { --ink: #F1EEF8; --muted: #A9A3BC; --line: rgba(255,255,255,.14); --glass: rgba(20,18,32,.55); --accent: #FF8A6B; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #05050A; color: var(--ink); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+         min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 26px 16px 48px; gap: 18px; }
+  header { text-align: center; max-width: 640px; }
+  header h1 { font-size: 26px; font-weight: 600; }
+  header p { color: var(--muted); font-size: 14px; line-height: 1.6; margin-top: 6px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .row button { border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--ink); font: 500 13px inherit;
+                padding: 9px 16px; border-radius: 999px; cursor: pointer; }
+  .row button.on { background: var(--ink); color: #111; border-color: var(--ink); }
+  .styles button { font-size: 14px; padding: 11px 20px; }
+  .desc { color: var(--muted); font-size: 13px; max-width: 520px; text-align: center; min-height: 40px; line-height: 1.55; }
+
+  .phone { width: 360px; max-width: 100%; aspect-ratio: 412 / 892; border-radius: 48px; position: relative; overflow: hidden;
+           box-shadow: 0 40px 120px rgba(80,60,160,.28), inset 0 0 0 1px rgba(255,255,255,.10); background: #05040A; touch-action: none; }
+  .phone::before { content: ''; position: absolute; top: 12px; left: 50%; width: 90px; height: 24px; margin-left: -45px;
+                   border-radius: 20px; background: #000; z-index: 30; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transition: filter .5s, transform .5s; }
+  .ui { position: absolute; inset: 0; z-index: 5; transition: opacity .4s; pointer-events: none; }
+  .ui.hidden { opacity: 0; }
+  .status { height: 46px; display: flex; justify-content: space-between; align-items: end; padding: 0 26px 2px; font-size: 12px; font-weight: 600; }
+  .actions { display: flex; justify-content: flex-end; gap: 16px; padding: 14px 22px 0; font-size: 18px; }
+  .title { font-size: 42px; font-weight: 700; letter-spacing: -1px; padding: 18px 22px 0; text-shadow: 0 2px 20px rgba(0,0,0,.5); }
+  .sub { color: var(--muted); font-size: 12.5px; padding: 4px 22px 0; }
+  .chips { display: flex; gap: 8px; padding: 16px 22px 0; }
+  .chip { border: 1px solid var(--line); background: rgba(255,255,255,.06); backdrop-filter: blur(8px); border-radius: 999px; padding: 7px 13px; font-size: 12px; color: var(--muted); }
+  .chip.on { color: var(--ink); border-color: rgba(255,255,255,.35); }
+  .people { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px 8px; padding: 22px 18px 0; }
+  .person { display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+  .person i { width: 78px; height: 78px; border-radius: 50%; display: block; box-shadow: 0 0 0 2px rgba(255,255,255,.18), 0 10px 24px rgba(0,0,0,.45); }
+  .person small { color: var(--muted); font-weight: 400; font-size: 11px; margin-top: -5px; }
+  .fab { position: absolute; right: 20px; bottom: 112px; height: 50px; padding: 0 20px; border-radius: 999px; background: var(--accent);
+         color: #2A120C; font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px; box-shadow: 0 10px 30px rgba(255,138,107,.35); }
+  .dock { position: absolute; left: 14px; right: 14px; bottom: 22px; height: 70px; border-radius: 28px; background: var(--glass);
+          backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); border: 1px solid var(--line);
+          display: flex; justify-content: space-around; align-items: center; font-size: 11px; color: var(--muted); }
+  .dock div { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .dock div b { font-size: 18px; font-weight: 400; }
+  .dock div.on { color: var(--accent); background: rgba(255,138,107,.14); border-radius: 22px; padding: 7px 14px; }
+  .hint { color: var(--muted); font-size: 12px; }
+  .p1 { background: linear-gradient(160deg,#E8B48A,#8C4A3B); } .p2 { background: linear-gradient(200deg,#9FB7C8,#3E5A73); }
+  .p3 { background: linear-gradient(140deg,#F2D6A2,#C08552); } .p4 { background: linear-gradient(180deg,#B9C7A5,#5D7550); }
+  .p5 { background: linear-gradient(120deg,#D9A7B0,#8A4E62); } .p6 { background: linear-gradient(170deg,#C5B5E0,#6B5A94); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Galaxy background · three styles</h1>
+  <p>Pick the one you like. Move the mouse over the phone (or tilt your phone) to feel the depth.</p>
+</header>
+
+<div class="row styles" id="styles">
+  <button data-s="spiral" class="on">1 · Spiral galaxy</button>
+  <button data-s="flight">2 · Star flight</button>
+  <button data-s="drift">3 · Milky Way drift</button>
+</div>
+<p class="desc" id="desc"></p>
+
+<div class="phone" id="phone">
+  <canvas id="sky"></canvas>
+  <div class="ui" id="ui">
+    <div class="status"><span>9:41</span><span>●●● ◔</span></div>
+    <div class="actions"><span>＋</span><span>➤</span><span>⋮</span></div>
+    <div class="title">People</div>
+    <div class="sub">Goa, March 2026 · 4,812 photos</div>
+    <div class="chips"><div class="chip on">All trips</div><div class="chip">Goa</div><div class="chip">Sylhet</div><div class="chip">Groups</div></div>
+    <div class="people">
+      <div class="person"><i class="p1"></i>Maya<small>214 photos</small></div>
+      <div class="person"><i class="p2"></i>Rahim<small>188 photos</small></div>
+      <div class="person"><i class="p3"></i>Nila<small>162 photos</small></div>
+      <div class="person"><i class="p5"></i>Arif<small>140 photos</small></div>
+      <div class="person"><i class="p6"></i>Tanvir<small>97 photos</small></div>
+      <div class="person"><i class="p4"></i>Sara<small>61 photos</small></div>
+    </div>
+    <div class="fab">◎ Scan</div>
+    <div class="dock"><div class="on"><b>☺</b>People</div><div><b>▢</b>Photos</div><div><b>▤</b>Albums</div><div><b>◎</b>Explore</div><div><b>⇄</b>Share</div></div>
+  </div>
+</div>
+
+<div class="row">
+  <button id="bUi" class="on">App screen on top</button>
+  <button id="bSpeed">Speed: calm</button>
+  <button id="bShoot">Shooting star</button>
+</div>
+<div class="row" id="blurs">
+  <button data-b="0">Blur: off</button>
+  <button data-b="4">Soft</button>
+  <button data-b="10" class="on">Dreamy</button>
+  <button data-b="20">Heavy</button>
+</div>
+<p class="hint">Everything is drawn in code (no video), so the app can draw it the same way.</p>
+
+<script>
+(() => {
+  const canvas = document.getElementById('sky'), ctx = canvas.getContext('2d'), phone = document.getElementById('phone');
+  let W = 0, H = 0, DPR = 1, speed = 1, style = 'spiral', blur = 10, K = 1;
+  const dot = (x, y, r) => { const d = r * K; ctx.fillRect(x - d / 2, y - d / 2, d, d); };
+  const TAU = Math.PI * 2;
+
+  let seed = 1;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  const gauss = () => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); };
+  const tints = ['255,255,255', '255,244,232', '232,238,255', '255,230,208', '216,228,255'];
+
+  // ---- Shared: depth from the pointer or the phone's tilt, eased. ----
+  const tilt = { x: 0, y: 0, tx: 0, ty: 0 };
+  phone.addEventListener('pointermove', e => {
+    const r = phone.getBoundingClientRect();
+    tilt.tx = ((e.clientX - r.left) / r.width - .5) * 2; tilt.ty = ((e.clientY - r.top) / r.height - .5) * 2;
+  });
+  phone.addEventListener('pointerleave', () => { tilt.tx = 0; tilt.ty = 0; });
+  addEventListener('deviceorientation', e => {
+    if (e.gamma == null) return;
+    tilt.tx = Math.max(-1, Math.min(1, e.gamma / 30)); tilt.ty = Math.max(-1, Math.min(1, (e.beta - 45) / 30));
+  });
+
+  // ---- Shared: faint far stars that twinkle. ----
+  const far = [];
+  function makeFar() {
+    far.length = 0; seed = 11;
+    for (let i = 0; i < 700; i++) far.push({ x: rnd(), y: rnd(), r: Math.pow(rnd(), 3) * 1.2 + .25, a: .2 + rnd() * .5,
+      ph: rnd() * TAU, sp: .5 + rnd() * 2, c: tints[(rnd() * 5) | 0], d: .2 + rnd() * .5 });
+  }
+  function drawFar(t, k = 1) {
+    for (const s of far) {
+      const tw = .55 + .45 * Math.sin(t * s.sp + s.ph);
+      const x = (s.x * W + tilt.x * 10 * s.d) % W, y = s.y * H + tilt.y * 10 * s.d;
+      ctx.fillStyle = `rgba(${s.c},${s.a * tw * k})`;
+      dot(x, y, s.r);
+    }
+  }
+
+  // ---- Shared: out-of-focus "bokeh" lights, only when blurred. ----
+  const bokeh = [];
+  function makeBokeh() {
+    bokeh.length = 0; seed = 51;
+    const cols = ['255,200,220', '190,200,255', '255,225,190', '180,240,235', '230,190,255'];
+    for (let i = 0; i < 30; i++) bokeh.push({ x: rnd(), y: rnd(), r: 5 + Math.pow(rnd(), 2) * 16, a: .4 + rnd() * .4,
+      c: cols[(rnd() * cols.length) | 0], ph: rnd() * TAU, sp: .2 + rnd() * .5, dx: (rnd() - .5) * .004, dy: -(.002 + rnd() * .004), d: .3 + rnd() });
+  }
+  function drawBokeh(t) {
+    if (!blur) return;
+    const k = Math.min(1, blur / 10);
+    for (const b of bokeh) {
+      const x = ((b.x + b.dx * t + 10) % 1) * W - tilt.x * 20 * b.d;
+      const y = ((b.y + b.dy * t + 10) % 1) * H - tilt.y * 16 * b.d;
+      const tw = .6 + .4 * Math.sin(t * b.sp + b.ph);
+      ctx.fillStyle = `rgba(${b.c},${b.a * tw * k})`;
+      ctx.beginPath(); ctx.arc(x, y, b.r * (1 + blur * .05), 0, TAU); ctx.fill();
+    }
+  }
+
+  // ---- Shared: nebula clouds, soft and breathing. ----
+  function cloud(x, y, r, col, a) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(${col},${a})`); g.addColorStop(.5, `rgba(${col},${a * .4})`); g.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+  }
+
+  // ---- Shared: shooting stars with a glowing head and sparkles. ----
+  const shots = [], sparks = [];
+  let nextShot = 3500;
+  function shoot() {
+    const left = Math.random() < .5;
+    shots.push({ x: (left ? .05 : .55) + Math.random() * .35, y: .04 + Math.random() * .3,
+      ang: (left ? .45 : 2.7) + (Math.random() - .5) * .3, sp: .55 + Math.random() * .35, t: 0, life: 1100 + Math.random() * 500 });
+  }
+  function drawShots(dt) {
+    nextShot -= dt * speed;
+    if (nextShot <= 0) { shoot(); nextShot = 5000 + Math.random() * 6000; }
+    for (let i = shots.length - 1; i >= 0; i--) {
+      const s = shots[i]; s.t += dt; const p = s.t / s.life;
+      if (p >= 1) { shots.splice(i, 1); continue; }
+      const dist = s.sp * Math.min(W, H) * 1.4 * p;
+      const hx = s.x * W + Math.cos(s.ang) * dist, hy = s.y * H + Math.sin(s.ang) * dist;
+      const len = Math.min(W, H) * .32 * Math.min(1, p * 4) * (1 - p * .5);
+      const tx = hx - Math.cos(s.ang) * len, ty = hy - Math.sin(s.ang) * len;
+      const fade = Math.sin(p * Math.PI);
+      const g = ctx.createLinearGradient(tx, ty, hx, hy);
+      g.addColorStop(0, 'rgba(160,190,255,0)'); g.addColorStop(.7, `rgba(210,225,255,${.35 * fade})`); g.addColorStop(1, `rgba(255,250,240,${.95 * fade})`);
+      ctx.strokeStyle = g; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hx, hy); ctx.stroke();
+      cloud(hx, hy, 7, '255,245,230', .8 * fade);
+      if (Math.random() < .5) sparks.push({ x: hx, y: hy, vx: (Math.random() - .5) * .04, vy: (Math.random() - .5) * .04 + .02, t: 0, life: 500 + Math.random() * 400 });
+    }
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const s = sparks[i]; s.t += dt; const p = s.t / s.life;
+      if (p >= 1) { sparks.splice(i, 1); continue; }
+      s.x += s.vx * dt; s.y += s.vy * dt;
+      ctx.fillStyle = `rgba(255,240,220,${(1 - p) * .7})`; dot(s.x, s.y, 1.4);
+    }
+  }
+
+  // ==== 1. Spiral galaxy ====
+  const gal = [];
+  function makeGalaxy() {
+    gal.length = 0; seed = 21;
+    const ARMS = 2;
+    for (let i = 0; i < 9000; i++) {
+      const kind = rnd();
+      let r, a, c, al, size;
+      if (kind < .12) {                       // the bulge: a round, warm core
+        r = Math.abs(gauss()) * .07; a = rnd() * TAU;
+        c = rnd() < .5 ? '255,226,190' : '255,238,215'; al = .18 + rnd() * .32; size = .5 + rnd() * .8;
+      } else if (kind < .32) {                // faint disk between the arms
+        r = .05 + Math.pow(rnd(), .8) * .9; a = rnd() * TAU;
+        c = '190,195,240'; al = .08 + rnd() * .18; size = .4 + rnd() * .6;
+      } else {                                // the arms: a logarithmic spiral
+        r = .06 + Math.pow(rnd(), 1.15) * .92;
+        const arm = (i % ARMS) * TAU / ARMS;
+        a = arm + Math.log(r) * 3.1 + gauss() * .085 / (r + .06);
+        r += gauss() * .012;
+        const hot = rnd() < .05;              // pink star-forming knots
+        c = hot ? '255,140,185' : r < .25 ? '235,225,255' : rnd() < .65 ? '165,188,255' : '210,200,255';
+        al = (hot ? .6 : .3) + rnd() * .55; size = Math.pow(rnd(), 3) * 1.5 + .4;
+      }
+      // A few arm stars carry a soft glow, so the arms read as glowing gas.
+      const glow = kind >= .32 && rnd() < .05 ? (r < .3 ? '255,180,200' : '120,140,255') : null;
+      gal.push({ r: Math.max(.002, r), a, z: gauss() * .012, size, c, al, ph: rnd() * TAU, glow });
+    }
+  }
+  function drawSpiral(t, dt) {
+    drawFar(t, .9);
+    const cx = W * .5 + tilt.x * 16, cy = H * .3 + tilt.y * 12;
+    const R = Math.max(W, H) * .58;
+    const tiltY = .5 + tilt.y * .04, plane = -.5 + tilt.x * .05;
+    const cosP = Math.cos(plane), sinP = Math.sin(plane);
+    ctx.globalCompositeOperation = 'lighter';
+    // Halo and arms' glow.
+    cloud(cx, cy, R * .55, '110,90,220', .10);
+    cloud(cx, cy, R * .30, '255,170,150', .07);
+    for (const s of gal) {
+      // Inner stars orbit faster than outer ones (differential rotation).
+      const ang = s.a + t * .05 / Math.sqrt(s.r + .05);
+      const lx = Math.cos(ang) * s.r * R, ly = Math.sin(ang) * s.r * R * tiltY + s.z * R;
+      const x = cx + lx * cosP - ly * sinP, y = cy + lx * sinP + ly * cosP;
+      if (x < -4 || x > W + 4 || y < -4 || y > H + 4) continue;
+      const tw = .75 + .25 * Math.sin(t * 2 + s.ph);
+      if (s.glow) cloud(x, y, R * .045, s.glow, .05);
+      ctx.fillStyle = `rgba(${s.c},${s.al * tw})`;
+      dot(x, y, s.size);
+    }
+    // The bright core, gently pulsing.
+    const pulse = 1 + .05 * Math.sin(t * .8);
+    cloud(cx, cy, R * .14 * pulse, '255,215,180', .28);
+    cloud(cx, cy, R * .05 * pulse, '255,245,230', .45);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ==== 2. Star flight ====
+  const fly = [];
+  function makeFlight() {
+    fly.length = 0; seed = 31;
+    for (let i = 0; i < 900; i++) fly.push({ x: (rnd() - .5) * 2, y: (rnd() - .5) * 2, z: rnd(), c: tints[(rnd() * 5) | 0] });
+  }
+  function drawFlight(t, dt) {
+    // Nebula clouds drift slowly across, far behind.
+    ctx.globalCompositeOperation = 'lighter';
+    const m = Math.min(W, H);
+    cloud(W * (.25 + .05 * Math.sin(t * .05)) - tilt.x * 8, H * .22, m * .8, '120,80,220', .28);
+    cloud(W * (.85 + .04 * Math.cos(t * .04)) - tilt.x * 8, H * .48, m * .65, '230,80,140', .22);
+    cloud(W * (.35 + .05 * Math.cos(t * .03)) - tilt.x * 8, H * .84, m * .75, '40,170,190', .2);
+    drawFar(t, .6);
+    // Stars stream gently towards you from a vanishing point that follows the tilt.
+    const vx = W * .5 - tilt.x * 40, vy = H * .38 - tilt.y * 30;
+    const f = m * .55;
+    for (const s of fly) {
+      const pz = s.z;
+      s.z -= dt * .000045 * speed;
+      if (s.z <= .02) { s.z = 1; s.x = (Math.random() - .5) * 2; s.y = (Math.random() - .5) * 2; continue; }
+      const x = vx + s.x / s.z * f, y = vy + s.y / s.z * f;
+      if (x < -20 || x > W + 20 || y < -20 || y > H + 20) { s.z = 1; continue; }
+      const near = 1 - s.z;
+      const a = Math.min(1, near * 1.4);
+      // A short streak shows the motion; longer as stars come close.
+      const px = vx + s.x / pz * f, py = vy + s.y / pz * f;
+      ctx.strokeStyle = `rgba(${s.c},${a})`; ctx.lineWidth = (.4 + near * 1.8) * Math.sqrt(K); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(px + (px - x) * 6 * near, py + (py - y) * 6 * near); ctx.lineTo(x, y); ctx.stroke();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ==== 3. Milky Way drift (parallax layers) ====
+  let band = null;
+  const layers = [[], [], []];
+  function makeDrift() {
+    seed = 41;
+    const ang = -.95;
+    layers.forEach(l => l.length = 0);
+    for (let i = 0; i < 3600; i++) {
+      const along = (rnd() - .5) * 1.4, across = gauss() * .06 * (1 + .5 * Math.cos(along * 5));
+      const d = rnd() < .7 ? 0 : rnd() < .7 ? 1 : 2;
+      layers[d].push({ x: .5 + along * Math.cos(ang) - across * Math.sin(ang), y: .3 + along * Math.sin(ang) + across * Math.cos(ang),
+        r: (Math.pow(rnd(), 4) * 1.1 + .25) * (1 + d * .5), a: .2 + rnd() * .55, ph: rnd() * TAU, c: tints[(rnd() * 5) | 0] });
+    }
+    for (let i = 0; i < 260; i++) {
+      const d = 1 + (rnd() < .3 ? 1 : 0);
+      layers[d].push({ x: rnd(), y: rnd(), r: (Math.pow(rnd(), 3) * 1.4 + .4) * (1 + d * .4), a: .3 + rnd() * .6, ph: rnd() * TAU, c: tints[(rnd() * 5) | 0] });
+    }
+    // Pre-drawn glow and dust lanes of the band.
+    const S = Math.round(Math.max(W, H) * 1.6 * DPR) || 1;
+    band = document.createElement('canvas'); band.width = band.height = Math.min(S, 3000);
+    const b = band.getContext('2d'), n = band.width;
+    b.translate(n / 2, n * .4); b.rotate(ang);
+    const blobs = [[0, 0, .2, '255,214,170', .5], [-.12, .01, .15, '255,196,160', .38], [.13, -.01, .15, '255,210,178', .34],
+      [-.28, .02, .16, '160,140,255', .3], [.3, -.02, .17, '130,160,255', .28], [-.44, 0, .15, '120,96,230', .22],
+      [.46, .01, .15, '80,170,230', .2], [.05, .05, .1, '255,120,170', .24], [-.2, -.05, .09, '255,140,190', .2]];
+    for (const [x, y, r, c, a] of blobs) {
+      b.save(); b.scale(1, .42);
+      const g = b.createRadialGradient(x * n, y * n / .42, 0, x * n, y * n / .42, r * n);
+      g.addColorStop(0, `rgba(${c},${a})`); g.addColorStop(1, `rgba(${c},0)`);
+      b.fillStyle = g; b.beginPath(); b.arc(x * n, y * n / .42, r * n, 0, TAU); b.fill(); b.restore();
+    }
+    b.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 34; i++) {
+      const x = (rnd() - .5) * .8 * n, y = gauss() * .012 * n, rx = (.03 + rnd() * .07) * n, ry = (.006 + rnd() * .012) * n;
+      b.save(); b.translate(x, y); b.scale(1, ry / rx);
+      const g = b.createRadialGradient(0, 0, 0, 0, 0, rx);
+      g.addColorStop(0, 'rgba(0,0,0,.75)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      b.fillStyle = g; b.beginPath(); b.arc(0, 0, rx, 0, TAU); b.fill(); b.restore();
+    }
+  }
+  function drawDrift(t, dt) {
+    drawFar(t, .7);
+    ctx.globalCompositeOperation = 'lighter';
+    // The band breathes and drifts a touch; nebula clouds swell around it.
+    const drift = Math.sin(t * .05) * 10;
+    const breathe = .85 + .15 * Math.sin(t * .35);
+    ctx.globalAlpha = breathe;
+    const n = band.width / DPR;
+    ctx.drawImage(band, W / 2 - n / 2 + drift - tilt.x * 6, H * .4 - n * .4 - tilt.y * 6, n, n);
+    ctx.globalAlpha = 1;
+    cloud(W * .2 - tilt.x * 8, H * .2, W * .55 * breathe, '200,90,170', .08);
+    cloud(W * .85 - tilt.x * 8, H * .12, W * .45, '90,120,255', .08);
+    // Three layers at three depths: nearer ones move more with the tilt.
+    layers.forEach((layer, d) => {
+      const px = drift * (1 + d) - tilt.x * (6 + d * 14), py = -tilt.y * (6 + d * 12);
+      for (const s of layer) {
+        const tw = .6 + .4 * Math.sin(t * (1 + d * .6) + s.ph);
+        const x = s.x * W + px, y = s.y * H + py;
+        if (s.r > 1.5) cloud(x, y, s.r * 3.5, s.c, .25 * s.a * tw);
+        ctx.fillStyle = `rgba(${s.c},${s.a * tw})`;
+        dot(x, y, s.r);
+      }
+    });
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  const styles = {
+    spiral: { make: makeGalaxy, draw: drawSpiral, text: 'A whole spiral galaxy above the title, its two arms turning slowly — inner stars orbit faster than the outer ones, the core glows and gently pulses, pink star-forming knots dot the arms.' },
+    flight: { make: makeFlight, draw: drawFlight, text: 'Gliding calmly through deep space: stars drift towards you from a vanishing point and stretch into soft streaks as they pass, with violet, rose and teal nebulae far behind.' },
+    drift:  { make: makeDrift,  draw: drawDrift,  text: 'The Milky Way band with dust lanes, now in three layers of stars at different depths — tilt and the near stars move more than the far ones. Nebula clouds breathe slowly around it.' },
+  };
+
+  function resize() {
+    const r = canvas.getBoundingClientRect();
+    if (r.width < 1) return;
+    DPR = Math.min(devicePixelRatio || 1, 2); W = r.width; H = r.height;
+    canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+    makeFar(); makeBokeh(); styles[style].make();
+  }
+
+  let last = performance.now(), clock = 0;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (!W) { resize(); return; }
+    const dt = Math.min(now - last, 100); last = now;
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    clock += still ? 0 : dt * speed;
+    const t = clock / 1000;
+    tilt.x += (tilt.tx - tilt.x) * .05; tilt.y += (tilt.ty - tilt.y) * .05;
+
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#0A0918'); bg.addColorStop(.55, '#06050E'); bg.addColorStop(1, '#0A0610');
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+    styles[style].draw(t, still ? 0 : dt * speed);
+    ctx.globalCompositeOperation = 'lighter';
+    drawBokeh(t);
+    if (!still) drawShots(dt * speed);
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Calm, darker ground under the faces and the nav bar.
+    const v = ctx.createLinearGradient(0, H * .45, 0, H);
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.45)');
+    ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  }
+
+  // Controls.
+  const desc = document.getElementById('desc');
+  function pick(s) {
+    style = s; desc.textContent = styles[s].text;
+    document.querySelectorAll('#styles button').forEach(b => b.classList.toggle('on', b.dataset.s === s));
+    if (W) styles[s].make();
+  }
+  document.querySelectorAll('#styles button').forEach(b => b.onclick = () => pick(b.dataset.s));
+  document.getElementById('bUi').onclick = e => { document.getElementById('ui').classList.toggle('hidden'); e.target.classList.toggle('on'); };
+  const speeds = [[1, 'calm'], [3, 'lively'], [10, 'fast']];
+  let si = 0;
+  document.getElementById('bSpeed').onclick = e => { si = (si + 1) % speeds.length; speed = speeds[si][0]; e.target.textContent = 'Speed: ' + speeds[si][1]; };
+  document.getElementById('bShoot').onclick = shoot;
+
+  function setBlur(b) {
+    blur = b;
+    // Bigger, brighter dots under more blur; the canvas grows a little so
+    // the soft edges stay outside the screen.
+    K = 1 + b * .22;
+    canvas.style.filter = b ? `blur(${b}px) saturate(1.25) brightness(${1 + b * .025})` : 'none';
+    canvas.style.transform = b ? `scale(${1 + b * .006})` : 'none';
+    document.querySelectorAll('#blurs button').forEach(x => x.classList.toggle('on', +x.dataset.b === b));
+  }
+  document.querySelectorAll('#blurs button').forEach(x => x.onclick = () => setBlur(+x.dataset.b));
+  setBlur(10);
+  pick('spiral');
+  new ResizeObserver(resize).observe(canvas);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

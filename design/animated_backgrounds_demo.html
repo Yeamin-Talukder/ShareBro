@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Animated backgrounds demo</title>
+<style>
+  :root { --ink: #F1EEF8; --muted: #A9A3BC; --line: rgba(255,255,255,.14); --glass: rgba(20,18,32,.55); --accent: #FF8A6B; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #05050A; color: var(--ink); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+         min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 26px 16px 48px; gap: 16px; }
+  header { text-align: center; max-width: 660px; }
+  header h1 { font-size: 26px; font-weight: 600; }
+  header p { color: var(--muted); font-size: 14px; line-height: 1.6; margin-top: 6px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 700px; }
+  .row button { border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--ink); font: 500 13px inherit;
+                padding: 9px 15px; border-radius: 999px; cursor: pointer; }
+  .row button.on { background: var(--ink); color: #111; border-color: var(--ink); }
+  .styles button { font-size: 14px; padding: 11px 18px; }
+  .desc { color: var(--muted); font-size: 13.5px; max-width: 540px; text-align: center; min-height: 44px; line-height: 1.55; }
+  .desc b { color: var(--ink); font-weight: 600; }
+
+  .phone { width: 360px; max-width: 100%; aspect-ratio: 412 / 892; border-radius: 48px; position: relative; overflow: hidden;
+           box-shadow: 0 40px 120px rgba(80,60,160,.28), inset 0 0 0 1px rgba(255,255,255,.10); background: #05040A; }
+  .phone::before { content: ''; position: absolute; top: 12px; left: 50%; width: 90px; height: 24px; margin-left: -45px;
+                   border-radius: 20px; background: #000; z-index: 30; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .ui { position: absolute; inset: 0; z-index: 5; transition: opacity .4s; pointer-events: none; }
+  .ui.hidden { opacity: 0; }
+  .status { height: 46px; display: flex; justify-content: space-between; align-items: end; padding: 0 26px 2px; font-size: 12px; font-weight: 600; }
+  .actions { display: flex; justify-content: flex-end; gap: 16px; padding: 14px 22px 0; font-size: 18px; }
+  .title { font-size: 42px; font-weight: 700; letter-spacing: -1px; padding: 18px 22px 0; text-shadow: 0 2px 20px rgba(0,0,0,.5); }
+  .sub { color: var(--muted); font-size: 12.5px; padding: 4px 22px 0; }
+  .chips { display: flex; gap: 8px; padding: 16px 22px 0; }
+  .chip { border: 1px solid var(--line); background: rgba(10,8,20,.35); backdrop-filter: blur(10px); border-radius: 999px; padding: 7px 13px; font-size: 12px; color: var(--muted); }
+  .chip.on { color: var(--ink); border-color: rgba(255,255,255,.35); }
+  .people { display: grid; grid-template-columns: repeat(3,1fr); gap: 18px 8px; padding: 22px 18px 0; }
+  .person { display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; text-shadow: 0 1px 8px rgba(0,0,0,.7); }
+  .person i { width: 78px; height: 78px; border-radius: 50%; display: block; box-shadow: 0 0 0 2px rgba(255,255,255,.18), 0 10px 24px rgba(0,0,0,.45); }
+  .person small { color: var(--muted); font-weight: 400; font-size: 11px; margin-top: -5px; }
+  .fab { position: absolute; right: 20px; bottom: 112px; height: 50px; padding: 0 20px; border-radius: 999px; background: var(--accent);
+         color: #2A120C; font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px; box-shadow: 0 10px 30px rgba(255,138,107,.35); }
+  .dock { position: absolute; left: 14px; right: 14px; bottom: 22px; height: 70px; border-radius: 28px; background: var(--glass);
+          backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); border: 1px solid var(--line);
+          display: flex; justify-content: space-around; align-items: center; font-size: 11px; color: var(--muted); }
+  .dock div { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .dock div b { font-size: 18px; font-weight: 400; }
+  .dock div.on { color: var(--accent); background: rgba(255,138,107,.14); border-radius: 22px; padding: 7px 14px; }
+  .hint { color: var(--muted); font-size: 12px; text-align: center; max-width: 540px; line-height: 1.6; }
+  .p1 { background: linear-gradient(160deg,#E8B48A,#8C4A3B); } .p2 { background: linear-gradient(200deg,#9FB7C8,#3E5A73); }
+  .p3 { background: linear-gradient(140deg,#F2D6A2,#C08552); } .p4 { background: linear-gradient(180deg,#B9C7A5,#5D7550); }
+  .p5 { background: linear-gradient(120deg,#D9A7B0,#8A4E62); } .p6 { background: linear-gradient(170deg,#C5B5E0,#6B5A94); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Animated backgrounds for ShareBro</h1>
+  <p>Five styles running behind the same People screen. Switch between them, hide the screen to see the background alone, and change the speed.</p>
+</header>
+
+<div class="row styles" id="styles">
+  <button data-s="galaxy" class="on">1 · Dreamy galaxy</button>
+  <button data-s="memories">2 · Floating memories</button>
+  <button data-s="liquid">3 · Liquid gradient</button>
+  <button data-s="constellation">4 · Constellation</button>
+  <button data-s="aurora">5 · Aurora ribbons</button>
+</div>
+<p class="desc" id="desc"></p>
+
+<div class="phone" id="phone">
+  <canvas id="sky"></canvas>
+  <div class="ui" id="ui">
+    <div class="status"><span>9:41</span><span>●●● ◔</span></div>
+    <div class="actions"><span>＋</span><span>➤</span><span>⋮</span></div>
+    <div class="title">People</div>
+    <div class="sub">Goa, March 2026 · 4,812 photos</div>
+    <div class="chips"><div class="chip on">All trips</div><div class="chip">Goa</div><div class="chip">Sylhet</div><div class="chip">Groups</div></div>
+    <div class="people">
+      <div class="person"><i class="p1"></i>Maya<small>214 photos</small></div>
+      <div class="person"><i class="p2"></i>Rahim<small>188 photos</small></div>
+      <div class="person"><i class="p3"></i>Nila<small>162 photos</small></div>
+      <div class="person"><i class="p5"></i>Arif<small>140 photos</small></div>
+      <div class="person"><i class="p6"></i>Tanvir<small>97 photos</small></div>
+      <div class="person"><i class="p4"></i>Sara<small>61 photos</small></div>
+    </div>
+    <div class="fab">◎ Scan</div>
+    <div class="dock"><div class="on"><b>☺</b>People</div><div><b>▢</b>Photos</div><div><b>▤</b>Albums</div><div><b>◎</b>Explore</div><div><b>⇄</b>Share</div></div>
+  </div>
+</div>
+
+<div class="row">
+  <button id="bUi" class="on">App screen on top</button>
+  <button id="bSpeed">Speed: calm</button>
+  <button id="bEvent">Play "sent!" moment</button>
+</div>
+<p class="hint">"Sent!" moment: a one-off flourish the app could play when a transfer finishes — each style has its own.<br>
+In the real app the "photos" in style 2 would be your own trip photos, blurred and dimmed.</p>
+
+<script>
+(() => {
+  const canvas = document.getElementById('sky'), ctx = canvas.getContext('2d');
+  const TAU = Math.PI * 2;
+  let W = 0, H = 0, DPR = 1, speed = 1, style = 'galaxy', clock = 0;
+  let seed = 1;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  const gauss = () => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); };
+  const glow = (x, y, r, c, a) => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(${c},${a})`); g.addColorStop(.5, `rgba(${c},${a * .4})`); g.addColorStop(1, `rgba(${c},0)`);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+  };
+  const bg = (top, mid, bottom) => {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, top); g.addColorStop(.55, mid); g.addColorStop(1, bottom);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  };
+  // One-off "sent!" flourish, shared by all styles (each draws it its own way).
+  let event = -1;
+
+  // ===== 1. Dreamy galaxy =====
+  const gal = [], bokeh = [];
+  const galaxy = {
+    text: '<b>Dreamy galaxy.</b> A soft, out-of-focus spiral galaxy turning very slowly, with blurred bokeh lights floating upward and twinkling. Calm and premium. <b>Sent!</b> → the core flares and a shooting star crosses.',
+    filter: 'blur(9px) saturate(1.25) brightness(1.2)', scale: 1.06,
+    make() {
+      gal.length = 0; bokeh.length = 0; seed = 21;
+      for (let i = 0; i < 6000; i++) {
+        const k = rnd(); let r, a, c, al, s;
+        if (k < .12) { r = Math.abs(gauss()) * .07; a = rnd() * TAU; c = '255,230,200'; al = .2 + rnd() * .3; s = 2.2; }
+        else if (k < .3) { r = .05 + Math.pow(rnd(), .8) * .9; a = rnd() * TAU; c = '190,195,240'; al = .08 + rnd() * .15; s = 2; }
+        else { r = .06 + Math.pow(rnd(), 1.15) * .92; a = (i % 2) * Math.PI + Math.log(r) * 3.1 + gauss() * .085 / (r + .06);
+               c = rnd() < .05 ? '255,140,185' : r < .25 ? '235,225,255' : '165,188,255'; al = .3 + rnd() * .5; s = 2.4; }
+        gal.push({ r, a, c, al, s });
+      }
+      const cols = ['255,200,220', '190,200,255', '255,225,190', '180,240,235', '230,190,255'];
+      for (let i = 0; i < 28; i++) bokeh.push({ x: rnd(), y: rnd(), r: 6 + Math.pow(rnd(), 2) * 18, a: .35 + rnd() * .4,
+        c: cols[(rnd() * 5) | 0], ph: rnd() * TAU, dx: (rnd() - .5) * .004, dy: -(.002 + rnd() * .004) });
+    },
+    draw(t, e) {
+      bg('#0B0A1A', '#07060F', '#0A0610');
+      ctx.globalCompositeOperation = 'lighter';
+      const cx = W * .5, cy = H * .17, R = Math.max(W, H) * .5;
+      glow(cx, cy, R * .5, '110,90,220', .1);
+      for (const s of gal) {
+        const ang = s.a + t * .04 / Math.sqrt(s.r + .05);
+        const lx = Math.cos(ang) * s.r * R, ly = Math.sin(ang) * s.r * R * .5;
+        const x = cx + lx * .88 + ly * .48, y = cy - lx * .48 * .5 + ly * .88;
+        ctx.fillStyle = `rgba(${s.c},${s.al})`; ctx.fillRect(x, y, s.s, s.s);
+      }
+      const flare = e >= 0 ? Math.sin(Math.min(1, e) * Math.PI) : 0;
+      glow(cx, cy, R * .13 * (1 + .05 * Math.sin(t * .8) + flare * .6), '255,215,180', .22 + flare * .4);
+      for (const b of bokeh) {
+        const x = ((b.x + b.dx * t + 10) % 1) * W, y = ((b.y + b.dy * t + 10) % 1) * H;
+        ctx.fillStyle = `rgba(${b.c},${b.a * (.6 + .4 * Math.sin(t * .4 + b.ph))})`;
+        ctx.beginPath(); ctx.arc(x, y, b.r, 0, TAU); ctx.fill();
+      }
+      if (e >= 0 && e < 1.2) {               // a shooting star
+        const p = e / 1.2, hx = W * (.1 + .9 * p), hy = H * (.08 + .25 * p);
+        ctx.strokeStyle = `rgba(255,245,230,${Math.sin(p * Math.PI)})`; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(hx - W * .3, hy - H * .08); ctx.lineTo(hx, hy); ctx.stroke();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    },
+  };
+
+  // ===== 2. Floating memories =====
+  const cards = [];
+  let cardArt = [];
+  function paintPhoto(w, h, k) {
+    // Stand-in "photos": sunsets, beaches, mountains, forests, city lights.
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d');
+    const scenes = [
+      ['#FFB27A', '#E8457A', '#3A1E3F', '#2A1426'], ['#9FD3E6', '#4A90B8', '#E8D4A2', '#C9A46A'],
+      ['#B9C9E8', '#6E7FB8', '#3C4A6E', '#22283F'], ['#BFE3B0', '#5E9A63', '#2E5238', '#1C3324'],
+      ['#2A1F4A', '#141030', '#FFCF7A', '#FF8A5C'], ['#FFD9B0', '#F29C6B', '#7A4A6E', '#3E2440'],
+    ];
+    const [a, b, d, e] = scenes[k % scenes.length];
+    const sky = g.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, a); sky.addColorStop(.6, b); sky.addColorStop(1, d);
+    g.fillStyle = sky; g.fillRect(0, 0, w, h);
+    g.fillStyle = 'rgba(255,240,210,.85)'; g.beginPath(); g.arc(w * (.3 + (k % 3) * .2), h * .38, w * .09, 0, TAU); g.fill();
+    g.fillStyle = e; g.beginPath(); g.moveTo(0, h * .75);
+    for (let x = 0; x <= w; x += w / 6) g.lineTo(x, h * (.55 + .18 * Math.sin(x / w * 7 + k)));
+    g.lineTo(w, h); g.lineTo(0, h); g.fill();
+    // Two little people, because these are friends' trip photos.
+    g.fillStyle = 'rgba(20,12,20,.8)';
+    for (const px of [.45, .58]) { g.beginPath(); g.arc(w * px, h * .62, w * .035, 0, TAU); g.fill(); g.fillRect(w * (px - .03), h * .65, w * .06, h * .16); }
+    return c;
+  }
+  const memories = {
+    text: '<b>Floating memories.</b> Soft, blurred copies of your own trip photos drift slowly upward like floating cards, turning a little and fading in and out. Personal — no other app looks like this. <b>Sent!</b> → the photos rise faster and glow.',
+    filter: 'blur(5px) saturate(1.15)', scale: 1.04,
+    make() {
+      cards.length = 0; seed = 61;
+      cardArt = Array.from({ length: 12 }, (_, k) => paintPhoto(160, 200, k));
+      for (let i = 0; i < 18; i++) {
+        const s = 95 + rnd() * 90;
+        cards.push({ x: rnd(), y: rnd(), w: s, h: s * (rnd() < .5 ? 1.25 : .8), rot: (rnd() - .5) * .5, vr: (rnd() - .5) * .06,
+          vy: .006 + rnd() * .01, art: (rnd() * 12) | 0, depth: .4 + rnd() * .6, ph: rnd() * TAU });
+      }
+      cards.sort((a, b) => a.depth - b.depth);
+    },
+    draw(t, e) {
+      bg('#120E1E', '#0B0914', '#0E0A12');
+      const boost = e >= 0 ? Math.sin(Math.min(1, e / 1.5) * Math.PI) : 0;
+      for (const c of cards) {
+        const y = (((c.y - c.vy * t * c.depth - boost * .05) % 1.3) + 1.3) % 1.3 - .15;
+        const x = c.x * W + Math.sin(t * .2 + c.ph) * 12;
+        ctx.save(); ctx.translate(x, y * H); ctx.rotate(c.rot + Math.sin(t * c.vr + c.ph) * .15);
+        ctx.globalAlpha = Math.min(1, (.5 + .3 * c.depth) * (.75 + .25 * Math.sin(t * .3 + c.ph)) + boost * .3);
+        const w = c.w * c.depth, h = c.h * c.depth;
+        ctx.beginPath(); ctx.roundRect(-w / 2, -h / 2, w, h, 10); ctx.clip();
+        ctx.drawImage(cardArt[c.art], -w / 2, -h / 2, w, h);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+      // Darken so text stays easy to read.
+      ctx.fillStyle = 'rgba(8,6,14,.28)'; ctx.fillRect(0, 0, W, H);
+    },
+  };
+
+  // ===== 3. Liquid gradient =====
+  const liquid = {
+    text: '<b>Liquid gradient.</b> Big, soft colour shapes in the brand colours slowly melt and flow into each other, like an animated wallpaper. The lightest on the battery, and the only one that also works well in light mode. <b>Sent!</b> → a warm wave washes across.',
+    filter: 'blur(38px) saturate(1.3)', scale: 1.25,
+    make() {},
+    draw(t, e) {
+      ctx.fillStyle = '#0B0816'; ctx.fillRect(0, 0, W, H);
+      const blobs = [
+        ['255,122,80', .32, .18, .46, .9, .7], ['232,69,122', .78, .3, .42, .7, 1.1], ['123,97,255', .25, .62, .5, 1.2, .8],
+        ['34,195,176', .8, .8, .44, .8, 1.3], ['255,180,120', .55, .45, .3, 1.5, .6],
+      ];
+      for (const [c, bx, by, r, fx, fy] of blobs) {
+        const x = W * (bx + .16 * Math.sin(t * .09 * fx + bx * 9)), y = H * (by + .1 * Math.cos(t * .08 * fy + by * 7));
+        ctx.fillStyle = `rgba(${c},.75)`;
+        ctx.beginPath(); ctx.ellipse(x, y, W * r, W * r * (.8 + .2 * Math.sin(t * .2 + fx)), t * .05 * fx, 0, TAU); ctx.fill();
+      }
+      if (e >= 0 && e < 2) {
+        const p = e / 2;
+        ctx.fillStyle = `rgba(255,190,140,${.6 * Math.sin(p * Math.PI)})`;
+        ctx.beginPath(); ctx.ellipse(W * (-.3 + 1.6 * p), H * .5, W * .45, H * .7, .3, 0, TAU); ctx.fill();
+      }
+      ctx.fillStyle = 'rgba(6,4,12,.45)'; ctx.fillRect(0, 0, W, H);
+    },
+  };
+
+  // ===== 4. Constellation =====
+  const nodes = [], pulses = [];
+  const constellation = {
+    text: '<b>Constellation.</b> Faint stars drift slowly; nearby ones join with fine lines like a star map, and now and then a glowing spark travels along a line — like a file going from one friend to another. <b>Sent!</b> → sparks race across the whole network.',
+    filter: 'none', scale: 1,
+    make() {
+      nodes.length = 0; pulses.length = 0; seed = 71;
+      for (let i = 0; i < 70; i++) nodes.push({ x: rnd() * W, y: rnd() * H, vx: (rnd() - .5) * .012, vy: (rnd() - .5) * .012,
+        r: 1 + rnd() * 1.8, c: rnd() < .3 ? '255,170,150' : rnd() < .5 ? '170,190,255' : '220,215,255', ph: rnd() * TAU });
+    },
+    draw(t, e, dt) {
+      bg('#0B0A1C', '#07060F', '#090612');
+      glow(W * .2, H * .15, W * .7, '110,90,220', .1); glow(W * .9, H * .7, W * .6, '232,69,122', .06);
+      const maxD = Math.min(W, H) * .26;
+      for (const n of nodes) {
+        n.x += n.vx * dt; n.y += n.vy * dt;
+        if (n.x < -20) n.x = W + 20; if (n.x > W + 20) n.x = -20; if (n.y < -20) n.y = H + 20; if (n.y > H + 20) n.y = -20;
+      }
+      const links = [];
+      ctx.lineWidth = .8;
+      for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j], d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (d < maxD) {
+          const al = (1 - d / maxD) * .35;
+          ctx.strokeStyle = `rgba(200,200,255,${al})`; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+          links.push([a, b]);
+        }
+      }
+      // Sparks travel along the lines, like files being sent.
+      if (links.length && Math.random() < (e >= 0 && e < 1.5 ? .5 : .02) * speed) {
+        const [a, b] = links[(Math.random() * links.length) | 0];
+        pulses.push({ a, b, t: 0, life: 900 + Math.random() * 600 });
+      }
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = pulses.length - 1; i >= 0; i--) {
+        const p = pulses[i]; p.t += dt; const k = p.t / p.life;
+        if (k >= 1) { pulses.splice(i, 1); continue; }
+        const x = p.a.x + (p.b.x - p.a.x) * k, y = p.a.y + (p.b.y - p.a.y) * k;
+        glow(x, y, 9, '255,170,140', .9 * Math.sin(k * Math.PI));
+      }
+      for (const n of nodes) {
+        const tw = .6 + .4 * Math.sin(t * 1.5 + n.ph);
+        glow(n.x, n.y, n.r * 5, n.c, .25 * tw);
+        ctx.fillStyle = `rgba(${n.c},${.9 * tw})`; ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, TAU); ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    },
+  };
+
+  // ===== 5. Aurora ribbons =====
+  const stars = [];
+  const aurora = {
+    text: '<b>Aurora ribbons.</b> Northern-lights curtains in teal, violet and pink slowly wave across the top of a starry night sky. The motion stays up high, so the faces and photos below sit on calm dark ground. <b>Sent!</b> → the aurora surges brighter.',
+    filter: 'blur(1.5px) saturate(1.2)', scale: 1.01,
+    make() {
+      stars.length = 0; seed = 81;
+      for (let i = 0; i < 380; i++) stars.push({ x: rnd(), y: rnd(), r: Math.pow(rnd(), 3) * 1.6 + .4, a: .3 + rnd() * .6, ph: rnd() * TAU });
+    },
+    draw(t, e) {
+      bg('#050B16', '#060812', '#08060E');
+      for (const s of stars) {
+        ctx.fillStyle = `rgba(255,255,255,${s.a * (.6 + .4 * Math.sin(t * 1.3 + s.ph))})`; ctx.fillRect(s.x * W, s.y * H, s.r, s.r);
+      }
+      const surge = e >= 0 ? Math.sin(Math.min(1, e / 2) * Math.PI) : 0;
+      ctx.globalCompositeOperation = 'lighter';
+      const ribbons = [['60,230,180', .16, .9, 0], ['140,110,255', .24, 1.3, 2], ['255,110,170', .32, .7, 4]];
+      for (const [c, base, f, ph] of ribbons) {
+        for (let x = -4; x < W + 4; x += 3) {
+          const u = x / W;
+          const y = H * (base + .05 * Math.sin(u * 5 * f + t * .35 + ph) + .03 * Math.sin(u * 13 + t * .6 + ph));
+          const h = H * (.16 + .07 * Math.sin(u * 4 + t * .25 + ph));
+          const a = (.10 + .08 * Math.sin(u * 9 + t * .5 + ph)) * (1 + surge * 1.5);
+          const g = ctx.createLinearGradient(0, y - h, 0, y + h * .25);
+          g.addColorStop(0, `rgba(${c},0)`); g.addColorStop(.75, `rgba(${c},${a})`); g.addColorStop(1, `rgba(${c},0)`);
+          ctx.fillStyle = g; ctx.fillRect(x, y - h, 3.2, h * 1.25);
+        }
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    },
+  };
+
+  const styles = { galaxy, memories, liquid, constellation, aurora };
+  function pick(s) {
+    style = s; event = -1;
+    document.getElementById('desc').innerHTML = styles[s].text;
+    canvas.style.filter = styles[s].filter;
+    canvas.style.transform = `scale(${styles[s].scale})`;
+    document.querySelectorAll('#styles button').forEach(b => b.classList.toggle('on', b.dataset.s === s));
+    if (W) styles[s].make();
+  }
+  function resize() {
+    const r = canvas.getBoundingClientRect();
+    if (r.width < 1) return;
+    DPR = Math.min(devicePixelRatio || 1, 2); W = r.width; H = r.height;
+    canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+    styles[style].make();
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (!W) { resize(); return; }
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const dt = still ? 0 : Math.min(now - last, 100) * speed; last = now;
+    clock += dt;
+    if (event >= 0) { event += dt / 1000; if (event > 3) event = -1; }
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    styles[style].draw(clock / 1000, event, dt);
+    // Calm, darker ground under the faces and the nav bar.
+    const v = ctx.createLinearGradient(0, H * .5, 0, H);
+    v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.4)');
+    ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  }
+
+  document.querySelectorAll('#styles button').forEach(b => b.onclick = () => pick(b.dataset.s));
+  document.getElementById('bUi').onclick = e => { document.getElementById('ui').classList.toggle('hidden'); e.target.classList.toggle('on'); };
+  const speeds = [[1, 'calm'], [3, 'lively'], [8, 'fast']];
+  let si = 0;
+  document.getElementById('bSpeed').onclick = e => { si = (si + 1) % speeds.length; speed = speeds[si][0]; e.target.textContent = 'Speed: ' + speeds[si][1]; };
+  document.getElementById('bEvent').onclick = () => { event = 0; };
+
+  pick('galaxy');
+  new ResizeObserver(resize).observe(canvas);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
