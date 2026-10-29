@@ -18,6 +18,7 @@ Future<void> main() async {
   final db = await AppDb.open();
   final controller = ScanController(db);
   await controller.load();
+  await Island.load(db);
   runApp(PhotoOrganizerApp(controller: controller));
 }
 
@@ -102,6 +103,7 @@ class _PhotoOrganizerAppState extends State<PhotoOrganizerApp>
         darkTheme: buildTheme(brandScheme(Brightness.dark)),
         themeMode: _brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
         navigatorKey: islandNavigator,
+        scaffoldMessengerKey: islandMessenger,
         // The island floats above every screen.
         builder: (context, child) => Island(
           controller: widget.controller,

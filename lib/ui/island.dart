@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../data/dates.dart';
+import '../data/db.dart';
 import '../scan/scan_controller.dart';
 import '../share/receive.dart';
 import '../share/send_center.dart';
@@ -15,6 +16,12 @@ import 'widgets.dart';
 
 /// The app's navigator, so the island can open screens from above it.
 final islandNavigator = GlobalKey<NavigatorState>();
+
+/// The app's messenger: quick messages fall back to bottom bars when the
+/// island is turned off.
+final islandMessenger = GlobalKey<ScaffoldMessengerState>();
+
+const _enabledKey = 'island_on';
 
 /// Springy, like the iPhone's Dynamic Island.
 const _spring = Cubic(0.2, 1.25, 0.3, 1);
@@ -44,9 +51,29 @@ class Island extends StatefulWidget {
   static final _toasts = StreamController<_Toast>.broadcast();
   static final _quiet = ValueNotifier<int>(0);
 
-  /// A short message in the island ("Copied", "3 moved to trash · Undo").
-  static void toast(String text, {IconData icon = Icons.check_rounded, String? action, VoidCallback? onAction}) =>
+  /// Off in Settings: nothing shows at the top; requests ask in a popup and
+  /// messages show as bars at the bottom instead.
+  static final enabled = ValueNotifier<bool>(true);
+
+  static Future<void> load(AppDb db) async => enabled.value = (await db.setting(_enabledKey)) != '0';
+
+  static Future<void> setEnabled(AppDb db, bool on) async {
+    enabled.value = on;
+    await db.setSetting(_enabledKey, on ? '1' : '0');
+  }
+
+  /// A short message in the island ("Copied", "3 moved to trash · Undo"),
+  /// or a bar at the bottom when the island is off.
+  static void toast(String text, {IconData icon = Icons.check_rounded, String? action, VoidCallback? onAction}) {
+    if (enabled.value) {
       _toasts.add(_Toast(text, icon, action, onAction));
+      return;
+    }
+    islandMessenger.currentState?.showSnackBar(SnackBar(
+      content: Row(children: [Icon(icon, size: 18), const SizedBox(width: 10), Expanded(child: Text(text))]),
+      action: action == null || onAction == null ? null : SnackBarAction(label: action, onPressed: onAction),
+    ));
+  }
 
   @override
   State<Island> createState() => _IslandState();
@@ -109,6 +136,7 @@ class _IslandState extends State<Island> {
     r.addListener(_changed);
     c.addListener(_onScan);
     Island._quiet.addListener(_changed);
+    Island.enabled.addListener(_changed);
   }
 
   @override
@@ -118,6 +146,7 @@ class _IslandState extends State<Island> {
     r.removeListener(_changed);
     c.removeListener(_onScan);
     Island._quiet.removeListener(_changed);
+    Island.enabled.removeListener(_changed);
     _transient?.cancel();
     _collapse?.cancel();
     super.dispose();
@@ -168,6 +197,7 @@ class _IslandState extends State<Island> {
   }
 
   _Kind get _kind {
+    if (!Island.enabled.value) return _Kind.none;
     final quiet = Island._quiet.value > 0;
     if (r.pending != null && !r.pending!.answered) return _Kind.ask;
     if (_toast != null) return _Kind.toast;

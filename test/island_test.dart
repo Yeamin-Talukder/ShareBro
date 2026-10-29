@@ -139,6 +139,28 @@ void main() {
     expect(find.text('Cancel'), findsNothing);
   });
 
+  testWidgets('turned off: no island, messages become bottom bars', (tester) async {
+    final c = _Controller();
+    c.sharing.jobs.add(_job());
+    Island.enabled.value = false;
+    addTearDown(() => Island.enabled.value = true);
+    await tester.pumpWidget(MediaQuery(
+      data: phone,
+      child: MaterialApp(
+        scaffoldMessengerKey: islandMessenger,
+        home: Island(controller: c, child: const Scaffold(body: SizedBox.expand())),
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 700));
+    // The sending pill would say "To Maya's Pixel 8 Pro".
+    expect(find.textContaining('To Maya'), findsNothing);
+    Island.toast('Copied', icon: Icons.copy_rounded);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(SnackBar), findsOneWidget);
+    expect(find.text('Copied'), findsOneWidget);
+  });
+
   testWidgets('quick messages show in the island', (tester) async {
     final c = _Controller();
     await tester.pumpWidget(MediaQuery(

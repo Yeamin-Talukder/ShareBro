@@ -241,13 +241,40 @@ class _IncomingWatcherState extends State<IncomingWatcher> {
     showMessageDialog(context, from: m.from, text: m.text);
   }
 
-  /// Requests are answered in the island (see island.dart); this just
-  /// gives a nudge when one arrives.
+  /// Requests are answered in the island (see island.dart); with the
+  /// island turned off, a popup asks instead.
   void _check() {
     final req = _r.pending;
     if (req == null || req == _shown || req.answered) return;
     _shown = req;
     Haptics.lift();
+    if (Island.enabled.value) return;
+    var open = true;
+    showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.download_rounded),
+        title: Text('${req.from} wants to send you ${req.summary}'),
+        content: Text('${formatBytes(req.totalBytes)} · via ${req.via}'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Decline')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Accept')),
+        ],
+      ),
+    ).then((yes) {
+      open = false;
+      req.answer(yes ?? false);
+    });
+    // Answered elsewhere (a notification button, or it timed out): close
+    // this popup (and only this one).
+    void closeIfAnswered() {
+      if (_r.pending == req && !req.answered) return;
+      _r.removeListener(closeIfAnswered);
+      if (open && mounted) Navigator.of(context).pop();
+    }
+
+    _r.addListener(closeIfAnswered);
   }
 
   @override

@@ -14,6 +14,7 @@ import '../scan/scan_controller.dart';
 import '../share/net.dart';
 import '../share/prepare.dart';
 import 'app_lock.dart';
+import 'island.dart';
 import 'storage_screen.dart';
 import 'aurora.dart';
 import 'widgets.dart';
@@ -383,6 +384,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         return;
                       }
                       await c.setAppLock(v);
+                      setState(() {});
+                    },
+                  ),
+                  SwitchListTile(
+                    secondary: const Icon(Icons.horizontal_rule_rounded),
+                    title: const Text('Island at the top'),
+                    subtitle: const Text(
+                      'Shows sending, receiving, scanning and requests in a pill. '
+                      'Off: requests ask in a popup, messages show at the bottom',
+                    ),
+                    value: Island.enabled.value,
+                    onChanged: (v) async {
+                      await Island.setEnabled(c.db, v);
                       setState(() {});
                     },
                   ),
