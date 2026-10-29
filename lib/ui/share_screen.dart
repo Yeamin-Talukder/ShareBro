@@ -11,6 +11,7 @@ import '../share/native_files.dart';
 import '../share/net.dart';
 import '../share/prepare.dart';
 import '../share/receive.dart';
+import 'app_picker.dart';
 import 'devices.dart';
 import 'file_icons.dart';
 import 'gallery_view.dart';
@@ -69,6 +70,12 @@ class _ShareTabState extends State<ShareTab> {
       ),
     );
     if (ids != null) _add(ids.map(SendItem.asset));
+  }
+
+  Future<void> _pickApps() async {
+    final items = await Navigator.push<List<SendItem>>(
+        context, MaterialPageRoute(builder: (_) => const AppPickerScreen()));
+    if (items != null) _add(items);
   }
 
   Future<void> _pickFiles() async {
@@ -197,6 +204,7 @@ class _ShareTabState extends State<ShareTab> {
         _PickButton(icon: Icons.folder_rounded, label: 'Folder', color: const Color(0xFFB8860B), onTap: _pickFolder),
         _PickButton(icon: Icons.notes_rounded, label: 'Text', color: const Color(0xFF2BB5A6), onTap: _writeText),
         _PickButton(icon: Icons.content_paste_rounded, label: 'Paste', color: const Color(0xFF6E5BFF), onTap: _paste),
+        _PickButton(icon: Icons.apps_rounded, label: 'Apps', color: const Color(0xFF3DDC84), onTap: _pickApps),
       ]),
       AnimatedSize(
         duration: 260.ms,

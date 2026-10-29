@@ -26,6 +26,7 @@ class MainActivity : FlutterFragmentActivity() {
         val messenger = flutterEngine.dartExecutor.binaryMessenger
         trash = TrashChannel(this, messenger)
         notify = NotifyChannel(applicationContext, messenger)
+        AppsChannel(applicationContext, messenger)
 
         // Android drops Wi-Fi multicast packets unless an app holds this lock;
         // LocalSend-style device discovery needs it while sharing is open.
