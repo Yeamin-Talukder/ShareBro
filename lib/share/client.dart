@@ -40,7 +40,11 @@ Future<LsResponse> postJson(
 }) async {
   final req = await client.postUrl(uri).timeout(timeout);
   req.headers.contentType = ContentType.json;
-  if (body != null) req.write(jsonEncode(body));
+  // Sized, not chunked: LocalSend's own client always sends a length, and
+  // some receivers drop chunked requests.
+  final bytes = body == null ? const <int>[] : utf8.encode(jsonEncode(body));
+  req.contentLength = bytes.length;
+  if (bytes.isNotEmpty) req.add(bytes);
   final res = await req.close().timeout(timeout);
   final text = await res.transform(utf8.decoder).join().timeout(timeout);
   Object? decoded;

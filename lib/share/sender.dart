@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import 'client.dart';
 import 'net.dart';
 import 'prepare.dart';
@@ -26,8 +28,33 @@ class CancelToken {
   void cancel() => cancelled = true;
 }
 
-/// Photos sent at the same time to one device.
-const _parallel = 3;
+/// Files sent at the same time to one device. Two keeps phones and the
+/// LocalSend apps comfortable (three could make some receivers drop
+/// connections).
+const _parallel = 2;
+
+/// A plain-language reason for a failed send, instead of a raw error like
+/// "HttpException: Connection reset by peer, uri = …".
+String explainSendError(Object e, String alias) {
+  final text = '$e'.toLowerCase();
+  if (e is TimeoutException || text.contains('timed out')) {
+    return '$alias didn\'t answer. Check that you\'re both on the same Wi-Fi or hotspot.';
+  }
+  if (e is HandshakeException || e is TlsException) {
+    return 'Couldn\'t connect securely to $alias. Find it again in the list and retry.';
+  }
+  if (text.contains('refused') || text.contains('no route') || text.contains('unreachable')) {
+    return 'Couldn\'t reach $alias. Open LocalSend there and make sure it can receive.';
+  }
+  if (text.contains('reset') || text.contains('closed') || text.contains('broken pipe')) {
+    return '$alias closed the connection. Try again — if it keeps happening, restart LocalSend there.';
+  }
+  if (e is SocketException || e is HttpException) return 'Lost the connection to $alias. Try again.';
+  return 'Something went wrong sending to $alias. Try again.';
+}
+
+/// Lost connections, as opposed to answers from the other device.
+bool _dropped(Object e) => e is SocketException || e is HttpException || e is HandshakeException;
 
 /// Waiting for the friend to tap "Accept" on their phone.
 const _acceptTimeout = Duration(minutes: 3);
@@ -47,33 +74,42 @@ class LsSender {
     void Function(int sentBytes, int totalBytes, int filesDone)? onProgress,
     void Function()? onAccepted,
   }) async {
-    final client = lsHttpClient(fingerprint: device.fingerprint)
-      ..connectionTimeout = const Duration(seconds: 8);
+    final client = lsHttpClient(fingerprint: device.fingerprint)..connectionTimeout = const Duration(seconds: 8);
     final byId = {for (var i = 0; i < files.length; i++) 'p$i': files[i]};
     try {
-      final LsResponse prep;
-      try {
-        prep = await postJson(
-          client,
-          device.uri('/prepare-upload', pin == null ? null : {'pin': pin}),
-          {
-            'info': identity.info(download: true).toJson(),
-            'files': {
-              for (final e in byId.entries)
-                e.key: LsFile(
-                  id: e.key,
-                  fileName: e.value.fileName,
-                  size: e.value.size,
-                  fileType: e.value.mime,
-                  preview: e.value.preview,
-                  modified: e.value.modified,
-                ).toJson(),
-            },
-          },
-          timeout: _acceptTimeout,
-        );
-      } on TimeoutException {
-        return SendResult(SendOutcome.declined, message: 'No answer from ${device.alias}');
+      final request = {
+        'info': identity.info(download: true).toJson(),
+        'files': {
+          for (final e in byId.entries)
+            e.key: LsFile(
+              id: e.key,
+              fileName: e.value.fileName,
+              size: e.value.size,
+              fileType: e.value.mime,
+              preview: e.value.preview,
+              modified: e.value.modified,
+            ).toJson(),
+        },
+      };
+      LsResponse? prep;
+      for (var attempt = 0; prep == null; attempt++) {
+        final started = DateTime.now();
+        try {
+          prep = await postJson(
+            client,
+            device.uri('/prepare-upload', pin == null ? null : {'pin': pin}),
+            request,
+            timeout: _acceptTimeout,
+          );
+        } on TimeoutException {
+          return SendResult(SendOutcome.declined, message: 'No answer from ${device.alias}');
+        } catch (e) {
+          // Dropped straight away (before they could even see the request):
+          // a stale or refused connection, worth one quick retry.
+          final quick = DateTime.now().difference(started) < const Duration(seconds: 4);
+          if (attempt > 0 || !quick || !_dropped(e) || (cancel?.cancelled ?? false)) rethrow;
+          await Future<void>.delayed(const Duration(milliseconds: 700));
+        }
       }
       switch (prep.status) {
         case 204:
@@ -98,6 +134,7 @@ class LsSender {
       var sentBytes = 0, filesDone = 0;
       final sent = <String>[], failed = <String>[];
       final queue = tokens.entries.toList();
+      Object? lastError;
 
       Future<void> worker() async {
         while (queue.isNotEmpty && !(cancel?.cancelled ?? false)) {
@@ -109,27 +146,35 @@ class LsSender {
           for (var attempt = 0; attempt < 3 && !ok && !(cancel?.cancelled ?? false); attempt++) {
             sentBytes -= fileBytes;
             fileBytes = 0;
+            // Retries get a fresh connection: the old one may be dead.
+            final http = attempt == 0
+                ? client
+                : (lsHttpClient(fingerprint: device.fingerprint)..connectionTimeout = const Duration(seconds: 8));
             try {
-              final req = await client.postUrl(device.uri('/upload', {
-                'sessionId': sessionId,
-                'fileId': entry.key,
-                'token': entry.value,
-              }));
+              final req = await http.postUrl(
+                device.uri('/upload', {'sessionId': sessionId, 'fileId': entry.key, 'token': entry.value}),
+              );
               req.contentLength = file.size;
               req.headers.contentType = ContentType.parse(file.mime);
-              await req.addStream(file.open().map((chunk) {
-                fileBytes += chunk.length;
-                sentBytes += chunk.length;
-                onProgress?.call(sentBytes, total, filesDone);
-                return chunk;
-              }));
+              await req.addStream(
+                file.open().map((chunk) {
+                  fileBytes += chunk.length;
+                  sentBytes += chunk.length;
+                  onProgress?.call(sentBytes, total, filesDone);
+                  return chunk;
+                }),
+              );
               final res = await req.close();
               await res.drain<void>();
               ok = res.statusCode >= 200 && res.statusCode < 300;
+              if (!ok) lastError = HttpException('Upload refused (${res.statusCode})');
               // A wrong token or a finished session won't get better by retrying.
               if (res.statusCode == 403 || res.statusCode == 409) break;
-            } catch (_) {
+            } catch (e) {
+              lastError = e;
               await Future<void>.delayed(Duration(milliseconds: 600 * (attempt + 1)));
+            } finally {
+              if (!identical(http, client)) http.close(force: true);
             }
           }
           (ok ? sent : failed).add(file.assetId);
@@ -142,8 +187,12 @@ class LsSender {
 
       if (cancel?.cancelled ?? false) {
         try {
-          await postJson(client, device.uri('/cancel', {'sessionId': sessionId}), null,
-              timeout: const Duration(seconds: 3));
+          await postJson(
+            client,
+            device.uri('/cancel', {'sessionId': sessionId}),
+            null,
+            timeout: const Duration(seconds: 3),
+          );
         } catch (_) {}
         return SendResult(SendOutcome.cancelled, sent: sent, failed: failed);
       }
@@ -151,12 +200,14 @@ class LsSender {
         failed.isEmpty ? SendOutcome.done : SendOutcome.failed,
         sent: sent,
         failed: failed,
-        message: failed.isEmpty ? null : '${failed.length} files didn\'t arrive',
+        message: failed.isEmpty
+            ? null
+            : '${failed.length} of ${tokens.length} didn\'t arrive. '
+                  '${lastError == null ? 'Try again.' : explainSendError(lastError!, device.alias)}',
       );
-    } on SocketException catch (e) {
-      return SendResult(SendOutcome.failed, message: 'Can\'t reach ${device.alias} (${e.message})');
     } catch (e) {
-      return SendResult(SendOutcome.failed, message: '$e');
+      debugPrint('Send to ${device.alias} failed: $e');
+      return SendResult(SendOutcome.failed, message: explainSendError(e, device.alias));
     } finally {
       client.close(force: true);
     }
