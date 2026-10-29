@@ -103,7 +103,7 @@ class _AuroraState extends State<Aurora> with SingleTickerProviderStateMixin {
               // The base sits outside the blur, so the edges never fade out.
               ColoredBox(
                 color: dark
-                    ? Color.lerp(base, const Color(0xFF0B0816), 0.7)!
+                    ? Color.lerp(base, const Color(0xFF050309), 0.85)!
                     : Color.lerp(base, const Color(0xFFFFF6F0), 0.7)!,
               ),
               // The colour shapes, melted together by a heavy blur.
@@ -134,6 +134,17 @@ const _shapes = [
   (Color(0xFFFFB478), 0.55, 0.44, 0.30, 2, 2, 5.1),
 ];
 
+/// Dark mode's own, deeper jewel tones (same order as [_shapes]): wine,
+/// rose-plum, midnight indigo, deep teal and a low ember. Rich, but dark
+/// enough that the screen stays calm and text pops.
+const _darkColors = [
+  Color(0xFF8E1F3E), // wine
+  Color(0xFF6E1A62), // plum
+  Color(0xFF3A27A6), // midnight indigo
+  Color(0xFF0C6A6E), // deep teal
+  Color(0xFF9C4614), // ember
+];
+
 class _FlowPainter extends CustomPainter {
   _FlowPainter({required this.t, required this.wave, required this.dark, required this.strength, required this.base})
       : super(repaint: Listenable.merge([t, wave]));
@@ -148,9 +159,10 @@ class _FlowPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
     final a = 2 * math.pi * t.value;
-    final alpha = (dark ? 0.78 : 0.42) * strength;
+    final alpha = (dark ? 0.8 : 0.42) * strength;
     final paint = Paint();
-    for (final (color, bx, by, r, fx, fy, ph) in _shapes) {
+    for (final (i, (light, bx, by, r, fx, fy, ph)) in _shapes.indexed) {
+      final color = dark ? _darkColors[i] : light;
       final x = w * (bx + 0.16 * math.sin(a * fx + ph));
       final y = h * (by + 0.10 * math.cos(a * fy + ph * 0.7));
       final rx = w * r, ry = rx * (0.8 + 0.2 * math.sin(a * 2 + ph));
@@ -191,7 +203,7 @@ class _ShadePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    final shade = dark ? const Color(0xFF06040C) : base;
+    final shade = dark ? const Color(0xFF030208) : base;
     canvas.drawRect(
       rect,
       Paint()
@@ -199,10 +211,10 @@ class _ShadePainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            shade.withValues(alpha: dark ? 0.55 : 0.45),
-            shade.withValues(alpha: dark ? 0.38 : 0.30),
+            shade.withValues(alpha: dark ? 0.6 : 0.45),
+            shade.withValues(alpha: dark ? 0.32 : 0.30),
             shade.withValues(alpha: dark ? 0.42 : 0.30),
-            shade.withValues(alpha: dark ? 0.62 : 0.50),
+            shade.withValues(alpha: dark ? 0.7 : 0.50),
           ],
           stops: const [0, 0.3, 0.65, 1],
         ).createShader(rect),
