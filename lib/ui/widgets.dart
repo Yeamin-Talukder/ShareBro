@@ -10,6 +10,7 @@ import '../data/dates.dart';
 import '../data/db.dart';
 import 'fast_thumb.dart';
 import 'motion.dart';
+import 'sections.dart';
 
 /// Round face picture. Shares a [Hero] tag with the person page header so it
 /// flies between the two.
@@ -276,16 +277,17 @@ class DateChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final v = value;
-    return InputChip(
-      avatar: const Icon(Icons.date_range, size: 18),
-      label: Text(v == null ? 'Any date' : formatSpan(v)),
-      selected: v != null,
-      showCheckmark: false,
-      onPressed: () async {
-        final picked = await pickDays(context, v);
-        if (picked != null) onChanged(picked);
-      },
-      onDeleted: v == null ? null : () => onChanged(null),
+    return Center(
+      child: CapsuleChip(
+        icon: Icons.calendar_month_rounded,
+        label: v == null ? 'Any date' : formatSpan(v),
+        selected: v != null,
+        onTap: () async {
+          final picked = await pickDays(context, v);
+          if (picked != null) onChanged(picked);
+        },
+        onDeleted: v == null ? null : () => onChanged(null),
+      ),
     );
   }
 }

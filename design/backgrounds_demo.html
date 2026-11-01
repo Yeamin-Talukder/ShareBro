@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShareBro · Backgrounds</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block">
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { background:#050407; }
+  body { color:#F2F1F5; font-family:Roboto, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;
+         display:flex; flex-wrap:wrap; gap:36px; justify-content:center; align-items:flex-start; padding:24px 16px 48px; }
+  button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+  .i { display:inline-block; flex:none; font-family:'Material Symbols Rounded'; font-weight:400; font-style:normal; line-height:1; white-space:nowrap;
+       font-feature-settings:'liga'; font-variation-settings:'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; width:1em; height:1em; overflow:hidden; }
+  .i.fill { font-variation-settings:'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+
+  .side { width:360px; max-width:100%; }
+  .side h1 { font-size:24px; font-weight:800; letter-spacing:-.5px; }
+  .side .lead { color:rgba(242,241,245,.65); font-size:13.5px; line-height:1.6; margin-top:6px; }
+  .side h4 { font-size:11.5px; letter-spacing:1.2px; text-transform:uppercase; color:rgba(242,241,245,.42); margin:22px 0 10px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chips button { padding:8px 13px; border-radius:999px; border:1px solid rgba(255,255,255,.13); font-size:12.5px; background:rgba(255,255,255,.04); position:relative; }
+  .chips button.on { background:#F2F1F5; color:#111; border-color:#F2F1F5; font-weight:700; }
+  .chips button .star { color:#FF8A6B; margin-left:4px; }
+  .chips button.on .star { color:#D9432B; }
+  .about { margin-top:18px; padding:16px 18px; border-radius:20px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); }
+  .about b { font-size:16px; display:flex; align-items:center; gap:8px; }
+  .about .tag { font-size:11px; font-weight:700; padding:3px 8px; border-radius:99px; background:#FF8A6B; color:#2A0D06; }
+  .about p { font-size:13px; line-height:1.55; color:rgba(242,241,245,.7); margin-top:6px; }
+  .about .meta { display:flex; gap:14px; margin-top:10px; font-size:12px; color:rgba(242,241,245,.5); }
+  .about .meta span { display:flex; align-items:center; gap:4px; }
+
+  .stage { position:relative; flex:none; }
+  .phone { position:absolute; width:412px; height:892px; transform-origin:0 0; border-radius:54px; overflow:hidden; isolation:isolate; user-select:none;
+           box-shadow:0 0 0 11px #0c0a0e, 0 0 0 12px rgba(255,255,255,.09), 0 50px 140px rgba(0,0,0,.6); transition:background .4s, color .4s; }
+  .phone.dark { --bg:#0B0A0F; --ink:#F2EFF5; --l2:rgba(235,235,245,.62); --card:rgba(30,29,35,.72); --fill:rgba(118,118,128,.24);
+                --glass:rgba(36,34,42,.55); --glassb:rgba(255,255,255,.14); --g:#FF8A6B; --onG:#2A0D06; background:var(--bg); color:var(--ink); }
+  .phone.light { --bg:#F2F1F6; --ink:#1A1820; --l2:rgba(60,60,67,.62); --card:rgba(255,255,255,.78); --fill:rgba(118,118,128,.14);
+                 --glass:rgba(255,255,255,.6); --glassb:rgba(255,255,255,.8); --g:#D9432B; --onG:#fff; background:var(--bg); color:var(--ink); }
+  #bg { position:absolute; inset:0; z-index:0; }
+  #bg canvas { position:absolute; inset:0; width:100%; height:100%; }
+  .layer { position:absolute; inset:0; }
+  .sbar { position:absolute; left:0; right:0; top:0; height:46px; z-index:20; display:flex; justify-content:space-between; padding:15px 30px 0; font-size:15px; font-weight:600; }
+  .cam { position:absolute; top:12px; left:50%; width:20px; height:20px; margin-left:-10px; border-radius:50%; background:#000; z-index:21; }
+  .home { position:absolute; bottom:8px; left:50%; width:124px; height:4px; margin-left:-62px; border-radius:2px; background:currentColor; opacity:.8; z-index:21; }
+
+  /* Sample screen: People */
+  .scr { position:absolute; inset:0; z-index:2; padding:46px 16px 0; display:flex; flex-direction:column; }
+  .nav { display:flex; justify-content:flex-end; min-height:52px; align-items:center; }
+  .tcap { display:flex; border-radius:24px; background:var(--glass); border:1px solid var(--glassb); backdrop-filter:blur(20px) saturate(1.5); -webkit-backdrop-filter:blur(20px) saturate(1.5); }
+  .tcap span { width:44px; height:44px; display:grid; place-items:center; }
+  .ttl { font-size:34px; font-weight:800; letter-spacing:-.8px; margin:2px 4px 0; }
+  .sub { font-size:14px; color:var(--l2); margin:2px 4px 0; }
+  .chiprow { display:flex; gap:8px; margin:14px -16px 0; padding:0 16px; overflow:hidden; }
+  .cc { height:36px; padding:0 14px; border-radius:18px; background:var(--fill); font-size:14px; font-weight:600; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; flex:none; }
+  .cc.on { background:var(--g); color:var(--onG); }
+  .card { background:var(--card); border-radius:24px; border:1px solid rgba(127,127,127,.08); margin-top:14px; }
+  .row { display:flex; align-items:center; gap:14px; padding:12px 16px; }
+  .itile { width:32px; height:32px; border-radius:9px; display:grid; place-items:center; color:#fff; flex:none; }
+  .row b { font-size:15.5px; font-weight:600; display:block; }
+  .row small { font-size:13px; color:var(--l2); }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px 10px; margin-top:20px; }
+  .p { text-align:center; }
+  .p .face { width:92px; height:92px; margin:0 auto; border-radius:50%; position:relative; overflow:hidden; box-shadow:0 0 0 3px var(--g); }
+  .p .face.un { box-shadow:0 0 0 3px var(--fill); }
+  .p b { display:block; font-size:14px; font-weight:600; margin-top:8px; }
+  .p small { font-size:12px; color:var(--l2); }
+  .dock { position:absolute; left:50%; bottom:22px; transform:translateX(-50%); z-index:5; display:flex; gap:2px; padding:6px; border-radius:32px;
+          background:var(--glass); border:1px solid var(--glassb); backdrop-filter:blur(24px) saturate(1.6); -webkit-backdrop-filter:blur(24px) saturate(1.6);
+          box-shadow:0 10px 40px rgba(0,0,0,.25); }
+  .dock span { width:74px; height:52px; border-radius:26px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:10.5px; font-weight:600; }
+  .dock span.on { background:var(--fill); color:var(--g); }
+</style>
+</head>
+<body>
+<aside class="side">
+  <h1>Backgrounds · pick one</h1>
+  <p class="lead">Six calmer options to replace the coloured aurora. Each is shown behind the People screen with the glass dock, so you can judge it with real content on top. ★ marks the ones I'd pick.</p>
+  <h4>Background</h4>
+  <div class="chips" id="opts"></div>
+  <div class="about" id="about"></div>
+  <h4>Look</h4>
+  <div class="chips" id="modes"><button data-m="dark" class="on">Dark</button><button data-m="light">Light</button></div>
+  <h4>Motion</h4>
+  <div class="chips" id="motion"><button data-v="1" class="on">Animated</button><button data-v="0">Still (reduce motion)</button></div>
+</aside>
+
+<div class="stage" id="stage">
+  <div class="phone dark" id="phone">
+    <div id="bg"></div>
+    <div class="scr" id="scr"></div>
+    <div class="dock">
+      <span class="on"><i class="i fill" style="font-size:24px">face</i>People</span>
+      <span><i class="i" style="font-size:24px">photo_library</i>Photos</span>
+      <span><i class="i" style="font-size:24px">explore</i>Explore</span>
+      <span><i class="i" style="font-size:24px">send</i>Share</span>
+    </div>
+    <div class="sbar"><span>9:41</span><span>●●● ▮</span></div><div class="cam"></div><div class="home"></div>
+  </div>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const phone = $('#phone'), bg = $('#bg');
+const W = 412, H = 892;
+let dark = true, animated = !matchMedia('(prefers-reduced-motion: reduce)').matches, current = 'grid', raf = 0, gen = 0;
+
+// ---- Placeholder faces: flat shapes, no real photos ----
+const PEOPLE = [['Maya', 128, '#5E9BFF'], ['Leo', 96, '#30D158'], ['Priya', 74, '#BF5AF2'], ['Sam', 61, '#FFD60A'], ['Kenji', 52, '#64D2FF'],
+  ['Zoe', 40, '#FF375F'], ['Omar', 33, '#FF9F0A'], ['Ana', 27, '#AC8E68'], ['Unnamed', 12, '#8E8A96']];
+const shade = (c, k) => '#' + [1, 3, 5].map(i => Math.round(parseInt(c.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('');
+function faceSvg(c) {
+  return `<svg viewBox="0 0 92 92" width="92" height="92"><rect width="92" height="92" fill="${shade(c, .45)}"/>
+    <ellipse cx="46" cy="98" rx="38" ry="30" fill="${shade(c, .75)}"/><circle cx="46" cy="42" r="21" fill="${c}"/></svg>`;
+}
+function screen() {
+  $('#scr').innerHTML = `
+    <div class="nav"><div class="tcap"><span><i class="i" style="font-size:22px">search</i></span><span><i class="i" style="font-size:22px">add_photo_alternate</i></span><span><i class="i" style="font-size:22px">more_horiz</i></span></div></div>
+    <div class="ttl">People</div><div class="sub">24 people</div>
+    <div class="chiprow"><span class="cc">All trips</span><span class="cc on"><i class="i" style="font-size:17px">luggage</i>Goa trip</span><span class="cc">Lisbon</span><span class="cc">Wedding</span></div>
+    <div class="card"><div class="row"><span class="itile" style="background:#FF9F0A"><i class="i" style="font-size:19px">person_search</i></span>
+      <div><b>Needs more photos</b><small>Omar and Ana are in only a few</small></div></div></div>
+    <div class="grid">${PEOPLE.map(([n, k, c], i) => `<div class="p"><div class="face ${i === 8 ? 'un' : ''}">${faceSvg(c)}</div><b>${i === 8 ? 'Add a name' : n}</b><small>${k} photos</small></div>`).join('')}</div>`;
+}
+
+// ---- Backgrounds ----
+const OPTS = {
+  solid: {
+    name: 'Plain', star: true, motion: 'None', cost: 'Free',
+    about: 'Apple-style system background: near-black in dark, soft grey in light. Nothing moves, so photos and faces are the only colour on screen. The cleanest fit for the flat look.',
+    draw() { bg.innerHTML = ''; },
+  },
+  glow: {
+    name: 'Coral glow', star: false, motion: 'Slow breathing', cost: 'Very low',
+    about: 'Plain background with one soft glow of the brand coral behind the big title, breathing very slowly. Keeps a little warmth and identity without the busy colours.',
+    draw(g) {
+      bg.innerHTML = '<div class="layer" id="gl"></div>';
+      const el = $('#gl');
+      const paint = t => {
+        const a = (dark ? .30 : .20) + Math.sin(t / 2600) * .06;
+        const x = 22 + Math.sin(t / 7000) * 6, y = 6 + Math.cos(t / 9000) * 3;
+        el.style.background = `radial-gradient(70% 38% at ${x}% ${y}%, rgba(${dark ? '255,138,107' : '255,138,107'},${a}), transparent 70%)`;
+      };
+      loop(g, paint);
+    },
+  },
+  grid: {
+    name: 'Dot grid', star: true, motion: 'A light drifts across', cost: 'Low',
+    about: 'A fine grid of dots, like a design canvas. A soft coral light slowly drifts and lights up the dots near it. Precise and premium; reads as "a tool for organising".',
+    draw(g) {
+      const { ctx } = canvas();
+      const gap = 22;
+      const paint = t => {
+        ctx.clearRect(0, 0, W, H);
+        const lx = W * (.5 + .38 * Math.sin(t / 6100)), ly = H * (.32 + .22 * Math.sin(t / 8300 + 1));
+        for (let y = gap / 2; y < H; y += gap) for (let x = gap / 2; x < W; x += gap) {
+          const d = Math.hypot(x - lx, y - ly), k = Math.max(0, 1 - d / 230);
+          const base = dark ? .10 : .13, r = 1.15 + k * 1.1;
+          ctx.fillStyle = k > .02 ? `rgba(255,138,107,${base + k * .55})` : (dark ? `rgba(255,255,255,${base})` : `rgba(26,24,32,${base})`);
+          ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+        }
+      };
+      loop(g, paint);
+    },
+  },
+  topo: {
+    name: 'Contour map', star: false, motion: 'Lines slowly shift', cost: 'Low',
+    about: 'Faint topographic lines, like a trail map, that slowly reshape. Fits an app made for trips and the places you went. Subtle enough to sit behind text.',
+    draw(g) {
+      const { ctx } = canvas();
+      const centers = [[.15, .12, 15], [.95, .55, 13], [.25, .92, 12]];
+      const paint = t => {
+        ctx.clearRect(0, 0, W, H);
+        ctx.lineWidth = 1.2;
+        for (const [cx, cy, n] of centers) {
+          for (let k = 1; k <= n; k++) {
+            const r0 = k * 26;
+            ctx.strokeStyle = k % 5 === 0 ? (dark ? 'rgba(255,138,107,.20)' : 'rgba(217,67,43,.18)') : (dark ? 'rgba(255,255,255,.07)' : 'rgba(26,24,32,.08)');
+            ctx.beginPath();
+            for (let a = 0; a <= 64; a++) {
+              const th = a / 64 * Math.PI * 2;
+              const wob = Math.sin(th * 3 + t / 5200 + k * .35) * 9 + Math.sin(th * 5 - t / 7300 + k) * 5 + Math.cos(th * 2 + cx * 9) * 7;
+              const r = r0 + wob * (k / n + .3);
+              const x = cx * W + Math.cos(th) * r, y = cy * H + Math.sin(th) * r * .82;
+              a ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+            }
+            ctx.closePath(); ctx.stroke();
+          }
+        }
+      };
+      loop(g, paint);
+    },
+  },
+  photo: {
+    name: 'Photo glow', star: true, motion: 'Changes with your photos', cost: 'Low (one blurred image)',
+    about: 'Your newest photo, blurred and darkened, like Apple Music or Photos memories. On a person\'s page it would be their photos. The app takes its colour from your own pictures. (Placeholder scenes here.)',
+    draw(g) {
+      bg.innerHTML = '<div class="layer" id="pa"></div><div class="layer" id="pb" style="opacity:0"></div><div class="layer" id="pv"></div>';
+      const scenes = [['#2E5C86', '#B8955E', '#F2C14E'], ['#7E4636', '#4A3530', '#F29E4E'], ['#33607A', '#3B6948', '#EADFB4'], ['#3A3463', '#76472F', '#E8A0C0']];
+      const scene = ([sky, gr, sun]) => `<svg viewBox="0 0 100 200" preserveAspectRatio="none" style="width:100%;height:100%;filter:blur(${dark ? 46 : 52}px) saturate(1.3);transform:scale(1.4)">
+        <rect width="100" height="200" fill="${sky}"/><circle cx="72" cy="40" r="16" fill="${sun}"/><rect y="120" width="100" height="80" fill="${gr}"/>
+        <circle cx="35" cy="112" r="13" fill="#FF8A6B"/><circle cx="62" cy="116" r="12" fill="#5E9BFF"/></svg>`;
+      const a = $('#pa'), b = $('#pb'), v = $('#pv');
+      v.style.background = dark ? 'rgba(8,7,12,.62)' : 'rgba(242,241,246,.55)';
+      let k = 0; a.innerHTML = scene(scenes[0]);
+      if (!animated) return;
+      const step = () => {
+        if (g !== gen) return;
+        k = (k + 1) % scenes.length;
+        const [show, hide] = k % 2 ? [b, a] : [a, b];
+        show.innerHTML = scene(scenes[k]);
+        show.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 1600, fill: 'forwards' });
+        hide.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1600, fill: 'forwards' });
+        setTimeout(step, 5000);
+      };
+      setTimeout(step, 4000);
+    },
+  },
+  grain: {
+    name: 'Film grain', star: false, motion: 'Grain shimmers', cost: 'Low',
+    about: 'A deep tinted background with fine film grain and a soft vignette, like a darkroom. Cinematic and quiet; the grain is barely there, but it stops the screen looking flat and digital.',
+    draw(g) {
+      bg.innerHTML = '<canvas width="206" height="446" id="gr" style="position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated"></canvas><div class="layer" id="vg"></div>';
+      const cv = $('#gr'), ctx = cv.getContext('2d');
+      $('#vg').style.background = dark ? 'radial-gradient(120% 80% at 50% 30%, transparent 40%, rgba(0,0,0,.55))' : 'radial-gradient(120% 80% at 50% 30%, transparent 45%, rgba(60,40,30,.10))';
+      const img = ctx.createImageData(206, 446);
+      let last = 0;
+      const paint = t => {
+        if (t - last < 90) return;
+        last = t;
+        const base = dark ? [16, 13, 20] : [244, 241, 236];
+        for (let i = 0; i < img.data.length; i += 4) {
+          const n = (Math.random() - .5) * (dark ? 16 : 12);
+          img.data[i] = base[0] + n; img.data[i + 1] = base[1] + n; img.data[i + 2] = base[2] + n; img.data[i + 3] = 255;
+        }
+        ctx.putImageData(img, 0, 0);
+      };
+      loop(g, paint);
+    },
+  },
+};
+
+function canvas() {
+  bg.innerHTML = '<canvas></canvas>';
+  const cv = $('canvas', bg), dpr = Math.min(2, devicePixelRatio || 1);
+  cv.width = W * dpr; cv.height = H * dpr;
+  const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
+  return { ctx, cv };
+}
+function loop(g, paint) {
+  const t0 = performance.now();
+  // Still mode: one frame, as if a few seconds in.
+  if (!animated) { paint(3000); return; }
+  const tick = now => { if (g !== gen) return; paint(now - t0 + 3000); raf = requestAnimationFrame(tick); };
+  raf = requestAnimationFrame(tick);
+}
+
+function show(key) {
+  gen++; cancelAnimationFrame(raf);
+  current = key;
+  const o = OPTS[key];
+  $$('#opts button').forEach(b => b.classList.toggle('on', b.dataset.k === key));
+  $('#about').innerHTML = `<b>${o.name}${o.star ? '<span class="tag">My pick</span>' : ''}</b><p>${o.about}</p>
+    <div class="meta"><span><i class="i" style="font-size:15px">animation</i>${o.motion}</span><span><i class="i" style="font-size:15px">battery_horiz_075</i>${o.cost}</span></div>`;
+  o.draw(gen);
+  bg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 400 });
+}
+
+$('#opts').innerHTML = Object.entries(OPTS).map(([k, o]) => `<button data-k="${k}">${o.name}${o.star ? '<span class="star">★</span>' : ''}</button>`).join('');
+$$('#opts button').forEach(b => b.onclick = () => show(b.dataset.k));
+$$('#modes button').forEach(b => b.onclick = () => {
+  dark = b.dataset.m === 'dark';
+  $$('#modes button').forEach(x => x.classList.toggle('on', x === b));
+  phone.className = 'phone ' + (dark ? 'dark' : 'light');
+  show(current);
+});
+$$('#motion button').forEach(b => b.onclick = () => {
+  animated = b.dataset.v === '1';
+  $$('#motion button').forEach(x => x.classList.toggle('on', x === b));
+  show(current);
+});
+if (!animated) $$('#motion button').forEach(x => x.classList.toggle('on', x.dataset.v === '0'));
+
+function fit() {
+  const avail = Math.min(window.innerHeight - 48, 900) / 916, w = Math.min(window.innerWidth - 32, 460) / 436;
+  const scale = Math.max(.5, Math.min(1, avail, w));
+  const s = $('#stage'); s.style.width = 436 * scale + 'px'; s.style.height = 916 * scale + 'px';
+  Object.assign(phone.style, { transform: `scale(${scale})`, left: 12 * scale + 'px', top: 12 * scale + 'px' });
+}
+window.addEventListener('resize', fit);
+fit(); screen(); document.fonts.ready.then(() => show('grid'));
+</script>
+</body>
+</html>

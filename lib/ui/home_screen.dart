@@ -7,15 +7,20 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import '../data/db.dart';
+import '../data/trip_days.dart';
 import '../scan/scan_controller.dart';
 import 'face_cloud.dart';
+import 'find_me_screen.dart';
 import 'glass.dart';
 import 'group_editor.dart';
 import 'motion.dart';
+import 'people_space.dart';
 import 'person_screen.dart';
 import 'review_screen.dart';
 import 'scan_screen.dart';
 import 'scan_sheet.dart';
+import 'search_screen.dart';
+import 'sections.dart';
 import 'send_center_screen.dart';
 import 'settings_screen.dart';
 import 'timeline_screen.dart';
@@ -38,6 +43,9 @@ class _HomeScreenState extends State<HomeScreen> {
   ScanController get c => widget.controller;
   List<PersonSummary>? _people;
   List<TripSummary> _trips = const [];
+
+  /// The selected trip's days, for the day chips.
+  List<TripDay> _days = const [];
   int _reviewCount = 0;
   int? _tripId;
   DaySpan? _dates;
@@ -46,7 +54,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _loadedRevision = -1;
 
   /// Floating bubble view instead of the grid.
-  bool _cloud = false;
+  /// Grid, bubbles or one of the spatial views; remembered.
+  PeopleLayout _layout = PeopleLayout.grid;
 
   /// Person that just absorbed a drag-merge; plays a pop.
   int? _popId;
@@ -57,6 +66,18 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     c.addListener(_onChange);
     _reload();
+    c.db.setting(_layoutKey).then((v) {
+      if (mounted) setState(() => _layout = PeopleLayout.byName(v));
+    });
+  }
+
+  static const _layoutKey = 'people_layout';
+
+  void _setLayout(PeopleLayout l) {
+    if (l == _layout) return;
+    Haptics.tick();
+    setState(() => _layout = l);
+    c.db.setSetting(_layoutKey, l.name);
   }
 
   @override
@@ -98,13 +119,22 @@ class _HomeScreenState extends State<HomeScreen> {
     final groups = await c.db.groups();
     if (_groupId != null && !groups.any((g) => g.id == _groupId)) _groupId = null;
     final people = await c.db.people(tripId: _tripId, dates: _dates, groupId: _groupId);
+    final days = _tripId == null ? const <TripDay>[] : await tripDays(c.db, _tripId!);
     _countReviewLater();
     if (!mounted) return;
     setState(() {
+      _days = days;
       _trips = trips;
       _groups = groups;
       _people = people;
     });
+  }
+
+  /// Picking another trip drops a day picked from the old one.
+  void _pickTrip(int? id) {
+    if (_days.any((d) => d.span == _dates)) _dates = null;
+    _tripId = id;
+    _reload();
   }
 
   void _openScan() => Navigator.push(context,
@@ -230,9 +260,17 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: GlassScrollView(
         title: 'People',
+        physics: people != null && people.isNotEmpty && _layout.spatial ? const NeverScrollableScrollPhysics() : null,
+        subtitle: people == null || people.isEmpty ? null : '${people.length} ${people.length == 1 ? 'person' : 'people'}',
         actions: [
+          ToolbarCapsule(children: [
             if (people != null && people.isNotEmpty)
-              _SearchButton(people: people, onOpen: _openPerson),
+              IconButton(
+                tooltip: 'Search',
+                icon: const Icon(Icons.search_rounded),
+                onPressed: () => Navigator.push(
+                    context, MaterialPageRoute(builder: (_) => SearchScreen(controller: c))),
+              ),
             // Always here, so a new scan is never hard to find.
             ListenableBuilder(
               listenable: c,
@@ -270,9 +308,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   case 'together':
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => TogetherScreen(controller: c, tripId: _tripId)));
-                  case 'cloud':
-                    Haptics.tick();
-                    setState(() => _cloud = !_cloud);
+                  case 'findme':
+                    final trip = _trips.where((t) => t.id == _tripId).firstOrNull;
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => FindMeScreen(controller: c, tripId: trip?.id, tripName: trip?.name)));
                   case 'settings':
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => SettingsScreen(controller: c)));
@@ -285,12 +326,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: ListTile(leading: Icon(Icons.join_inner), title: Text('Photos together')),
                   ),
                 if (people != null && people.isNotEmpty)
-                  PopupMenuItem(
-                    value: 'cloud',
+                  const PopupMenuItem(
+                    value: 'findme',
                     child: ListTile(
-                      leading: Icon(_cloud ? Icons.grid_view_rounded : Icons.bubble_chart_outlined),
-                      title: Text(_cloud ? 'Grid view' : 'Bubble view'),
-                    ),
+                        leading: Icon(Icons.face_retouching_natural_rounded), title: Text('Find my photos link')),
                   ),
                 const PopupMenuItem(
                   value: 'settings',
@@ -298,12 +337,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-          ],
+          ]),
+        ],
         slivers: [
         if (_trips.isNotEmpty || (people?.isNotEmpty ?? false))
           SliverToBoxAdapter(
             child: SizedBox(
-              height: 48,
+              height: 46,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -321,30 +361,55 @@ class _HomeScreenState extends State<HomeScreen> {
                   _TripChip(
                     label: 'All trips',
                     selected: _tripId == null,
-                    onTap: () {
-                      _tripId = null;
-                      _reload();
-                    },
+                    onTap: () => _pickTrip(null),
                   ),
                   for (final t in _trips)
                     _TripChip(
                       label: t.name,
                       count: t.photoCount,
                       selected: _tripId == t.id,
-                      onTap: () {
-                        _tripId = t.id;
-                        _reload();
-                      },
+                      onTap: () => _pickTrip(t.id),
                       onLongPress: () => _editTrip(t),
                     ),
                 ],
               ),
             ),
           ),
+        if (_tripId != null && _days.length > 1)
+          // The fade goes on the row, not the sliver: effects are boxes, and
+          // a box can't hold a sliver (the whole page went blank).
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 46,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: [
+                  for (final d in _days)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Center(
+                        child: CapsuleChip(
+                          icon: Icons.today_rounded,
+                          label: d.label,
+                          count: d.photos.length,
+                          selected: _dates == d.span,
+                          onTap: () {
+                            Haptics.tick();
+                            _dates = _dates == d.span ? null : d.span;
+                            _reload();
+                          },
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ).animate(key: ValueKey(_tripId)).fadeIn(duration: 250.ms).moveY(begin: -6),
+          ),
         if (people != null && (people.isNotEmpty || _groups.isNotEmpty))
           SliverToBoxAdapter(
             child: SizedBox(
-              height: 48,
+              height: 46,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -352,39 +417,45 @@ class _HomeScreenState extends State<HomeScreen> {
                   for (final g in _groups)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: GestureDetector(
-                        onLongPress: () async {
-                          if (await showGroupEditor(context, c, group: g)) c.changed();
-                        },
-                        child: ChoiceChip(
-                          avatar: const Icon(Icons.diversity_3_outlined, size: 18),
-                          label: Text('${g.name} · ${g.members.length}'),
+                      child: Center(
+                        child: CapsuleChip(
+                          icon: Icons.diversity_3_rounded,
+                          label: g.name,
+                          count: g.members.length,
                           selected: _groupId == g.id,
-                          onSelected: (v) {
+                          onTap: () {
                             Haptics.tick();
-                            _groupId = v ? g.id : null;
+                            _groupId = _groupId == g.id ? null : g.id;
                             _reload();
+                          },
+                          onLongPress: () async {
+                            if (await showGroupEditor(context, c, group: g)) c.changed();
                           },
                         ),
                       ),
                     ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: ActionChip(
-                      avatar: const Icon(Icons.add, size: 18),
-                      label: const Text('New group'),
-                      onPressed: () async {
-                        if (await showGroupEditor(context, c)) c.changed();
-                      },
+                    child: Center(
+                      child: CapsuleChip(
+                        outlined: true,
+                        icon: Icons.add_rounded,
+                        label: 'New group',
+                        onTap: () async {
+                          if (await showGroupEditor(context, c)) c.changed();
+                        },
+                      ),
                     ),
                   ),
                   if (_tripId != null)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: ActionChip(
-                        avatar: const Icon(Icons.timeline, size: 18),
-                        label: const Text('Trip timeline'),
-                        onPressed: () => Navigator.push(
+                      child: Center(
+                        child: CapsuleChip(
+                        outlined: true,
+                        icon: Icons.timeline_rounded,
+                        label: 'Trip timeline',
+                        onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => TimelineScreen(
@@ -394,13 +465,38 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ),
+                        ),
                       ),
                     ),
                 ],
               ),
             ),
           ),
-        if (_tripId != null && people != null)
+        if (people != null && people.isNotEmpty)
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 46,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: [
+                  for (final l in PeopleLayout.values)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Center(
+                        child: CapsuleChip(
+                          icon: l.icon,
+                          label: l.label,
+                          selected: _layout == l,
+                          onTap: () => _setLayout(l),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        if (_tripId != null && people != null && !_layout.spatial)
           SliverToBoxAdapter(child: _MissingCard(people: people, onOpen: _openPerson)),
         if (c.running)
           SliverToBoxAdapter(
@@ -439,7 +535,16 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
             ),
           )
-        else if (_cloud)
+        else if (_layout.spatial)
+          SliverFillRemaining(
+            child: PeopleSpace(
+              people: people,
+              layout: _layout,
+              onOpen: _openPerson,
+              hubLabel: _tripId == null ? null : _trips.firstWhere((t) => t.id == _tripId).name,
+            ),
+          )
+        else if (_layout == PeopleLayout.bubbles)
           SliverPadding(
             padding: EdgeInsets.fromLTRB(8, 8, 8, MediaQuery.paddingOf(context).bottom + _fabClearance),
             sliver: SliverToBoxAdapter(
@@ -631,24 +736,23 @@ class _PersonTileState extends State<_PersonTile> {
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _hovered ? scheme.primary : Colors.transparent,
-                boxShadow: _hovered
-                    ? [BoxShadow(color: scheme.primary.withAlpha(120), blurRadius: 20)]
-                    : const [],
+                color: _hovered || person.name != null ? scheme.primary : scheme.onSurface.withAlpha(45),
+                boxShadow: _hovered ? [BoxShadow(color: scheme.primary.withAlpha(70), spreadRadius: 5)] : const [],
               ),
               child: avatar,
             ),
           ),
         ),
       ]),
-      const SizedBox(height: 6),
+      const SizedBox(height: 7),
       Text(
-        person.displayName,
+        person.name ?? 'Add a name',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          fontWeight: FontWeight.w600,
-          color: person.name == null ? scheme.onSurfaceVariant : null,
+          fontSize: 14.5,
+          fontWeight: person.name == null ? FontWeight.w600 : FontWeight.w700,
+          color: person.name == null ? scheme.primary : null,
         ),
       ),
       // Counts roll up from 0 when the grid first appears.
@@ -657,7 +761,7 @@ class _PersonTileState extends State<_PersonTile> {
         duration: 900.ms,
         curve: Curves.easeOutCubic,
         builder: (context, v, _) => Text('${v.round()} photos',
-            style: Theme.of(context).textTheme.bodySmall),
+            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
       ),
     ]);
   }
@@ -704,6 +808,9 @@ class _ScanButton extends StatelessWidget {
                 FloatingActionButton.small(
                   heroTag: null,
                   elevation: 0,
+                  backgroundColor: scheme.primary,
+                  foregroundColor: scheme.onPrimary,
+                  shape: const CircleBorder(),
                   onPressed: onOpen,
                   child: const Icon(Icons.face_retouching_natural),
                 )
@@ -714,6 +821,10 @@ class _ScanButton extends StatelessWidget {
           : FloatingActionButton.extended(
               key: const ValueKey('start'),
               heroTag: null,
+              backgroundColor: scheme.primary,
+              foregroundColor: scheme.onPrimary,
+              elevation: 3,
+              shape: const StadiumBorder(),
               onPressed: onStart,
               icon: const Icon(Icons.face_retouching_natural),
               label: const Text('Scan album'),
@@ -741,13 +852,14 @@ class _TripChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: GestureDetector(
-        onLongPress: onLongPress,
-        child: ChoiceChip(
-          avatar: count == null ? null : const Icon(Icons.luggage_outlined, size: 18),
-          label: Text(count == null ? label : '$label · $count'),
+      child: Center(
+        child: CapsuleChip(
+          icon: count == null ? null : Icons.luggage_rounded,
+          label: label,
+          count: count,
           selected: selected,
-          onSelected: (_) => onTap(),
+          onTap: onTap,
+          onLongPress: onLongPress,
         ),
       ),
     );
@@ -765,8 +877,7 @@ class _MiniProgress extends StatelessWidget {
     final c = controller;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Card(
-        clipBehavior: Clip.antiAlias,
+      child: SectionCard(
         child: InkWell(
           onTap: onTap,
           child: Padding(
@@ -787,8 +898,9 @@ class _MiniProgress extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Scanning ${c.albumName ?? ''}',
-                        style: const TextStyle(fontWeight: FontWeight.w600)),
-                    Text('${c.done} of ${c.total} · ${c.facesFound} faces'),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    Text('${c.done} of ${c.total} · ${c.facesFound} faces',
+                        style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -823,56 +935,6 @@ class _ReviewButton extends StatelessWidget {
   }
 }
 
-class _SearchButton extends StatelessWidget {
-  const _SearchButton({required this.people, required this.onOpen});
-
-  final List<PersonSummary> people;
-  final ValueChanged<PersonSummary> onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    return SearchAnchor(
-      viewHintText: 'Search people',
-      builder: (context, search) => IconButton(
-        tooltip: 'Search',
-        icon: const Icon(Icons.search),
-        onPressed: search.openView,
-      ),
-      suggestionsBuilder: (context, search) {
-        final q = search.text.trim().toLowerCase();
-        final matches = people
-            .where((p) =>
-                (p.name?.toLowerCase().contains(q) ?? false) ||
-                (p.nickname?.toLowerCase().contains(q) ?? false))
-            .toList();
-        if (matches.isEmpty) {
-          return [
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: Text('No named person matches')),
-            ),
-          ];
-        }
-        return [
-          for (final p in matches)
-            ListTile(
-              leading: FaceAvatar(
-                  personId: p.id, thumb: p.coverThumb, radius: 22, hero: false),
-              title: Text(p.displayName),
-              subtitle: Text(p.nickname == null
-                  ? '${p.photoCount} photos'
-                  : '"${p.nickname}" · ${p.photoCount} photos'),
-              onTap: () {
-                search.closeView(p.displayName);
-                onOpen(p);
-              },
-            ),
-        ];
-      },
-    );
-  }
-}
-
 /// "Who's missing": named people with very few photos in this trip, so you
 /// can take more of them tomorrow.
 class _MissingCard extends StatelessWidget {
@@ -895,17 +957,14 @@ class _MissingCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Card(
-        color: scheme.tertiaryContainer,
+      child: SectionCard(
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Icon(Icons.person_search_outlined, color: scheme.onTertiaryContainer),
-              const SizedBox(width: 8),
-              Text('Needs more photos',
-                  style: TextStyle(
-                      color: scheme.onTertiaryContainer, fontWeight: FontWeight.w700)),
+            const Row(children: [
+              IconTile(icon: Icons.person_search_rounded, color: Color(0xFFFF9F0A)),
+              SizedBox(width: 12),
+              Text('Needs more photos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             ]),
             const SizedBox(height: 10),
             SizedBox(
@@ -924,8 +983,7 @@ class _MissingCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text('${p.displayName.split(' ').first} · ${p.photoCount}',
-                            style: TextStyle(
-                                fontSize: 12, color: scheme.onTertiaryContainer)),
+                            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
                       ]),
                     ),
                   ),

@@ -12,10 +12,12 @@ import '../share/protocol.dart';
 import '../share/receive.dart';
 import '../share/send_center.dart';
 import 'aurora.dart';
+import 'devices.dart';
 import 'file_icons.dart';
 import 'glass.dart';
 import 'island.dart';
 import 'motion.dart';
+import 'sections.dart';
 import 'send_center_screen.dart';
 import 'share_screen.dart';
 import 'widgets.dart';
@@ -47,12 +49,21 @@ class TransferStage extends StatefulWidget {
     required this.filesDone,
     this.fromIcon = Icons.smartphone_rounded,
     this.toIcon = Icons.smartphone_rounded,
+    this.fromColor,
+    this.toColor,
+    this.status,
     this.height = 250,
   });
 
   final TransferPhase phase;
   final String fromName, toName;
   final IconData fromIcon, toIcon;
+
+  /// Each phone's colour; null means the accent (that's you).
+  final Color? fromColor, toColor;
+
+  /// One line over the arc saying what's happening.
+  final String? status;
   final Widget Function(int index) token;
 
   /// Bumps the receiving avatar each time a file lands.
@@ -83,8 +94,7 @@ class _TransferStageState extends State<TransferStage> with SingleTickerProvider
     final phase = widget.phase;
     final lineColor = switch (phase) {
       TransferPhase.failed => scheme.error,
-      TransferPhase.done => Colors.green,
-      TransferPhase.waiting => scheme.outline,
+      TransferPhase.waiting => scheme.onSurfaceVariant.withAlpha(110),
       _ => scheme.primary,
     };
     return SizedBox(
@@ -94,7 +104,7 @@ class _TransferStageState extends State<TransferStage> with SingleTickerProvider
           final w = box.maxWidth, h = widget.height;
           final a = Offset(_avatar / 2 + 8, h - _avatar / 2 - 34);
           final b = Offset(w - _avatar / 2 - 8, h - _avatar / 2 - 34);
-          final c = Offset(w / 2, 18);
+          final c = Offset(w / 2, widget.status == null ? 18 : 44);
           Offset at(double t) {
             final u = 1 - t;
             return a * (u * u) + c * (2 * u * t) + b * (t * t);
@@ -143,26 +153,65 @@ class _TransferStageState extends State<TransferStage> with SingleTickerProvider
                           ),
                         );
                       }(),
-                  // A "tap Accept" bubble over their phone while we wait.
+                  // An "Accept?" bubble over their phone while we wait.
                   if (phase == TransferPhase.asking)
                     Positioned(
-                      left: b.dx - 26,
-                      top: b.dy - _avatar / 2 - 58,
-                      child: Transform.translate(
-                        offset: Offset(0, math.sin(v * math.pi * 2) * 4),
-                        child: Glass(
-                          radius: 18,
-                          padding: const EdgeInsets.all(10),
-                          child: Icon(Icons.touch_app_rounded, color: scheme.tertiary),
+                      left: b.dx - 80,
+                      width: 160,
+                      top: b.dy - _avatar / 2 - 48,
+                      child: Center(
+                        child: Transform.translate(
+                          offset: Offset(0, math.sin(v * math.pi * 2) * 4),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                            decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(16)),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(Icons.touch_app_rounded, size: 16, color: scheme.primary),
+                              const SizedBox(width: 5),
+                              const Text('Accept?',
+                                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white)),
+                            ]),
+                          ),
                         ),
                       ),
+                    ),
+                  if (widget.status != null)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: 4,
+                      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Icon(
+                          switch (phase) {
+                            TransferPhase.waiting => Icons.wifi_tethering_rounded,
+                            TransferPhase.asking => Icons.touch_app_rounded,
+                            TransferPhase.flowing => Icons.send_rounded,
+                            TransferPhase.done => Icons.check_circle_rounded,
+                            TransferPhase.failed => Icons.error_rounded,
+                          },
+                          size: 17,
+                          color: phase == TransferPhase.failed ? scheme.error : scheme.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(widget.status!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: phase == TransferPhase.failed ? scheme.error : scheme.onSurfaceVariant,
+                              )),
+                        ),
+                      ]),
                     ),
                   _DeviceAvatar(
                     center: a,
                     size: _avatar,
                     icon: widget.fromIcon,
                     name: widget.fromName,
-                    active: phase != TransferPhase.waiting,
+                    color: widget.fromColor,
+                    active: true,
                     pulse: phase == TransferPhase.flowing ? v : null,
                   ),
                   _DeviceAvatar(
@@ -174,9 +223,10 @@ class _TransferStageState extends State<TransferStage> with SingleTickerProvider
                       _ => widget.toIcon,
                     },
                     name: widget.toName,
+                    color: widget.toColor,
                     active: phase != TransferPhase.waiting,
                     tint: switch (phase) {
-                      TransferPhase.done => Colors.green,
+                      TransferPhase.done => scheme.primary,
                       TransferPhase.failed => scheme.error,
                       _ => null,
                     },
@@ -221,6 +271,7 @@ class _DeviceAvatar extends StatelessWidget {
     required this.icon,
     required this.name,
     required this.active,
+    this.color,
     this.tint,
     this.pulse,
     this.radar,
@@ -232,6 +283,9 @@ class _DeviceAvatar extends StatelessWidget {
   final IconData icon;
   final String name;
   final bool active;
+
+  /// The phone's own colour; null means the accent.
+  final Color? color;
   final Color? tint;
 
   /// 0..1 loop value: a soft ring breathes out while sending.
@@ -244,11 +298,12 @@ class _DeviceAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final colors = tint != null
-        ? [tint!, tint!]
-        : active
-        ? [scheme.primary, scheme.tertiary]
-        : [scheme.surfaceContainerHighest, scheme.surfaceContainerHigh];
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final fill = tint ??
+        (active ? (color ?? scheme.primary) : (dark ? const Color(0xFF3A3A40) : const Color(0xFFD1D1D6)));
+    // Rings in the phone's colour; radar rings in the accent.
+    final ringColor = radar != null ? scheme.primary : fill;
+    final onFill = tint == scheme.primary || (tint == null && active && color == null) ? scheme.onPrimary : Colors.white;
     final ring = pulse ?? radar;
     return Positioned(
       left: center.dx - 60,
@@ -271,7 +326,7 @@ class _DeviceAvatar extends StatelessWidget {
                         height: size * (1 + t * 0.6),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          border: Border.all(color: colors.first.withValues(alpha: (1 - t) * 0.5), width: 2),
+                          border: Border.all(color: ringColor.withValues(alpha: (1 - t) * 0.6), width: 2),
                         ),
                       );
                     }(),
@@ -279,19 +334,7 @@ class _DeviceAvatar extends StatelessWidget {
                       duration: 300.ms,
                       width: size,
                       height: size,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-                        boxShadow: active
-                            ? [
-                                BoxShadow(
-                                  color: colors.first.withValues(alpha: 0.35),
-                                  blurRadius: 18,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ]
-                            : null,
-                      ),
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: fill),
                       child: AnimatedSwitcher(
                         duration: 300.ms,
                         transitionBuilder: (c, a) => ScaleTransition(
@@ -302,7 +345,7 @@ class _DeviceAvatar extends StatelessWidget {
                           icon,
                           key: ValueKey(icon),
                           size: size * 0.45,
-                          color: active ? Colors.white : scheme.outline,
+                          color: active || tint != null ? onFill : scheme.onSurfaceVariant,
                         ),
                       ),
                     )
@@ -334,7 +377,7 @@ class _Burst extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const colors = [Color(0xFFFF8A5C), Color(0xFFE8457A), Color(0xFF6E5BFF), Color(0xFF2BB5A6), Color(0xFFFFD84D)];
+    const colors = [Color(0xFFFF8A6B), Color(0xFFFFD60A), Color(0xFF5E5CE6), Color(0xFF30B0C7), Color(0xFF34C759)];
     // A zero-size anchor at the phone's centre; the dots fly out of it.
     return Positioned(
       left: center.dx,
@@ -400,13 +443,13 @@ class _ArcPainter extends CustomPainter {
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
-      ..strokeWidth = 3
-      ..color = color.withValues(alpha: solid ? 0.8 : 0.55);
+      ..strokeWidth = 2.5
+      ..color = color.withValues(alpha: solid ? 0.9 : 0.75);
     if (solid) {
       canvas.drawPath(path, paint);
       return;
     }
-    const dash = 10.0, gap = 9.0;
+    const dash = 3.0, gap = 9.0;
     final shift = moving ? phase * (dash + gap) * 4 % (dash + gap) : 0.0;
     for (final PathMetric m in path.computeMetrics()) {
       for (var d = shift - (dash + gap); d < m.length; d += dash + gap) {
@@ -437,74 +480,109 @@ class TransferStats extends StatelessWidget {
   final Color color;
   final List<(String label, String value)> stats;
 
+  static IconData _icon(String label) => switch (label) {
+        'speed' => Icons.speed_rounded,
+        'left' => Icons.schedule_rounded,
+        _ => Icons.photo_library_rounded,
+      };
+
+  static Color _tile(String label) => switch (label) {
+        'speed' => const Color(0xFF30B0C7),
+        'left' => const Color(0xFF5E5CE6),
+        _ => const Color(0xFFFF9F0A),
+      };
+
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    return Column(
-      children: [
-        TweenAnimationBuilder<double>(
-          tween: Tween(end: progress),
-          duration: 400.ms,
-          curve: Curves.easeOutCubic,
-          builder: (context, v, _) => Column(
-            children: [
-              Text(
-                '${(v * 100).round()}%',
-                style: text.displayMedium?.copyWith(color: color, fontFeatures: const [FontFeature.tabularFigures()]),
-              ),
-              const SizedBox(height: 10),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(
-                  value: v,
-                  minHeight: 10,
-                  color: color,
-                  backgroundColor: color.withValues(alpha: 0.15),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
-        Text(
-          title,
-          style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 2),
-        AnimatedSwitcher(
-          duration: 200.ms,
-          child: Text(
-            caption,
-            key: ValueKey(caption),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: text.bodySmall,
-          ),
-        ),
-        if (stats.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              for (final (label, value) in stats)
-                Expanded(
-                  child: Column(
-                    children: [
-                      Text(
-                        value,
-                        style: text.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                      Text(label, style: text.labelSmall),
-                    ],
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      label: title,
+      child: Column(
+        children: [
+          TweenAnimationBuilder<double>(
+            tween: Tween(end: progress),
+            duration: 400.ms,
+            curve: Curves.easeOutCubic,
+            builder: (context, v, _) => Column(
+              children: [
+                Text(
+                  '${(v * 100).round()}%',
+                  style: text.displayMedium?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -2,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
-            ],
+                const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: v,
+                      minHeight: 8,
+                      color: color,
+                      backgroundColor: capsuleFill(context),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(height: 8),
+          AnimatedSwitcher(
+            duration: 200.ms,
+            child: Text(
+              caption,
+              key: ValueKey(caption),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+            ),
+          ),
+          if (stats.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            SectionCard(
+              child: IntrinsicHeight(
+                child: Row(
+                  children: [
+                    for (final (i, (label, value)) in stats.indexed) ...[
+                      if (i > 0) const VerticalDivider(width: 0.5, thickness: 0.5, indent: 14, endIndent: 14),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(color: _tile(label), borderRadius: BorderRadius.circular(8)),
+                              child: Icon(_icon(label), size: 17, color: Colors.white),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              value,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                            Text(label, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                          ]),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
@@ -545,8 +623,8 @@ class FileMosaic extends StatelessWidget {
                       bottom: 2,
                       child: CircleAvatar(
                         radius: 8,
-                        backgroundColor: Colors.green,
-                        child: const Icon(Icons.check_rounded, size: 11, color: Colors.white),
+                        backgroundColor: scheme.primary,
+                        child: Icon(Icons.check_rounded, size: 11, color: scheme.onPrimary),
                       ).animate().scaleXY(begin: 0, duration: 260.ms, curve: Curves.easeOutBack),
                     ),
                 ],
@@ -558,7 +636,7 @@ class FileMosaic extends StatelessWidget {
             width: 46,
             height: 46,
             alignment: Alignment.center,
-            decoration: BoxDecoration(color: scheme.surfaceContainerHigh, borderRadius: BorderRadius.circular(10)),
+            decoration: BoxDecoration(color: capsuleFill(context), borderRadius: BorderRadius.circular(10)),
             child: Text('+${count - shown}', style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
       ],
@@ -593,6 +671,58 @@ Widget _incomingTile(IncomingFile f) {
 }
 
 String _eta(Duration d) => d.inMinutes >= 1 ? '${d.inMinutes}m ${d.inSeconds % 60}s' : '${d.inSeconds}s';
+
+/// A glass back button, as on the other inner pages.
+Widget _backButton(BuildContext context) => Padding(
+      padding: const EdgeInsets.only(left: 12),
+      child: Center(
+        child: GlassIconButton(
+          tooltip: 'Back',
+          size: 44,
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.maybePop(context),
+        ),
+      ),
+    );
+
+/// Big title and a line under it.
+Widget _heading(BuildContext context, String title, String subtitle) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.7)),
+        Text(subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+      ]),
+    );
+
+/// The files card: a header and every file lighting up as it lands.
+Widget _filesCard(BuildContext context, String title, int bytes, Widget mosaic) => SectionCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const Spacer(),
+          Text(formatBytes(bytes), style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        ]),
+        const SizedBox(height: 10),
+        mosaic,
+      ]),
+    );
+
+/// Grey (or accent, for [main]) full-height capsule buttons.
+Widget _button(BuildContext context, String label, IconData? icon, VoidCallback onPressed, {bool main = false}) {
+  final style = FilledButton.styleFrom(
+    minimumSize: const Size.fromHeight(50),
+    backgroundColor: main ? null : capsuleFill(context),
+    foregroundColor: main ? null : Theme.of(context).colorScheme.onSurface,
+  );
+  return icon == null
+      ? FilledButton(style: style, onPressed: onPressed, child: Text(label))
+      : FilledButton.icon(style: style, onPressed: onPressed, icon: Icon(icon), label: Text(label));
+}
 
 /// One send, live: the stage, the numbers and every file lighting up.
 class TransferScreen extends StatelessWidget {
@@ -636,16 +766,20 @@ class TransferScreen extends StatelessWidget {
         child: Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(
-            title: const Text('Sending'),
+            leadingWidth: 64,
+            leading: _backButton(context),
             actions: [
-              IconButton(
-                tooltip: 'All sends',
-                onPressed: () => Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => SendCenterScreen(controller: controller)),
+              ToolbarCapsule(children: [
+                IconButton(
+                  tooltip: 'All sends',
+                  onPressed: () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => SendCenterScreen(controller: controller)),
+                  ),
+                  icon: const Icon(Icons.view_list_rounded),
                 ),
-                icon: const Icon(Icons.view_list_rounded),
-              ),
+              ]),
+              const SizedBox(width: 12),
             ],
           ),
           body: ListenableBuilder(
@@ -659,10 +793,17 @@ class TransferScreen extends StatelessWidget {
                 JobStatus.done => TransferPhase.done,
                 _ => TransferPhase.failed,
               };
-              final color = switch (phase) {
-                TransferPhase.done => Colors.green,
-                TransferPhase.failed => scheme.error,
-                _ => scheme.primary,
+              final color = phase == TransferPhase.failed ? scheme.error : scheme.primary;
+              final status = switch (job.status) {
+                JobStatus.waiting => 'Looking for ${job.deviceAlias}…',
+                JobStatus.preparing => 'Getting ready…',
+                JobStatus.asking => 'Waiting for ${job.deviceAlias} to accept',
+                JobStatus.sending => 'Sending',
+                JobStatus.done => 'Sent',
+                JobStatus.needsPin => '${job.deviceAlias} asks for a PIN',
+                JobStatus.cancelled => 'Cancelled',
+                JobStatus.declined => job.message ?? '${job.deviceAlias} declined',
+                JobStatus.failed => job.message ?? 'Didn\'t finish',
               };
               final caption = switch (job.status) {
                 JobStatus.waiting => 'Waiting for ${job.deviceAlias} to show up nearby…',
@@ -676,78 +817,77 @@ class TransferScreen extends StatelessWidget {
               };
               final speed = job.speed, left = job.remaining;
               return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
                 children: [
-                  Glass(
-                    radius: 32,
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-                    child: Column(
-                      children: [
-                        TransferStage(
-                          phase: phase,
-                          fromName: 'You',
-                          toName: job.deviceAlias,
-                          toIcon: job.nearby ? Icons.bluetooth_connected_rounded : Icons.smartphone_rounded,
-                          filesDone: job.filesDone,
-                          token: (i) => itemTile(job.items[i % job.items.length]),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: TransferStats(
-                            title: 'Sending ${job.personName} to ${job.deviceAlias}',
-                            caption: caption,
-                            progress: job.progress,
-                            color: color,
-                            stats: [
-                              ('sent', formatBytes(job.sentBytes)),
-                              ('speed', speed == null ? '–' : '${formatBytes(speed.round())}/s'),
-                              ('left', left == null ? '–' : _eta(left)),
-                            ],
-                          ),
-                        ),
-                      ],
+                  _heading(context, 'Sending', '${job.personName} to ${job.deviceAlias}'),
+                  SectionCard(
+                    padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+                    child: TransferStage(
+                      phase: phase,
+                      status: status,
+                      fromName: 'You',
+                      toName: job.deviceAlias,
+                      toIcon: job.nearby ? Icons.bluetooth_connected_rounded : Icons.smartphone_rounded,
+                      toColor: deviceColor(job.fingerprint),
+                      filesDone: job.filesDone,
+                      height: 230,
+                      token: (i) => itemTile(job.items[i % job.items.length]),
                     ),
                   ).animate().fadeIn(duration: 300.ms).scaleXY(begin: 0.96, curve: Curves.easeOutCubic),
-                  const SizedBox(height: 16),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: FileMosaic(
-                        count: job.items.length,
-                        tile: (i) => itemTile(job.items[i]),
-                        isDone: (i) => job.status == JobStatus.done || i < job.filesDone,
-                      ),
+                  const SizedBox(height: 14),
+                  TransferStats(
+                    title: 'Sending ${job.personName} to ${job.deviceAlias}',
+                    caption: caption,
+                    progress: job.progress,
+                    color: color,
+                    stats: [
+                      ('sent', formatBytes(job.sentBytes)),
+                      ('speed', speed == null ? '–' : '${formatBytes(speed.round())}/s'),
+                      ('left', left == null ? '–' : _eta(left)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _filesCard(
+                    context,
+                    'Files',
+                    job.totalBytes,
+                    FileMosaic(
+                      count: job.items.length,
+                      tile: (i) => itemTile(job.items[i]),
+                      isDone: (i) => job.status == JobStatus.done || i < job.filesDone,
                     ),
                   ),
                   const SizedBox(height: 18),
                   if (job.status == JobStatus.done)
-                    FilledButton.icon(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.check_rounded),
-                      label: const Text('Done'),
-                    ).animate().fadeIn().moveY(begin: 12)
+                    _button(context, 'Done', Icons.check_rounded, () => Navigator.pop(context), main: true)
+                        .animate()
+                        .fadeIn()
+                        .moveY(begin: 12)
                   else if (job.canRetry)
-                    FilledButton.icon(
-                      onPressed: () => _retry(context),
-                      icon: Icon(job.status == JobStatus.needsPin ? Icons.pin_rounded : Icons.refresh_rounded),
-                      label: Text(job.status == JobStatus.needsPin ? 'Enter PIN' : 'Try again'),
-                    )
+                    Row(children: [
+                      Expanded(child: _button(context, 'Close', null, () => Navigator.pop(context))),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _button(
+                          context,
+                          job.status == JobStatus.needsPin ? 'Enter PIN' : 'Try again',
+                          job.status == JobStatus.needsPin ? Icons.pin_rounded : Icons.refresh_rounded,
+                          () => _retry(context),
+                          main: true,
+                        ),
+                      ),
+                    ])
                   else if (!job.finished)
                     Row(
                       children: [
                         Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              Haptics.remove();
-                              s.cancelJob(job);
-                            },
-                            child: const Text('Cancel'),
-                          ),
+                          child: _button(context, 'Cancel', Icons.close_rounded, () {
+                            Haptics.remove();
+                            s.cancelJob(job);
+                          }),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton.tonal(onPressed: () => Navigator.pop(context), child: const Text('Hide')),
-                        ),
+                        const SizedBox(width: 10),
+                        Expanded(child: _button(context, 'Hide', null, () => Navigator.pop(context))),
                       ],
                     ),
                   if (!job.finished && !job.canRetry)
@@ -756,7 +896,7 @@ class TransferScreen extends StatelessWidget {
                       child: Text(
                         'It keeps going in the background if you leave.',
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     ),
                 ],
@@ -783,7 +923,7 @@ class ReceiveLiveScreen extends StatelessWidget {
         intensity: 0.8,
         child: Scaffold(
           backgroundColor: Colors.transparent,
-          appBar: AppBar(title: const Text('Receiving')),
+          appBar: AppBar(leadingWidth: 64, leading: _backButton(context)),
           body: ListenableBuilder(
             listenable: r,
             builder: (context, _) {
@@ -803,82 +943,77 @@ class ReceiveLiveScreen extends StatelessWidget {
               final left = speed == null || speed <= 0
                   ? null
                   : Duration(seconds: ((total - session.bytes) / speed).ceil());
-              final color = switch (phase) {
-                TransferPhase.done => Colors.green,
-                TransferPhase.failed => scheme.error,
-                _ => scheme.primary,
-              };
+              final color = phase == TransferPhase.failed ? scheme.error : scheme.primary;
+              final n = session.tokens.length;
               return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
                 children: [
-                  Glass(
-                    radius: 32,
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-                    child: Column(
-                      children: [
-                        TransferStage(
-                          phase: phase,
-                          fromName: session.from,
-                          toName: 'You',
-                          filesDone: session.done.length,
-                          token: (i) => files.isEmpty ? const SizedBox() : _incomingTile(files[i % files.length]),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: TransferStats(
-                            title: 'From ${session.from}',
-                            caption: session.finished
-                                ? (session.cancelled ? 'Stopped' : 'Everything arrived and was saved')
-                                : '${session.done.length} of ${session.tokens.length} arrived',
-                            progress: progress,
-                            color: color,
-                            stats: [
-                              ('received', formatBytes(session.bytes)),
-                              ('speed', speed == null ? '–' : '${formatBytes(speed.round())}/s'),
-                              ('left', left == null ? '–' : _eta(left)),
-                            ],
-                          ),
-                        ),
-                      ],
+                  _heading(context, 'Receiving', '$n ${n == 1 ? 'file' : 'files'} from ${session.from}'),
+                  SectionCard(
+                    padding: const EdgeInsets.fromLTRB(8, 10, 8, 4),
+                    child: TransferStage(
+                      phase: phase,
+                      status: switch (phase) {
+                        TransferPhase.done => 'Saved',
+                        TransferPhase.failed => 'Stopped',
+                        _ => 'Receiving',
+                      },
+                      fromName: session.from,
+                      fromIcon: Icons.devices_rounded,
+                      fromColor: deviceColor(session.from),
+                      toName: 'You',
+                      filesDone: session.done.length,
+                      height: 230,
+                      token: (i) => files.isEmpty ? const SizedBox() : _incomingTile(files[i % files.length]),
                     ),
                   ).animate().fadeIn(duration: 300.ms).scaleXY(begin: 0.96, curve: Curves.easeOutCubic),
-                  const SizedBox(height: 16),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: FileMosaic(
-                        count: files.length,
-                        tile: (i) => _incomingTile(files[i]),
-                        isDone: (i) => session.done.contains(files[i].id),
-                      ),
+                  const SizedBox(height: 14),
+                  TransferStats(
+                    title: 'From ${session.from}',
+                    caption: session.finished
+                        ? (session.cancelled ? 'Stopped' : 'Everything arrived and was saved')
+                        : '${session.done.length} of $n arrived',
+                    progress: progress,
+                    color: color,
+                    stats: [
+                      ('received', formatBytes(session.bytes)),
+                      ('speed', speed == null ? '–' : '${formatBytes(speed.round())}/s'),
+                      ('left', left == null ? '–' : _eta(left)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _filesCard(
+                    context,
+                    session.finished ? 'Arrived' : 'Arriving',
+                    total,
+                    FileMosaic(
+                      count: files.length,
+                      tile: (i) => _incomingTile(files[i]),
+                      isDone: (i) => session.done.contains(files[i].id),
                     ),
                   ),
+                  const SectionFooter('Photos and videos go to the ShareBro album and are scanned for faces.'),
                   const SizedBox(height: 18),
                   if (session.finished)
                     Row(
                       children: [
                         Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => Navigator.pushReplacement(
+                          child: _button(
+                            context,
+                            'History',
+                            Icons.history_rounded,
+                            () => Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(builder: (_) => TransferHistoryScreen(controller: controller)),
                             ),
-                            icon: const Icon(Icons.history_rounded),
-                            label: const Text('History'),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton.icon(
-                            onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.check_rounded),
-                            label: const Text('Done'),
-                          ),
-                        ),
+                        const SizedBox(width: 10),
+                        Expanded(child: _button(context, 'Done', Icons.check_rounded, () => Navigator.pop(context), main: true)),
                       ],
                     ).animate().fadeIn().moveY(begin: 12)
                   else
-                    FilledButton.tonal(onPressed: () => Navigator.pop(context), child: const Text('Hide')),
+                    _button(context, 'Hide', null, () => Navigator.pop(context)),
                 ],
               );
             },

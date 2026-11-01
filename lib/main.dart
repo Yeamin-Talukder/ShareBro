@@ -19,6 +19,7 @@ Future<void> main() async {
   final controller = ScanController(db);
   await controller.load();
   await Island.load(db);
+  await Appearance.load(db);
   runApp(PhotoOrganizerApp(controller: controller));
 }
 
@@ -31,12 +32,18 @@ class PhotoOrganizerApp extends StatefulWidget {
   State<PhotoOrganizerApp> createState() => _PhotoOrganizerAppState();
 }
 
-/// Follows the phone's light/dark setting, but instead of snapping, the new
-/// look spreads out from the middle of the screen as a growing circle.
+/// Follows the phone's light/dark setting (or the one picked in Settings),
+/// but instead of snapping, the new look spreads out from the middle of the
+/// screen as a growing circle.
 class _PhotoOrganizerAppState extends State<PhotoOrganizerApp>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
-  late Brightness _brightness =
-      WidgetsBinding.instance.platformDispatcher.platformBrightness;
+  static Brightness get _wanted => switch (Appearance.mode.value) {
+        ThemeMode.light => Brightness.light,
+        ThemeMode.dark => Brightness.dark,
+        ThemeMode.system => WidgetsBinding.instance.platformDispatcher.platformBrightness,
+      };
+
+  late Brightness _brightness = _wanted;
   final _screen = GlobalKey();
   late final NotifyBridge _notify = NotifyBridge(widget.controller);
 
@@ -57,12 +64,14 @@ class _PhotoOrganizerAppState extends State<PhotoOrganizerApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    Appearance.mode.addListener(_apply);
     _notify; // starts following transfers and scans for the notification shade
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    Appearance.mode.removeListener(_apply);
     _notify.dispose();
     _reveal.dispose();
     _old?.dispose();
@@ -70,8 +79,10 @@ class _PhotoOrganizerAppState extends State<PhotoOrganizerApp>
   }
 
   @override
-  Future<void> didChangePlatformBrightness() async {
-    final next = WidgetsBinding.instance.platformDispatcher.platformBrightness;
+  void didChangePlatformBrightness() => _apply();
+
+  Future<void> _apply() async {
+    final next = _wanted;
     if (next == _brightness) return;
     ui.Image? shot;
     try {

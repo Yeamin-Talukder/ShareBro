@@ -168,6 +168,7 @@ class _PhotoViewerState extends State<PhotoViewer> with TickerProviderStateMixin
 
   Widget _actionBar() => FutureBuilder<AssetEntity?>(
     future: AssetThumb.entity(_ids[_index]),
+    initialData: AssetThumb.peek(_ids[_index]),
     builder: (context, snap) => MediaActionBar(
       kind: GlassKind.clear,
       favourite: snap.data?.isFavorite ?? false,
@@ -302,7 +303,7 @@ class _PhotoViewerState extends State<PhotoViewer> with TickerProviderStateMixin
           Positioned.fill(
             child: Opacity(
               opacity: 1 - progress,
-              child: _BlurredBackdrop(id: id),
+              child: RepaintBoundary(child: _BlurredBackdrop(id: id)),
             ),
           ),
           Listener(
@@ -337,38 +338,42 @@ class _PhotoViewerState extends State<PhotoViewer> with TickerProviderStateMixin
                     itemBuilder: (context, i) => AnimatedBuilder(
                       animation: _pages,
                       builder: (context, child) {
-                        // Parallax: the outgoing photo drifts a little slower
-                        // than the page and settles back, like layered cards.
+                        // Layered cards: the photo on the left drifts a
+                        // little slower and sinks back while the one on the
+                        // right slides over it at full speed, so the two
+                        // never cross-blend. The tree keeps the same shape
+                        // at rest; changing it would rebuild the page (and
+                        // reload its photo) every time a swipe starts.
                         final page = _pages.hasClients && _pages.position.haveDimensions
                             ? _pages.page ?? _index.toDouble()
                             : _index.toDouble();
-                        final delta = (i - page).clamp(-1.0, 1.0);
-                        if (delta == 0) return child!;
+                        final back = (page - i).clamp(0.0, 1.0);
+                        final t = Curves.easeOut.transform(back);
                         final width = MediaQuery.sizeOf(context).width;
-                        final t = Curves.easeOut.transform(delta.abs());
-                        return Transform.translate(
-                          offset: Offset(-delta * width * 0.22, 0),
-                          child: Transform.scale(
-                            scale: 1 - t * 0.06,
-                            child: Opacity(opacity: (1 - t * 0.35).clamp(0, 1), child: child),
-                          ),
+                        return Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.translationValues(back * width * 0.3, 0, 0)
+                            ..scaleByDouble(1 - t * 0.08, 1 - t * 0.08, 1, 1),
+                          child: Opacity(opacity: 1 - t * 0.45, child: child),
                         );
                       },
-                      child: _ZoomPage(
-                        key: ValueKey(_ids[i]),
-                        id: _ids[i],
-                        active: i == _index,
-                        face: widget.faces[_ids[i]],
-                        highlight: _highlight && i == _index,
-                        db: widget.controller.db,
-                        onZoomChanged: (z) {
-                          if (i == _index && z != _zoomed) setState(() => _zoomed = z);
-                        },
-                        onFaceTap: (data) {
-                          Haptics.lift();
-                          setState(() => _spotlight = data);
-                        },
-                        onMiss: _toggleChrome,
+                      child: RepaintBoundary(
+                        child: _ZoomPage(
+                          key: ValueKey(_ids[i]),
+                          id: _ids[i],
+                          active: i == _index,
+                          face: widget.faces[_ids[i]],
+                          highlight: _highlight && i == _index,
+                          db: widget.controller.db,
+                          onZoomChanged: (z) {
+                            if (i == _index && z != _zoomed) setState(() => _zoomed = z);
+                          },
+                          onFaceTap: (data) {
+                            Haptics.lift();
+                            setState(() => _spotlight = data);
+                          },
+                          onMiss: _toggleChrome,
+                        ),
                       ),
                     ),
                   ),
@@ -497,15 +502,16 @@ class _BlurredBackdrop extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               const ColoredBox(color: Colors.black),
+              // A tiny thumbnail stretched to fill the screen reads as a soft
+              // blur, without running a full-screen blur filter every frame
+              // while you swipe.
               if (asset != null)
-                ImageFiltered(
-                  imageFilter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
-                  child: AssetEntityImage(
-                    asset,
-                    isOriginal: false,
-                    thumbnailSize: const ThumbnailSize.square(160),
-                    fit: BoxFit.cover,
-                  ),
+                AssetEntityImage(
+                  asset,
+                  isOriginal: false,
+                  thumbnailSize: const ThumbnailSize.square(32),
+                  fit: BoxFit.cover,
+                  filterQuality: FilterQuality.medium,
                 ),
               const ColoredBox(color: Colors.black45),
             ],
@@ -590,10 +596,20 @@ class _ZoomPageState extends State<_ZoomPage> with SingleTickerProviderStateMixi
   /// Zoomed in far enough to need more pixels than the screen-sized copy.
   bool _deepZoom = false;
 
+  /// One-finger panning only means something once zoomed in; at rest a
+  /// sideways swipe belongs to the pages.
+  bool _panning = false;
+
   void _report() {
-    widget.onZoomChanged(_isZoomed);
+    final zoomed = _isZoomed;
+    widget.onZoomChanged(zoomed);
     final deep = _transform.value.getMaxScaleOnAxis() > 1.8;
-    if (deep && !_deepZoom) setState(() => _deepZoom = true);
+    if ((deep && !_deepZoom) || zoomed != _panning) {
+      setState(() {
+        _deepZoom = _deepZoom || deep;
+        _panning = zoomed;
+      });
+    }
   }
 
   void _doubleTap() {
@@ -656,6 +672,7 @@ class _ZoomPageState extends State<_ZoomPage> with SingleTickerProviderStateMixi
                   onDoubleTap: _doubleTap,
                   child: InteractiveViewer(
                     transformationController: _transform,
+                    panEnabled: _panning,
                     maxScale: 6,
                     // Lets go of the edges smoothly instead of stopping dead.
                     interactionEndFrictionCoefficient: 0.0001,

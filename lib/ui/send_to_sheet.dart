@@ -9,6 +9,7 @@ import '../share/protocol.dart';
 import 'devices.dart';
 import 'file_icons.dart';
 import 'motion.dart';
+import 'sections.dart';
 import 'transfer_view.dart';
 import 'web_share_screen.dart';
 import 'widgets.dart';
@@ -37,7 +38,7 @@ String describeItems(List<SendItem> items) {
   return '$n ${n == 1 ? 'file' : 'files'}';
 }
 
-/// Sends [items] to [t] and opens the Sending screen.
+/// Sends [items] to [t] and, with [open], opens the Sending screen.
 Future<void> sendItemsTo(
   BuildContext context,
   ScanController controller,
@@ -45,6 +46,7 @@ Future<void> sendItemsTo(
   List<SendItem> items, {
   SendQuality? quality,
   bool popFirst = false,
+  bool open = true,
 }) async {
   final s = controller.sharing;
   Haptics.success();
@@ -52,7 +54,7 @@ Future<void> sendItemsTo(
   final job = t.nearbyName != null
       ? await s.enqueueNearby(personName: label, items: items, name: t.nearbyName!, quality: quality)
       : await s.enqueue(personName: label, items: items, device: t.device!, quality: quality);
-  if (!context.mounted) return;
+  if (!context.mounted || !open) return;
   final nav = Navigator.of(context);
   if (popFirst) nav.pop();
   await nav.push(MaterialPageRoute(builder: (_) => TransferScreen(controller: controller, job: job)));
@@ -97,7 +99,6 @@ class _SendToSheetState extends State<_SendToSheet> {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
     final items = widget.items;
     return DraggableScrollableSheet(
       expand: false,
@@ -123,79 +124,41 @@ class _SendToSheetState extends State<_SendToSheet> {
         const SizedBox(height: 16),
         DevicePicker(
           sharing: widget.controller.sharing,
+          count: items.length,
           onPick: (t) => sendItemsTo(context, widget.controller, t, items, quality: _quality, popFirst: true),
         ),
-        const SizedBox(height: 8),
-        Row(children: [
-          Expanded(
-            child: _BigOption(
-              icon: Icons.qr_code_2_rounded,
-              title: 'Link / QR',
-              subtitle: 'Any browser',
-              color: scheme.tertiaryContainer,
-              onTap: () {
-                final nav = Navigator.of(context);
-                nav.pop();
-                nav.push(MaterialPageRoute(
-                  builder: (_) => WebShareScreen(
-                    controller: widget.controller,
-                    title: widget.title ?? 'Shared with ShareBro',
-                    items: items,
-                    quality: _quality,
-                  ),
-                ));
-              },
-            ),
+        const SizedBox(height: 22),
+        SectionCard.rows(rows: [
+          SectionRow(
+            leading: const IconTile(icon: Icons.qr_code_2_rounded, color: Color(0xFF5E5CE6)),
+            title: 'Link or QR code',
+            subtitle: 'Opens in any browser',
+            chevron: true,
+            onTap: () {
+              final nav = Navigator.of(context);
+              nav.pop();
+              nav.push(MaterialPageRoute(
+                builder: (_) => WebShareScreen(
+                  controller: widget.controller,
+                  title: widget.title ?? 'Shared with ShareBro',
+                  items: items,
+                  quality: _quality,
+                ),
+              ));
+            },
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _BigOption(
-              icon: Icons.ios_share_rounded,
-              title: 'Other apps',
-              subtitle: 'Quick Share, WhatsApp…',
-              color: scheme.secondaryContainer,
-              onTap: () {
-                Navigator.pop(context);
-                shareItemsWithApps(items);
-              },
-            ),
+          SectionRow(
+            leading: const IconTile(icon: Icons.ios_share_rounded, color: Color(0xFF0A84FF)),
+            title: 'Other apps',
+            subtitle: 'Quick Share, WhatsApp and more',
+            chevron: true,
+            onTap: () {
+              Navigator.pop(context);
+              shareItemsWithApps(items);
+            },
           ),
         ]),
       ]),
-    );
-  }
-}
-
-class _BigOption extends StatelessWidget {
-  const _BigOption({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title, subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      onTap: onTap,
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            CircleAvatar(backgroundColor: color, child: Icon(icon)),
-            const SizedBox(height: 10),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-            Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-          ]),
-        ),
-      ),
     );
   }
 }
@@ -255,7 +218,7 @@ class ItemStrip extends StatelessWidget {
           return SizedBox.square(
             dimension: height,
             child: Stack(fit: StackFit.expand, children: [
-              ClipRRect(borderRadius: BorderRadius.circular(16), child: body),
+              ClipRRect(borderRadius: BorderRadius.circular(12), child: body),
               if (onRemove != null)
                 Positioned(
                   top: 4,
@@ -266,9 +229,9 @@ class ItemStrip extends StatelessWidget {
                       onRemove!(item);
                     },
                     child: const CircleAvatar(
-                      radius: 11,
-                      backgroundColor: Colors.black54,
-                      child: Icon(Icons.close_rounded, size: 14, color: Colors.white),
+                      radius: 10,
+                      backgroundColor: Color(0xB33C3C43),
+                      child: Icon(Icons.close_rounded, size: 13, color: Colors.white),
                     ),
                   ),
                 ),

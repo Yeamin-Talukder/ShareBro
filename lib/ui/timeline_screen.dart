@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../data/dates.dart';
+import '../data/trip_days.dart';
 import '../scan/scan_controller.dart';
 import 'photo_viewer.dart';
 import 'widgets.dart';
@@ -47,6 +48,9 @@ class _TimelineScreenState extends State<TimelineScreen> {
   List<(DateTime, List<_Stop>)>? _days;
   List<_Stop> _allStops = const [];
 
+  /// What each day was mostly about ("Beach"), by date.
+  Map<DateTime, String?> _places = const {};
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +59,9 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
   Future<void> _load() async {
     final shots = await widget.controller.db.tripTimeline(widget.tripId);
+    final places = {
+      for (final d in await tripDays(widget.controller.db, widget.tripId)) d.date: d.place,
+    };
     final days = <(DateTime, List<_Stop>)>[];
     final all = <_Stop>[];
     _Stop? stop;
@@ -86,6 +93,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
       setState(() {
         _days = days;
         _allStops = all;
+        _places = places;
       });
     }
   }
@@ -153,8 +161,12 @@ class _TimelineScreenState extends State<TimelineScreen> {
                   for (final (d, (day, stops)) in days.indexed) ...[
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-                      child: Text('Day ${d + 1} · ${formatSectionDay(day)}',
-                          style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(_places[day] == null ? 'Day ${d + 1}' : 'Day ${d + 1} · ${_places[day]}',
+                            style: text.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                        Text(formatSectionDay(day),
+                            style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant)),
+                      ]),
                     ),
                     for (final stop in stops)
                       _StopTile(stop: stop, onOpen: (i) => _open(stop.shots, i))

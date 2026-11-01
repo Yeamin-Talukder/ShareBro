@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShareBro · People views</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block">
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { background:#050407; }
+  body { color:#F2F1F5; font-family:Roboto, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;
+         display:flex; flex-wrap:wrap; gap:36px; justify-content:center; align-items:flex-start; padding:24px 16px 48px; }
+  button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .i { display:inline-block; flex:none; font-family:'Material Symbols Rounded'; font-weight:400; font-style:normal; line-height:1; white-space:nowrap;
+       font-feature-settings:'liga'; font-variation-settings:'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; width:1em; height:1em; overflow:hidden; }
+  .i.fill, .tab.on .i, .vchip.on .i { font-variation-settings:'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+
+  .side { width:360px; max-width:100%; }
+  .side h1 { font-size:24px; font-weight:800; letter-spacing:-.5px; }
+  .side .lead { color:rgba(242,241,245,.65); font-size:13.5px; line-height:1.6; margin-top:6px; }
+  .views { display:grid; gap:10px; margin-top:18px; }
+  .vw { border-radius:20px; padding:14px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); display:grid; grid-template-columns:auto 1fr; gap:12px; text-align:left; transition:all .25s; }
+  .vw.on { border-color:rgba(255,138,107,.65); background:rgba(255,138,107,.08); }
+  .vw .n { width:38px; height:38px; border-radius:12px; display:grid; place-items:center; background:rgba(118,118,128,.3); font-size:21px; transition:all .25s; }
+  .vw.on .n { background:#FF8A6B; color:#2A0D06; }
+  .vw b { font-size:14.5px; display:block; } .vw p { font-size:12.5px; color:rgba(242,241,245,.62); line-height:1.5; margin-top:2px; }
+  .vw em { font-style:normal; color:#FF8A6B; font-weight:600; }
+
+  .stage { position:relative; flex:none; }
+  .phone { position:absolute; width:412px; height:892px; transform-origin:0 0; border-radius:54px; overflow:hidden; isolation:isolate; user-select:none;
+           box-shadow:0 0 0 11px #0c0a0e, 0 0 0 12px rgba(255,255,255,.09), 0 50px 140px rgba(110,26,98,.32);
+           --fill:rgba(118,118,128,.24); --l2:rgba(235,235,245,.62); --l3:rgba(235,235,245,.32); --g:#FF8A6B; --onG:#2A0D06;
+           --glass:rgba(36,34,42,.55); --glassb:rgba(255,255,255,.14); background:#050309; color:#F2EFF5; }
+  .aur { position:absolute; inset:-10%; z-index:0; }
+  .aur b { position:absolute; width:80%; height:55%; border-radius:50%; filter:blur(55px); animation:drift 24s ease-in-out infinite alternate; }
+  .aur b:nth-child(1) { left:-18%; top:-6%; background:radial-gradient(#8E1F3E 0, transparent 68%); }
+  .aur b:nth-child(2) { left:42%; top:10%; background:radial-gradient(#6E1A62 0, transparent 68%); animation-delay:-7s; }
+  .aur b:nth-child(3) { left:-20%; top:48%; background:radial-gradient(#3A27A6 0, transparent 68%); animation-delay:-12s; }
+  .aur b:nth-child(4) { left:40%; top:68%; background:radial-gradient(#0C6A6E 0, transparent 68%); animation-delay:-3s; }
+  @keyframes drift { 50% { transform:translate(9%,6%) scale(1.12); } 100% { transform:translate(-7%,-5%) scale(.95); } }
+  .veil { position:absolute; inset:0; z-index:1; background:radial-gradient(120% 85% at 50% 35%, rgba(5,3,9,.18), rgba(5,3,9,.8)); }
+  .sbar { position:absolute; left:0; right:0; top:0; height:52px; z-index:20; display:flex; justify-content:space-between; padding:15px 30px 0; font-size:15px; font-weight:600; pointer-events:none; }
+  .cam { position:absolute; top:12px; left:50%; width:20px; height:20px; margin-left:-10px; border-radius:50%; background:#000; z-index:21; }
+  .home { position:absolute; bottom:8px; left:50%; width:124px; height:4px; margin-left:-62px; border-radius:2px; background:#fff; opacity:.8; z-index:21; }
+  .head { position:absolute; left:0; right:0; top:46px; z-index:6; }
+  .navrow { display:flex; justify-content:flex-end; padding:4px 16px 0; min-height:48px; align-items:center; }
+  .tcap { display:flex; border-radius:24px; background:var(--glass); backdrop-filter:blur(24px); border:1px solid var(--glassb); }
+  .tcap button { width:44px; height:44px; display:grid; place-items:center; }
+  .ttl { font-size:34px; font-weight:800; letter-spacing:-.8px; padding:2px 20px 0; }
+  .sub { font-size:14px; color:var(--l2); padding:2px 20px 0; }
+  .vrow { display:flex; gap:8px; padding:14px 16px 4px; overflow-x:auto; scrollbar-width:none; }
+  .vrow::-webkit-scrollbar { display:none; }
+  .vchip { flex:none; height:36px; padding:0 13px 0 11px; border-radius:18px; display:flex; align-items:center; gap:6px; font-size:14px; font-weight:600; background:var(--fill); transition:background .25s, color .25s; }
+  .vchip.on { background:var(--g); color:var(--onG); }
+
+  .field { position:absolute; left:0; right:0; top:236px; bottom:0; z-index:4; touch-action:none; cursor:grab; overflow:hidden; }
+  .field:active { cursor:grabbing; }
+  .nb { position:absolute; left:0; top:0; width:84px; height:84px; will-change:transform, opacity; }
+  .nb .face { position:absolute; inset:0; border-radius:50%; overflow:hidden; background:var(--f); border:3px solid var(--g); }
+  .nb.un .face { border:2.5px dashed var(--l3); }
+  .nb .face svg { position:absolute; left:0; right:0; bottom:-6%; width:100%; height:92%; color:rgba(255,255,255,.45); }
+  .nb span { position:absolute; top:100%; left:50%; transform:translateX(-50%); margin-top:5px; font-size:13px; font-weight:700; white-space:nowrap; transition:opacity .2s; text-shadow:0 1px 6px rgba(0,0,0,.6); }
+  .nb span small { display:block; text-align:center; font-size:11px; font-weight:500; color:var(--l2); }
+  .nb.un span { color:var(--g); }
+  .hub { position:absolute; width:96px; height:96px; margin:-48px; border-radius:50%; background:var(--g); color:var(--onG); display:grid; place-items:center; align-content:center; text-align:center;
+         font-size:12px; font-weight:800; box-shadow:0 0 0 8px rgba(255,138,107,.14); transition:opacity .4s, transform .5s cubic-bezier(.3,1.4,.5,1); z-index:1; pointer-events:none; }
+  .hub.hide { opacity:0; transform:scale(.5); }
+  .rings { position:absolute; inset:0; pointer-events:none; transition:opacity .5s; }
+  .rings.hide { opacity:0; }
+  .lensdot { position:absolute; width:300px; height:300px; margin:-150px; border-radius:50%; border:1.5px solid rgba(255,138,107,.35); pointer-events:none; transition:opacity .3s; opacity:0; }
+  .hintline { position:absolute; left:0; right:0; bottom:118px; z-index:5; text-align:center; font-size:12.5px; color:var(--l2); pointer-events:none; transition:opacity .4s; }
+  .dock { position:absolute; left:20px; right:20px; bottom:36px; height:68px; border-radius:34px; padding:6px; z-index:15; display:flex;
+          background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0) 45%), rgba(28,26,34,.62); backdrop-filter:blur(18px); border:1px solid rgba(255,255,255,.157); }
+  .dock .drop { position:absolute; top:6px; bottom:6px; left:6px; width:calc((100% - 12px) / 5); border-radius:28px; background:rgba(255,138,107,.18); border:1px solid rgba(255,138,107,.235); }
+  .dock .tab { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:12px; font-weight:500; opacity:.75; position:relative; }
+  .dock .tab.on { color:var(--g); font-weight:700; opacity:1; }
+  .toast { position:absolute; top:46px; left:50%; transform:translate(-50%,-24px) scale(.85); opacity:0; z-index:30; background:#000; padding:10px 16px 10px 12px; border-radius:22px;
+           font-size:13.5px; display:flex; gap:8px; align-items:center; transition:all .5s cubic-bezier(.3,1.4,.5,1); pointer-events:none; white-space:nowrap; }
+  .toast.show { opacity:1; transform:translate(-50%,0) scale(1); } .toast .i { color:var(--g); }
+</style>
+</head>
+<body>
+<aside class="side">
+  <h1>People · views like Honeycomb</h1>
+  <p class="lead">Six spatial ways to see everyone, all in the same spirit as the honeycomb: you touch and move the whole group, and faces grow, shrink and drift as they move. Pick a view here or with the chips in the phone, then drag it. Tap a face to open it.</p>
+  <div class="views" id="views"></div>
+</aside>
+
+<div class="stage" id="stage">
+  <div class="phone" id="phone">
+    <div class="aur"><b></b><b></b><b></b><b></b></div><div class="veil"></div>
+    <div class="head">
+      <div class="navrow"><div class="tcap"><button><span class="i" style="font-size:21px">search</span></button><button><span class="i" style="font-size:21px">add_photo_alternate</span></button><button><span class="i" style="font-size:21px">more_horiz</span></button></div></div>
+      <h1 class="ttl">People</h1><p class="sub" id="sub"></p>
+      <div class="vrow" id="vrow"></div>
+    </div>
+    <div class="field" id="field"><svg class="rings" id="rings" width="412" height="656"></svg><div class="hub" id="hub"><span class="i fill" style="font-size:26px">luggage</span>Bali 2025</div><div class="lensdot" id="lens"></div></div>
+    <p class="hintline" id="hint"></p>
+    <div class="dock" id="dock"></div>
+    <div class="sbar"><span>3:08</span><span>●●● ▮</span></div><div class="cam"></div>
+    <div class="toast" id="toast"></div><div class="home"></div>
+  </div>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const ic = (n, s = 20, c = '') => `<span class="i ${c}" style="font-size:${s}px">${n}</span>`;
+const SIL = '<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMax meet"><circle cx="50" cy="40" r="20" fill="currentColor"/><path d="M12 100c2-22 18-34 38-34s36 12 38 34z" fill="currentColor"/></svg>';
+const COLS = ['#C98F72','#7F98AE','#C9A46E','#8EA37E','#B98593','#9A8BC2','#C88866','#6FA39B','#BFA161','#A97B8A','#7D86C2','#B48C74','#8FA77F','#C27C7C','#9C8CC4'];
+const NAMES = ['Maya','Ravi','Sofia','Ayaan','Leo','Nadia',null,'Omar','Priya',null,'Kai','Zara','Ethan',null,'Iris','Noah','Aria','Sami',null,'Lena','Theo','Mina','Jonas',null,'Ella','Arjun','Rosa','Yusuf','Hana','Dev'];
+const PEOPLE = NAMES.map((n, k) => ({ n, k, c: Math.round(260 * Math.pow(.88, k)) + 3 }));
+const N = PEOPLE.length;
+const VIEWS = [
+  ['hive', 'hive', 'Honeycomb', 'Faces packed like the Apple Watch home screen. <em>Drag</em> to move around: faces near the middle grow, the edges shrink.'],
+  ['spiral', 'filter_vintage', 'Sunflower', 'A golden spiral: the people with the most photos sit in the middle, everyone else curls outwards. <em>Drag around the centre</em> to spin it.'],
+  ['globe', 'public', 'Globe', 'Everyone on a slowly turning 3D ball. <em>Drag</em> to roll it any way; faces at the front are big and named, the back ones fade.'],
+  ['orbit', 'orbit', 'Orbit', 'The trip in the middle and people circling it on tilted rings, closest friends on the inner ring. <em>Drag sideways</em> to spin the rings.'],
+  ['lens', 'search_check', 'Magnifier', 'A tight mosaic of small faces with a lens under your finger: faces swell as you pass over them and push their neighbours aside. <em>Drag over the faces</em>.'],
+  ['drum', 'view_carousel', 'Carousel', 'Faces wrapped around a turning drum, three rows high. <em>Swipe sideways</em> to spin it; it settles on a column.'],
+];
+const field = $('#field'), phone = $('#phone');
+const W = 412, H = 656, CX = 206, CY = 268;
+let view = 'hive', scale = 1, switchedAt = 0;
+const S = { pan: { x: 0, y: 0 }, rot: 0, yaw: 0, pitch: -.25, spin: 0, lens: { x: CX, y: CY, a: 0 }, drum: 0 };
+const V = { x: 0, y: 0, rot: 0, yaw: 0, pitch: 0, spin: 0, drum: 0 };
+let dragging = false;
+
+/* Nodes */
+field.insertAdjacentHTML('beforeend', PEOPLE.map((p, i) => `<div class="nb ${p.n ? '' : 'un'}" data-i="${i}"><div class="face" style="--f:${COLS[p.k % 15]}">${SIL}</div><span>${p.n || 'Add a name'}<small>${p.c} photos</small></span></div>`).join(''));
+const NODES = $$('.nb', field).map(el => ({ el, label: $('span', el), x: CX, y: CY, s: .2, o: 0 }));
+
+/* Fixed shapes */
+const HEX = (() => { const out = [[0, 0]], gap = 100; const dirs = [[-.5, .866], [-1, 0], [-.5, -.866], [.5, -.866], [1, 0], [.5, .866]];
+  for (let r = 1; out.length < N; r++) { let x = r * gap, y = 0; for (const [dx, dy] of dirs) for (let s = 0; s < r; s++) { out.push([x, y]); x += dx * gap; y += dy * gap; } } return out; })();
+const SPHERE = PEOPLE.map((_, i) => { const y = 1 - 2 * (i + .5) / N, r = Math.sqrt(1 - y * y), a = i * 2.39996; return [Math.cos(a) * r, y, Math.sin(a) * r]; });
+const RINGS = [[100, 5, .0065], [162, 10, -.0042], [226, N - 15, .0026]];
+
+function targets(t) {
+  const out = [];
+  if (view === 'hive') {
+    for (let i = 0; i < N; i++) {
+      const x = CX + HEX[i][0] + S.pan.x, y = CY + HEX[i][1] + S.pan.y;
+      const d = Math.hypot(x - CX, (y - CY) * 1.1);
+      const s = Math.max(.3, Math.min(1.04, 1.12 - d / 260));
+      out.push({ x, y, s, o: 1, z: s, lab: s > .95 });
+    }
+  } else if (view === 'spiral') {
+    for (let i = 0; i < N; i++) {
+      const a = i * 2.39996 + S.rot, r = 40 * Math.sqrt(i + .5);
+      const s = Math.max(.4, .86 - i * .016) * (1 + .03 * Math.sin(t / 600 + i));
+      out.push({ x: CX + r * Math.cos(a), y: CY + r * Math.sin(a), s, o: 1, z: 1 - i / N, lab: i === 0 });
+    }
+  } else if (view === 'globe') {
+    const cy = Math.cos(S.yaw), sy = Math.sin(S.yaw), cp = Math.cos(S.pitch), sp = Math.sin(S.pitch), R = 196;
+    for (let i = 0; i < N; i++) {
+      let [x, y, z] = SPHERE[i];
+      [x, z] = [x * cy + z * sy, -x * sy + z * cy];
+      [y, z] = [y * cp - z * sp, y * sp + z * cp];
+      const depth = (z + 1) / 2, persp = 1 / (1.6 - z * .45);
+      out.push({ x: CX + x * R * persp * 1.1, y: CY + y * R * persp * 1.1, s: .34 + .72 * depth * depth, o: .2 + .8 * depth, z: depth, lab: z > .72 });
+    }
+  } else if (view === 'orbit') {
+    let i = 0;
+    RINGS.forEach(([r, n, sp], ring) => {
+      for (let k = 0; k < n && i < N; k++, i++) {
+        const a = k * 2 * Math.PI / n + t * sp / 16 + S.spin * (ring === 1 ? -1 : 1) * (1.4 - ring * .3) + ring;
+        const depth = (1 - Math.cos(a)) / 2;
+        out.push({ x: CX + r * Math.sin(a), y: CY - r * .58 * Math.cos(a), s: (.52 - ring * .1) + (.4 - ring * .08) * depth, o: .45 + .55 * depth, z: depth + 2 - ring * .3, lab: depth > .85 && ring === 0 });
+      }
+    });
+  } else if (view === 'lens') {
+    const cols = 5, cell = 70, x0 = CX - 2 * cell, y0 = CY - 2.5 * cell - 6;
+    for (let i = 0; i < N; i++) {
+      let x = x0 + (i % cols) * cell, y = y0 + Math.floor(i / cols) * cell;
+      const dx = x - S.lens.x, dy = y - S.lens.y, d = Math.hypot(dx, dy);
+      const f = S.lens.a * Math.max(0, 1 - d / 150), e = f * f * (3 - 2 * f);
+      if (d > 0) { x += dx / d * 56 * e; y += dy / d * 56 * e; }
+      out.push({ x, y, s: .72 + .6 * e, o: 1, z: e, lab: e > .85 });
+    }
+  } else if (view === 'drum') {
+    const cols = Math.ceil(N / 3), step = 2 * Math.PI / cols, R = 205;
+    for (let i = 0; i < N; i++) {
+      const col = Math.floor(i / 3), row = i % 3, a = col * step + S.drum;
+      const z = Math.cos(a), depth = (z + 1) / 2;
+      out.push({ x: CX + R * Math.sin(a), y: CY + (row - 1) * (134 * (.75 + .25 * depth)), s: .38 + .62 * depth * depth, o: z < -.25 ? 0 : .15 + .85 * depth, z: depth, lab: z > .93 });
+    }
+  }
+  return out;
+}
+
+/* One loop: physics, then ease every face towards where its view wants it. */
+function loop(t) {
+  if (!dragging) {
+    const f = .94;
+    S.pan.x += V.x; S.pan.y += V.y; V.x *= f; V.y *= f;
+    S.rot += V.rot; V.rot *= .95;
+    S.yaw += V.yaw; S.pitch = Math.max(-1.1, Math.min(1.1, S.pitch + V.pitch)); V.yaw *= .96; V.pitch *= .93;
+    S.spin += V.spin; V.spin *= .95;
+    S.drum += V.drum; V.drum *= .93;
+    if (view === 'globe' && Math.abs(V.yaw) < .002) S.yaw += .0035;          // turns on its own
+    if (view === 'spiral' && Math.abs(V.rot) < .001) S.rot += .0012;
+    if (view === 'drum' && Math.abs(V.drum) < .004) {                         // settle on a column
+      const step = 2 * Math.PI / Math.ceil(N / 3), goal = Math.round(S.drum / step) * step; S.drum += (goal - S.drum) * .12;
+    }
+    if (view === 'hive') { S.pan.x *= .995; S.pan.y *= .995; }               // drifts home
+    if (view === 'lens') S.lens.a += (0 - S.lens.a) * .06;
+  }
+  const tg = targets(t);
+  const k = t - switchedAt < 900 ? .085 : .32;
+  NODES.forEach((n, i) => {
+    const g = tg[i];
+    n.x += (g.x - n.x) * k; n.y += (g.y - n.y) * k; n.s += (g.s - n.s) * k; n.o += (g.o - n.o) * k;
+    n.el.style.transform = `translate(${n.x - 42}px, ${n.y - 42}px) scale(${n.s})`;
+    n.el.style.opacity = n.o.toFixed(3);
+    n.el.style.zIndex = Math.round(g.z * 100) + 10;
+    n.label.style.opacity = g.lab && t - switchedAt > 500 ? 1 : 0;
+  });
+  $('#lens').style.cssText = `left:${S.lens.x}px;top:${S.lens.y}px;opacity:${view === 'lens' ? S.lens.a * .9 : 0}`;
+  requestAnimationFrame(loop);
+}
+
+/* Gestures */
+let last = null, startPt = null, moved = 0;
+const local = e => { const r = field.getBoundingClientRect(); return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale }; };
+field.addEventListener('pointerdown', e => {
+  field.setPointerCapture(e.pointerId); dragging = true; moved = 0;
+  last = { ...local(e), t: performance.now() }; startPt = last;
+  Object.keys(V).forEach(k => V[k] = 0);
+  if (view === 'lens') { S.lens.x = last.x; S.lens.y = last.y; }
+});
+field.addEventListener('pointermove', e => {
+  const p = local(e);
+  if (view === 'lens' && !dragging) { S.lens.x += (p.x - S.lens.x) * .5; S.lens.y += (p.y - S.lens.y) * .5; S.lens.a = Math.min(1, S.lens.a + .08); return; }
+  if (!dragging) return;
+  const dx = p.x - last.x, dy = p.y - last.y; moved += Math.hypot(dx, dy);
+  if (view === 'hive') { S.pan.x += dx; S.pan.y += dy; V.x = dx; V.y = dy; }
+  if (view === 'spiral') { const a0 = Math.atan2(last.y - CY, last.x - CX), a1 = Math.atan2(p.y - CY, p.x - CX); let da = a1 - a0; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI; S.rot += da; V.rot = da; }
+  if (view === 'globe') { S.yaw += dx * .009; S.pitch = Math.max(-1.1, Math.min(1.1, S.pitch - dy * .009)); V.yaw = dx * .009; V.pitch = -dy * .009; }
+  if (view === 'orbit') { S.spin += dx * .01; V.spin = dx * .01; }
+  if (view === 'lens') { S.lens.x = p.x; S.lens.y = p.y; S.lens.a = Math.min(1, S.lens.a + .15); }
+  if (view === 'drum') { S.drum += dx / 205; V.drum = dx / 205; }
+  last = { ...p, t: performance.now() };
+});
+const end = e => {
+  if (!dragging) return; dragging = false;
+  if (moved < 6) { const n = e.target.closest('.nb') || document.elementsFromPoint(e.clientX, e.clientY).find(x => x.classList?.contains('nb')); if (n) { const p = PEOPLE[+n.dataset.i]; toast(`Opens ${p.n || 'this person'}`, 'person'); pop(n); } }
+};
+field.addEventListener('pointerup', end); field.addEventListener('pointercancel', end);
+field.addEventListener('pointerleave', () => { if (view === 'lens' && !dragging) S.lens.a *= .5; });
+function pop(el) { el.firstElementChild.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.25)' }, { transform: 'scale(1)' }], { duration: 450, easing: 'cubic-bezier(.3,1.6,.5,1)' }); }
+
+/* Switching views */
+const HINTS = { hive: 'Drag to look around', spiral: 'Drag around the middle to spin', globe: 'Drag to roll the globe', orbit: 'Drag sideways to spin the rings', lens: 'Drag over the faces', drum: 'Swipe sideways to spin' };
+function setView(v, kick = true) {
+  view = v; switchedAt = performance.now();
+  Object.keys(V).forEach(k => V[k] = 0);
+  S.pan = { x: 0, y: 0 };
+  if (kick) {
+    if (v === 'hive') { V.x = -5; V.y = -3; }
+    if (v === 'spiral') V.rot = .05;
+    if (v === 'globe') { V.yaw = .07; V.pitch = .015; }
+    if (v === 'orbit') V.spin = .06;
+    if (v === 'drum') V.drum = .16;
+    if (v === 'lens') sweepLens();
+  }
+  $('#hub').classList.toggle('hide', v !== 'orbit');
+  $('#rings').classList.toggle('hide', v !== 'orbit');
+  $('#hint').textContent = HINTS[v];
+  $$('.vchip').forEach(c => c.classList.toggle('on', c.dataset.v === v));
+  $$('.vw').forEach(c => c.classList.toggle('on', c.dataset.v === v));
+  $('#sub').textContent = `${N} people`;
+}
+async function sweepLens() {
+  const path = [[80, 120], [320, 160], [120, 300], [300, 420], [200, 260]];
+  for (const [x, y] of path) for (let k = 0; k < 18; k++) {
+    if (view !== 'lens' || dragging) return;
+    S.lens.x += (x - S.lens.x) * .18; S.lens.y += (y - S.lens.y) * .18; S.lens.a = Math.min(1, S.lens.a + .1);
+    await new Promise(r => setTimeout(r, 28));
+  }
+}
+$('#rings').innerHTML = RINGS.map(([r]) => `<ellipse cx="${CX}" cy="${CY}" rx="${r}" ry="${r * .58}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="1"/>`).join('');
+$('#hub').style.cssText = `left:${CX}px;top:${CY}px`;
+$('#vrow').innerHTML = VIEWS.map(([k, icn, t]) => `<button class="vchip" data-v="${k}">${ic(icn, 18)}${t}</button>`).join('');
+$('#views').innerHTML = VIEWS.map(([k, icn, t, d]) => `<button class="vw" data-v="${k}"><span class="n">${ic(icn, 21, 'fill')}</span><span><b>${t}</b><p>${d}</p></span></button>`).join('');
+document.addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) setView(b.dataset.v); });
+function toast(msg, icon) { const t = $('#toast'); t.innerHTML = ic(icon, 16) + msg; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1800); }
+$('#dock').innerHTML = '<div class="drop"></div>' + [['group', 'People'], ['photo', 'Photos'], ['photo_album', 'Albums'], ['explore', 'Explore'], ['swap_horiz', 'Share']]
+  .map(([i, l], n) => `<div class="tab ${n === 0 ? 'on' : ''}">${ic(i, 24)}<span>${l}</span></div>`).join('');
+function fit() {
+  const avail = Math.min(window.innerHeight - 48, 900) / 916, w = Math.min(window.innerWidth - 32, 460) / 436;
+  scale = Math.max(.5, Math.min(1, avail, w));
+  const st = $('#stage'); st.style.width = 436 * scale + 'px'; st.style.height = 916 * scale + 'px';
+  Object.assign(phone.style, { transform: `scale(${scale})`, left: 12 * scale + 'px', top: 12 * scale + 'px' });
+}
+window.addEventListener('resize', fit);
+fit(); setView('hive'); requestAnimationFrame(loop);
+</script>
+</body>
+</html>

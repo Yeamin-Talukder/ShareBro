@@ -659,10 +659,7 @@ class _PulsingAvatar extends StatelessWidget {
             width: 46,
             height: 46,
             alignment: Alignment.center,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(colors: [Color(0xFFFF8A6B), Color(0xFF7B61FF)]),
-            ),
+            decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFFF8A6B)),
             child: Text(initial, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
           ),
         ],
@@ -679,10 +676,7 @@ class _SpinningFace extends StatelessWidget {
     return Container(
       width: 22,
       height: 22,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(colors: [Color(0xFF22C3B0), Color(0xFF7B61FF)]),
-      ),
+      decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF1F9E92)),
       child: const Icon(Icons.face_rounded, size: 15, color: Colors.white),
     ).animate(onPlay: (c) => c.repeat()).rotate(duration: 2400.ms);
   }

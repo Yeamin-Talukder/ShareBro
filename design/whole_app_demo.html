@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShareBro · Whole app, Share style</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block">
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { background:#050407; }
+  body { color:#F2F1F5; font-family:Roboto, "Segoe UI", system-ui, -apple-system, sans-serif; -webkit-font-smoothing:antialiased;
+         min-height:100vh; display:flex; flex-wrap:wrap; gap:36px; justify-content:center; align-items:flex-start; padding:24px 16px 48px; }
+  button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .i { display:inline-block; flex:none; font-family:'Material Symbols Rounded'; font-weight:400; font-style:normal; line-height:1; letter-spacing:normal; text-transform:none; white-space:nowrap; direction:ltr;
+       -webkit-font-smoothing:antialiased; font-feature-settings:'liga'; font-variation-settings:'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; width:1em; height:1em; overflow:hidden; }
+  .i.fill, .tab.on .i, .chip.on .i { font-variation-settings:'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+
+  /* ---------- Side panel ---------- */
+  .side { width:340px; max-width:100%; }
+  .side h1 { font-size:24px; font-weight:800; letter-spacing:-.5px; }
+  .side .lead { color:rgba(242,241,245,.65); font-size:13.5px; line-height:1.6; margin-top:6px; }
+  .side h4 { font-size:11.5px; letter-spacing:1.2px; text-transform:uppercase; color:rgba(242,241,245,.42); margin:22px 0 10px; }
+  .chipset { display:flex; flex-wrap:wrap; gap:8px; }
+  .chipset button { padding:8px 13px; border-radius:999px; border:1px solid rgba(255,255,255,.13); font-size:12.5px; font-weight:500; background:rgba(255,255,255,.04); }
+  .chipset button.on { background:#FF8A6B; color:#2A0D06; border-color:#FF8A6B; font-weight:700; }
+  .tips { list-style:none; display:grid; gap:8px; }
+  .tips li { font-size:12.8px; color:rgba(242,241,245,.65); line-height:1.5; padding-left:16px; position:relative; }
+  .tips li::before { content:''; position:absolute; left:2px; top:8px; width:5px; height:5px; border-radius:50%; background:#FF8A6B; }
+  .tips b { color:#F2F1F5; font-weight:600; }
+
+  /* ---------- Phone + tokens ---------- */
+  .stage { position:relative; flex:none; }
+  .phone { position:absolute; width:412px; height:892px; transform-origin:0 0; border-radius:54px; overflow:hidden; isolation:isolate; user-select:none;
+           box-shadow:0 0 0 11px #0c0a0e, 0 0 0 12px rgba(255,255,255,.09), 0 50px 140px rgba(110,26,98,.32);
+           --bg:#050309; --card:rgba(28,28,31,.78); --fill:rgba(118,118,128,.24); --fill2:rgba(118,118,128,.14); --sep:rgba(84,84,88,.5);
+           --l1:#F2EFF5; --l2:rgba(235,235,245,.62); --l3:rgba(235,235,245,.32); --g:#FF8A6B; --onG:#2A0D06; --o1:#FFD2C2; --o3:#8E1F3E;
+           --thumb:#636366; --glass:rgba(36,34,42,.55); --glassb:rgba(255,255,255,.14); --ring:rgba(255,255,255,.08); --sbg:rgba(5,3,9,.94); --rim:#141416;
+           background:var(--bg); color:var(--l1); }
+  .phone.light { --bg:#F2F2F7; --card:rgba(255,255,255,.84); --fill:rgba(118,118,128,.12); --fill2:rgba(118,118,128,.08); --sep:rgba(60,60,67,.16);
+           --l1:#111014; --l2:rgba(60,60,67,.62); --l3:rgba(60,60,67,.32); --g:#D9432B; --onG:#fff; --o1:#FFB49C; --o3:#8E1F3E;
+           --thumb:#fff; --glass:rgba(255,255,255,.62); --glassb:rgba(255,255,255,.8); --ring:rgba(0,0,0,.07); --sbg:rgba(242,242,247,.94); --rim:#fff; }
+  .phone.green { --g:#30D158; --onG:#00210B; --o1:#C2F7D2; --o3:#0A6B36; }
+  .phone.green.light { --g:#248A3D; --onG:#fff; --o1:#9BE8B2; --o3:#145C2A; }
+  .aur { position:absolute; inset:-10%; z-index:0; }
+  .aur b { position:absolute; width:80%; height:55%; border-radius:50%; filter:blur(55px); animation:drift 24s ease-in-out infinite alternate; opacity:.95; }
+  .aur b:nth-child(1) { left:-18%; top:-6%;  background:radial-gradient(var(--a1) 0, transparent 68%); }
+  .aur b:nth-child(2) { left:42%;  top:10%;  background:radial-gradient(var(--a2) 0, transparent 68%); animation-duration:29s; animation-delay:-7s; }
+  .aur b:nth-child(3) { left:-20%; top:48%;  background:radial-gradient(var(--a3) 0, transparent 68%); animation-duration:26s; animation-delay:-12s; }
+  .aur b:nth-child(4) { left:40%;  top:68%;  background:radial-gradient(var(--a4) 0, transparent 68%); animation-duration:31s; animation-delay:-3s; }
+  .aur b:nth-child(5) { left:22%; top:30%; width:56%; height:34%; background:radial-gradient(var(--a5) 0, transparent 68%); opacity:.6; animation-duration:21s; animation-delay:-15s; }
+  .phone { --a1:#8E1F3E; --a2:#6E1A62; --a3:#3A27A6; --a4:#0C6A6E; --a5:#9C4614; }
+  .phone.light { --a1:#F7C6CF; --a2:#EBCBEC; --a3:#D2CCF6; --a4:#C4E8E6; --a5:#F7D6BF; }
+  .phone.green { --a1:#0E6B45; --a2:#0B4F48; --a3:#1E5A22; --a4:#0A5C55; --a5:#3E6B12; }
+  .phone.green.light { --a1:#BDEFD0; --a2:#C5EFE8; --a3:#D6F2C4; --a4:#BFEDE6; --a5:#E4F5B8; }
+  @keyframes drift { 0% { transform:translate(0,0) scale(1); } 50% { transform:translate(9%,6%) scale(1.12); } 100% { transform:translate(-7%,-5%) scale(.95); } }
+  .phone.plain .aur, .phone.plain .veil, .phone.plain .pushbg { display:none; }
+  .phone.plain { --bg:#0B0B0E; } .phone.plain.light { --bg:#F2F2F7; }
+  .veil { position:absolute; inset:0; z-index:1; background:radial-gradient(120% 85% at 50% 35%, rgba(5,3,9,.18), rgba(5,3,9,.8)), linear-gradient(rgba(5,3,9,.3), rgba(5,3,9,.08) 40%, rgba(5,3,9,.55)); }
+  .light .veil { background:radial-gradient(120% 85% at 50% 35%, rgba(242,242,247,.25), rgba(242,242,247,.8)), linear-gradient(rgba(242,242,247,.4), rgba(242,242,247,.1) 40%, rgba(242,242,247,.6)); }
+  .sbar { position:absolute; left:0; right:0; top:0; height:52px; z-index:20; display:flex; justify-content:space-between; align-items:flex-start; padding:15px 30px 0;
+          font-size:15px; font-weight:600; background:linear-gradient(var(--sbg) 45%, transparent); pointer-events:none; }
+  .sbar .r { display:flex; gap:6px; align-items:center; }
+  .cam { position:absolute; top:12px; left:50%; width:20px; height:20px; margin-left:-10px; border-radius:50%; background:#000; z-index:21; box-shadow:inset 0 0 0 4px #111; }
+  .home { position:absolute; bottom:8px; left:50%; width:124px; height:4px; margin-left:-62px; border-radius:2px; background:var(--l1); opacity:.8; z-index:21; }
+
+  /* Screens stack */
+  .scr { position:absolute; inset:0; z-index:2; overflow-y:auto; overflow-x:hidden; padding:46px 0 140px; scrollbar-width:none; }
+  .scr::-webkit-scrollbar { display:none; }
+  .scr.pushed { z-index:10; background:var(--bg); box-shadow:-20px 0 40px rgba(0,0,0,.35); padding-bottom:60px; }
+  .scr.pushed .aurwrap { position:absolute; }
+  .scr.slide-in { animation:slidein .42s cubic-bezier(.2,.9,.25,1) both; }
+  .scr.slide-out { animation:slideout .32s cubic-bezier(.4,0,.6,1) both; }
+  @keyframes slidein { from { transform:translateX(100%); } }
+  @keyframes slideout { to { transform:translateX(100%); } }
+  .scr.fade-in > .content > * { animation:up .45s cubic-bezier(.2,.8,.2,1) both; }
+  .scr.fade-in > .content > *:nth-child(2) { animation-delay:.03s } .scr.fade-in > .content > *:nth-child(3) { animation-delay:.06s }
+  .scr.fade-in > .content > *:nth-child(4) { animation-delay:.09s } .scr.fade-in > .content > *:nth-child(n+5) { animation-delay:.12s }
+  @keyframes up { from { opacity:0; transform:translateY(12px); } }
+  @keyframes pop { from { opacity:0; transform:scale(.6); } }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .pushbg { position:absolute; inset:0; z-index:-1; overflow:hidden; }
+
+  /* The dock: same as the app; its highlight follows the theme colour. */
+  .dock { position:absolute; left:20px; right:20px; bottom:36px; height:68px; border-radius:34px; padding:6px; z-index:15; display:flex; transition:transform .35s cubic-bezier(.3,1.2,.5,1), opacity .25s;
+          background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0) 45%), rgba(28,26,34,.62); backdrop-filter:blur(18px) saturate(1.4);
+          border:1px solid rgba(255,255,255,.157); box-shadow:0 8px 24px rgba(0,0,0,.35); }
+  .light .dock { background:linear-gradient(180deg, rgba(255,255,255,.6), rgba(255,255,255,.2)), rgba(255,255,255,.66); border-color:rgba(255,255,255,.66); box-shadow:0 8px 24px rgba(0,0,0,.11); }
+  .dock.hide { transform:translateY(140%); opacity:0; }
+  .dock .drop { position:absolute; top:6px; bottom:6px; width:calc((100% - 12px) / 5); border-radius:28px; transition:left .52s cubic-bezier(.34,1.4,.5,1);
+                background:color-mix(in srgb, var(--g) 18%, transparent); border:1px solid color-mix(in srgb, var(--g) 24%, transparent); }
+  .dock .tab { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:12px; font-weight:500; color:var(--l1); opacity:.75; position:relative; z-index:1; }
+  .dock .tab.on { color:var(--g); font-weight:700; opacity:1; }
+  .dock .tab.on svg { animation:pop .45s cubic-bezier(.3,1.8,.5,1); }
+
+  /* ---------- Shared components ---------- */
+  .navrow { display:flex; justify-content:space-between; align-items:center; padding:4px 16px 0; min-height:48px; }
+  .tcap { display:flex; border-radius:24px; background:var(--glass); backdrop-filter:blur(24px) saturate(1.5); border:1px solid var(--glassb); box-shadow:0 4px 14px rgba(0,0,0,.18); margin-left:auto; }
+  .tcap button, .back { width:44px; height:44px; display:grid; place-items:center; position:relative; }
+  .back { border-radius:50%; background:var(--glass); backdrop-filter:blur(24px); border:1px solid var(--glassb); }
+  .badge { position:absolute; top:5px; right:3px; min-width:17px; height:17px; border-radius:9px; background:var(--g); color:var(--onG); font-size:10.5px; font-weight:800; display:grid; place-items:center; padding:0 4px; }
+  .ttl { font-size:34px; font-weight:800; letter-spacing:-.8px; padding:2px 20px 0; line-height:41px; }
+  .sub { font-size:14px; color:var(--l2); padding:2px 20px 0; }
+  .pad { padding:0 16px; }
+  .card { background:var(--card); border-radius:26px; overflow:hidden; position:relative; border:1px solid rgba(255,255,255,.055); }
+  .light .card { border-color:transparent; }
+  .sh2 { display:flex; justify-content:space-between; align-items:center; margin:26px 4px 10px; min-height:30px; }
+  .sh2 h3 { font-size:20px; font-weight:700; letter-spacing:-.3px; display:flex; align-items:center; gap:8px; }
+  .sh2 .cnt { font-size:14px; color:var(--l2); font-weight:500; }
+  .foot { font-size:13px; color:var(--l2); margin:8px 16px 0; line-height:1.4; }
+  .txt { color:var(--g); font-size:15px; font-weight:600; padding:6px 0; }
+  .row { display:flex; align-items:center; gap:14px; min-height:56px; padding:9px 16px; position:relative; cursor:pointer; transition:background .15s; }
+  .row:active { background:var(--fill2); }
+  .row + .row::before { content:''; position:absolute; top:0; right:0; left:62px; height:.5px; background:var(--sep); }
+  .row > .mid { flex:1; min-width:0; }
+  .row b { display:block; font-size:16.5px; font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row small { display:block; font-size:13px; color:var(--l2); margin-top:1px; }
+  .row .val { color:var(--l2); font-size:16px; }
+  .row .chev { color:var(--l3); }
+  .row.danger b { color:#FF453A; }
+  .tile { width:32px; height:32px; border-radius:9px; display:grid; place-items:center; color:#fff; flex:none; background:var(--c); }
+  .tgl { width:51px; height:31px; border-radius:16px; background:var(--fill); position:relative; flex:none; transition:background .25s; }
+  .tgl i { position:absolute; left:2px; top:2px; width:27px; height:27px; border-radius:50%; background:#fff; box-shadow:0 3px 8px rgba(0,0,0,.15); transition:transform .35s cubic-bezier(.3,1.3,.5,1); }
+  .tgl.on { background:var(--g); } .tgl.on i { transform:translateX(20px); }
+  .seg { position:relative; display:flex; height:38px; border-radius:19px; background:var(--fill); padding:2px; }
+  .seg .thumb { position:absolute; top:2px; bottom:2px; left:2px; border-radius:17px; background:var(--thumb); box-shadow:0 3px 8px rgba(0,0,0,.12); transition:transform .45s cubic-bezier(.32,1.3,.5,1); }
+  .seg button { flex:1; position:relative; z-index:1; font-size:14.5px; font-weight:500; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .seg button.on { font-weight:700; }
+  .seg button em { font-style:normal; font-size:12px; color:var(--l2); font-weight:500; }
+  .chips { display:flex; gap:8px; overflow-x:auto; padding:2px 16px; scrollbar-width:none; }
+  .chips::-webkit-scrollbar { display:none; }
+  .chip { flex:none; height:36px; padding:0 14px; border-radius:18px; display:flex; align-items:center; gap:6px; font-size:14px; font-weight:600; background:var(--fill); white-space:nowrap; transition:background .25s, color .25s; }
+  .chip em { font-style:normal; font-weight:500; color:var(--l2); font-size:12.5px; }
+  .chip.on { background:var(--g); color:var(--onG); } .chip.on em { color:inherit; opacity:.7; }
+  .chip.ghost { background:none; box-shadow:inset 0 0 0 1.5px var(--fill); color:var(--l2); }
+  .orbbtn { display:inline-flex; align-items:center; gap:8px; height:50px; padding:0 22px; border-radius:25px; font-size:16px; font-weight:700; color:var(--onG);
+            background:var(--g); box-shadow:0 8px 22px color-mix(in srgb, var(--g) 32%, transparent); }
+  .btn { height:50px; padding:0 24px; border-radius:25px; font-size:16px; font-weight:700; background:var(--g); color:var(--onG); display:inline-flex; align-items:center; gap:8px; }
+  .btn.grey { background:var(--fill); color:var(--l1); }
+  button:active, .row:active, .ptile:active, .acard:active, .ecard:active { transform:scale(.97); }
+  button, .ptile, .acard, .ecard { transition:transform .15s; }
+
+  /* Faces (placeholders: no real photos) */
+  .face { position:relative; border-radius:50%; overflow:hidden; background:var(--f1); }
+  .face svg { position:absolute; left:0; right:0; bottom:-6%; width:100%; height:92%; color:rgba(255,255,255,.45); }
+  /* Photo placeholders */
+  .ph { position:relative; overflow:hidden; background:var(--a); }
+  .ph .vd { position:absolute; right:5px; bottom:5px; z-index:1; font-size:11px; font-weight:700; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.5); display:flex; gap:3px; align-items:center; }
+  .ph .fv { position:absolute; left:5px; bottom:5px; z-index:1; color:#fff; filter:drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+
+  /* ---------- People ---------- */
+  .scanbar { display:flex; align-items:center; gap:14px; padding:14px 16px; }
+  .ringp { width:44px; height:44px; position:relative; flex:none; }
+  .ringp svg { transform:rotate(-90deg); } .ringp circle { fill:none; stroke-width:4; } .ringp .tr { stroke:var(--fill); } .ringp .fg { stroke:var(--g); stroke-linecap:round; }
+  .ringp span { position:absolute; inset:0; display:grid; place-items:center; font-size:11px; font-weight:800; }
+  .pgrid { display:grid; grid-template-columns:repeat(3, 1fr); gap:18px 10px; padding:6px 14px 0; }
+  .ptile { display:flex; flex-direction:column; align-items:center; gap:7px; text-align:center; cursor:pointer; position:relative; }
+  .pring { width:98px; height:98px; border-radius:50%; padding:3px; background:var(--g); position:relative; }
+  .pring.plain { background:var(--ring); }
+  .pring.unnamed { background:none; box-shadow:inset 0 0 0 2px var(--l3); }
+  .pring .face { width:100%; height:100%; border:3px solid var(--bg); }
+  .light .pring .face { border-color:#F2F2F7; }
+  .pring .stack { position:absolute; right:-2px; bottom:2px; display:flex; }
+  .pring .stack i { width:24px; height:24px; border-radius:50%; margin-left:-9px; border:2px solid var(--rim); background:var(--f1); }
+  .ptile b { font-size:14.5px; font-weight:700; max-width:110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ptile small { font-size:12px; color:var(--l2); margin-top:-5px; }
+  .ptile.unnamed b { color:var(--g); font-weight:600; }
+  .ptile.dragging { opacity:.3; } .ptile.target .pring { transform:scale(1.12); box-shadow:0 0 0 4px var(--g), 0 0 30px var(--g); }
+  .pring { transition:transform .25s cubic-bezier(.3,1.5,.5,1), box-shadow .25s; }
+  .ptile.merged .pring { animation:merged .7s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes merged { 30% { transform:scale(1.25); } }
+  .fab { position:absolute; right:20px; bottom:118px; z-index:14; transition:transform .35s cubic-bezier(.3,1.3,.5,1), opacity .25s; }
+  .fab.hide { transform:translateY(40px) scale(.8); opacity:0; pointer-events:none; }
+  .bubbles { position:relative; height:520px; margin:6px 16px 0; }
+  .bubbles .ptile { position:absolute; animation:float 6s ease-in-out infinite; }
+  @keyframes float { 50% { transform:translateY(-6px); } }
+
+  /* ---------- Photos ---------- */
+  .day { display:flex; justify-content:space-between; align-items:baseline; padding:20px 18px 8px; }
+  .day h3 { font-size:19px; font-weight:800; letter-spacing:-.3px; } .day small { font-size:13px; color:var(--l2); margin-left:8px; font-weight:500; }
+  .grid3 { display:grid; grid-template-columns:repeat(3, 1fr); gap:3px; padding:0 3px; }
+  .grid3 .ph { aspect-ratio:1; border-radius:4px; cursor:pointer; }
+  .grid3 .ph.big { grid-column:span 2; grid-row:span 2; aspect-ratio:auto; }
+  .ph .chk { position:absolute; right:6px; top:6px; z-index:2; width:24px; height:24px; border-radius:50%; border:2px solid #fff; background:rgba(0,0,0,.2); display:grid; place-items:center; color:transparent; transition:all .2s; }
+  .ph.sel .chk { background:var(--g); border-color:#fff; color:var(--onG); animation:pop .3s cubic-bezier(.3,1.6,.5,1); }
+  .ph.sel { transform:scale(.92); border-radius:12px; } .ph { transition:transform .2s, border-radius .2s; }
+  .selbar { position:absolute; left:16px; right:16px; bottom:30px; z-index:16; display:flex; justify-content:space-around; height:70px; border-radius:35px; padding:6px;
+            background:var(--glass); backdrop-filter:blur(24px) saturate(1.5); border:1px solid var(--glassb); box-shadow:0 16px 40px rgba(0,0,0,.4);
+            transform:translateY(150%); transition:transform .4s cubic-bezier(.3,1.25,.5,1); }
+  .selbar.show { transform:none; }
+  .selbar button { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; font-size:11.5px; font-weight:600; border-radius:28px; }
+  .selbar button.send { background:var(--g); color:var(--onG); }
+  .selbar button.del { color:#FF453A; }
+
+  /* ---------- Albums ---------- */
+  .smart { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+  .scard { height:104px; border-radius:22px; padding:12px; display:flex; flex-direction:column; justify-content:space-between; text-align:left; position:relative; overflow:hidden;
+           background:var(--card); border:1px solid rgba(255,255,255,.055); }
+  .light .scard { border-color:transparent; }
+  .scard .ic { width:36px; height:36px; border-radius:11px; background:var(--c1); color:#fff; display:grid; place-items:center; }
+  .scard b { font-size:15px; } .scard small { font-size:12.5px; color:var(--l2); display:block; }
+  .agrid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .acard { text-align:left; cursor:pointer; }
+  .acard .cov { aspect-ratio:1; border-radius:22px; overflow:hidden; position:relative; display:grid; grid-template-columns:2fr 1fr; grid-template-rows:1fr 1fr; gap:2px; box-shadow:0 14px 30px -18px rgba(0,0,0,.6); }
+  .acard .cov .ph:first-child { grid-row:span 2; }
+  .acard .cov .tag { position:absolute; left:8px; top:8px; z-index:2; display:flex; align-items:center; gap:4px; padding:4px 8px; border-radius:10px; font-size:11px; font-weight:700; color:#fff; background:rgba(0,0,0,.35); backdrop-filter:blur(8px); }
+  .acard b { display:block; font-size:15px; font-weight:700; margin-top:9px; } .acard small { font-size:13px; color:var(--l2); }
+
+  /* ---------- Explore ---------- */
+  .erow { display:flex; gap:12px; overflow-x:auto; padding:2px 16px 4px; scrollbar-width:none; }
+  .erow::-webkit-scrollbar { display:none; }
+  .ecard { flex:none; width:140px; height:180px; border-radius:22px; overflow:hidden; position:relative; cursor:pointer; background:var(--card); border:1px solid rgba(255,255,255,.055); }
+  .light .ecard { border-color:transparent; }
+  .ecard .ph { position:absolute; left:0; right:0; top:0; height:120px; }
+  .ecard .ic { position:absolute; left:10px; top:10px; width:32px; height:32px; border-radius:10px; display:grid; place-items:center; color:#fff; background:rgba(0,0,0,.28); }
+  .ecard .lb { position:absolute; left:12px; right:10px; bottom:10px; } .ecard .lb b { display:block; font-size:15px; } .ecard .lb small { font-size:12px; color:var(--l2); }
+
+  /* ---------- Share (summary) ---------- */
+  .acts6 { display:grid; grid-template-columns:repeat(6, 1fr); padding:16px 8px 14px; }
+  .act6 { display:flex; flex-direction:column; align-items:center; gap:7px; font-size:12px; color:var(--l2); font-weight:500; }
+  .act6 .sq { width:52px; height:52px; border-radius:15px; background:var(--fill); display:grid; place-items:center; color:var(--l1); }
+  .orb { position:relative; height:300px; overflow:hidden; }
+  .orb .plane { position:absolute; left:50%; top:150px; width:0; height:0; transform:scaleY(.7); }
+  .orb .plane > * { position:absolute; border-radius:50%; transform:translate(-50%,-50%); }
+  .orb .r { border:1px solid var(--ring); } .orb .r1 { width:200px; height:200px; } .orb .r2 { width:300px; height:300px; } .orb .r3 { width:400px; height:400px; border-style:dashed; }
+  .orb .sw { width:84px; height:84px; border:1.5px solid var(--g); animation:ripple 3s ease-out infinite; }
+  @keyframes ripple { from { transform:translate(-50%,-50%) scale(1); opacity:.7; } to { transform:translate(-50%,-50%) scale(4.6); opacity:0; } }
+  .orb .core { position:absolute; left:50%; top:150px; width:84px; height:84px; margin:-42px; border-radius:50%; display:grid; place-items:center; color:var(--onG);
+               background:var(--g); box-shadow:0 0 0 7px color-mix(in srgb, var(--g) 14%, transparent); }
+  .orb .dv { position:absolute; width:120px; margin:-28px 0 0 -60px; text-align:center; }
+  .orb .dv i { display:grid; place-items:center; width:56px; height:56px; margin:0 auto; border-radius:50%; color:#fff; background:var(--d1); }
+  .orb .dv span { display:inline-block; margin-top:8px; padding:3px 9px 4px; border-radius:11px; background:rgba(0,0,0,.4); font-size:12px; font-weight:600; }
+  .light .orb .dv span { background:rgba(255,255,255,.7); }
+
+  /* ---------- Settings ---------- */
+  .strict { padding:18px 18px 16px; text-align:center; }
+  .strict h4 { font-size:17px; font-weight:700; text-align:left; } .strict p { font-size:13.5px; color:var(--l2); text-align:left; margin-top:4px; line-height:1.45; }
+  .big { font-size:46px; font-weight:800; letter-spacing:-1.5px; margin:14px 0 2px; color:var(--g); font-variant-numeric:tabular-nums; }
+  .big small { font-size:18px; font-weight:600; color:var(--l2); letter-spacing:0; text-shadow:none; }
+  input[type=range] { -webkit-appearance:none; appearance:none; width:100%; height:28px; background:transparent; margin-top:14px; }
+  input[type=range]::-webkit-slider-runnable-track { height:4px; border-radius:2px; background:linear-gradient(90deg, var(--g) var(--p), var(--fill) var(--p)); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:28px; height:28px; border-radius:50%; background:#fff; margin-top:-12px; box-shadow:0 3px 10px rgba(0,0,0,.3), 0 0 0 .5px rgba(0,0,0,.05); }
+  input[type=range]::-moz-range-track { height:4px; border-radius:2px; background:var(--fill); } input[type=range]::-moz-range-progress { height:4px; background:var(--g); border-radius:2px; }
+  input[type=range]::-moz-range-thumb { width:28px; height:28px; border-radius:50%; background:#fff; border:0; }
+  .lr { display:flex; justify-content:space-between; font-size:12.5px; color:var(--l2); font-weight:600; }
+  .about { padding:20px; display:flex; align-items:center; gap:14px; }
+  .appic { width:56px; height:56px; border-radius:16px; display:grid; place-items:center; color:var(--onG); background:var(--g); }
+
+  /* ---------- Person ---------- */
+  .phero { text-align:center; padding:4px 20px 0; }
+  .phero .pring { width:132px; height:132px; margin:0 auto; padding:4px; }
+  .phero h1 { font-size:30px; font-weight:800; letter-spacing:-.7px; margin-top:12px; }
+  .phero p { font-size:14px; color:var(--l2); margin-top:2px; }
+  .pacts { display:flex; justify-content:center; gap:10px; margin-top:16px; }
+  .gbtn { width:50px; height:50px; border-radius:50%; display:grid; place-items:center; background:var(--fill); }
+  .toolrow { display:flex; gap:10px; align-items:center; margin:22px 16px 12px; }
+  .toolrow .seg { flex:1; }
+  .icbtn { width:38px; height:38px; border-radius:50%; display:grid; place-items:center; background:var(--fill); flex:none; }
+
+  .toast { position:absolute; top:46px; left:50%; transform:translate(-50%,-24px) scale(.85); opacity:0; z-index:30; background:#000; color:#fff; padding:10px 16px 10px 12px; border-radius:22px;
+           font-size:13.5px; font-weight:500; display:flex; gap:8px; align-items:center; max-width:370px; box-shadow:0 10px 30px rgba(0,0,0,.4); transition:all .5s cubic-bezier(.3,1.4,.5,1); pointer-events:none; white-space:nowrap; }
+  .toast.show { opacity:1; transform:translate(-50%,0) scale(1); } .toast svg { color:var(--g); }
+  .menu { position:absolute; right:16px; top:100px; z-index:25; width:240px; border-radius:16px; overflow:hidden; background:rgba(44,44,46,.9); backdrop-filter:blur(30px); box-shadow:0 18px 50px rgba(0,0,0,.45);
+          transform-origin:top right; transform:scale(.6); opacity:0; pointer-events:none; transition:transform .3s cubic-bezier(.3,1.35,.5,1), opacity .2s; }
+  .light .menu { background:rgba(250,250,250,.92); }
+  .menu.open { transform:none; opacity:1; pointer-events:auto; }
+  .menu button { display:flex; width:100%; justify-content:space-between; align-items:center; height:46px; padding:0 16px; font-size:16px; }
+  .menu button + button { border-top:.5px solid var(--sep); }
+  .scrim { position:absolute; inset:0; z-index:24; display:none; } .scrim.on { display:block; }
+  @media (prefers-reduced-motion: reduce) { .aur b, .sw, .bubbles .ptile, .ecard .ph.b2 { animation:none !important; } }
+</style>
+</head>
+<body>
+
+<aside class="side">
+  <h1>Whole app · Share style</h1>
+  <p class="lead">Every tab with the same look as the new Share page: big bold titles, grouped rounded cards, Settings-style rows with coloured icon tiles, capsule switches and chips, and Material icons. Colours are flat and simple: one accent colour, no gradients. Tap the dock to switch tabs; open a person or Settings to see inner pages.</p>
+  <h4>Theme</h4>
+  <div class="chipset" id="theme"><button data-th="coral">Coral (app)</button><button data-th="green">Green</button></div>
+  <h4>Background</h4>
+  <div class="chipset" id="bgset"><button data-bg="aurora">Aurora (now)</button><button data-bg="plain">Plain</button></div>
+  <h4>Appearance</h4>
+  <div class="chipset" id="appear"><button data-ap="dark">Dark</button><button data-ap="light">Light</button></div>
+  <h4>Jump to</h4>
+  <div class="chipset">
+    <button data-go="people">People</button><button data-go="scan">People · scanning</button><button data-go="bubbles">People · bubbles</button>
+    <button data-go="person">A person</button><button data-go="photos">Photos</button><button data-go="select">Photos · selecting</button>
+    <button data-go="albums">Albums</button><button data-go="explore">Explore</button><button data-go="share">Share</button><button data-go="settings">Settings</button>
+  </div>
+  <h4>Try it</h4>
+  <ul class="tips">
+    <li><b>People:</b> faces sit in rings (named people in the accent, new faces dashed with "Add a name"). Trips and groups are capsule chips. <b>Drag one face onto another</b> to merge.</li>
+    <li><b>Photos:</b> bold day headers, a tight grid, and <b>Select</b> brings a glass action bar (Send, Share, Favourite, Album, Trash) in place of the dock.</li>
+    <li><b>Albums:</b> Favourites, Videos and Trash as simple cards with a coloured icon, then albums as rounded mosaic covers.</li>
+    <li><b>Explore:</b> a duplicates row in a card, then swipeable category cards with the name under the cover.</li>
+    <li><b>Settings:</b> the strictness slider shows "≈ 32 people" in the accent colour; everything else is grouped rows with switches.</li>
+    <li><b>A person:</b> a big face ring, a Send button, and an All / Solo / Group switch above their photos.</li>
+  </ul>
+</aside>
+
+<div class="stage" id="stage">
+  <div class="phone" id="phone">
+    <div class="aur"><b></b><b></b><b></b><b></b><b></b></div>
+    <div class="veil"></div>
+    <div id="screens"></div>
+    <div class="fab" id="fab"><button class="orbbtn" data-act="scan">PLUSICON Scan album</button></div>
+    <div class="dock" id="dock"></div>
+    <div class="selbar" id="selbar"></div>
+    <div class="scrim" id="scrim" data-act="menuclose"></div>
+    <div class="menu" id="menu"></div>
+    <div class="sbar"><span>3:08</span><span class="r" id="sicons"></span></div>
+    <div class="cam"></div>
+    <div class="toast" id="toast"></div>
+    <div class="home"></div>
+  </div>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const M = {
+  people: 'group', image: 'photo', albums: 'photo_album', explore: 'explore', swap: 'swap_horiz', search: 'search', plus: 'add', addph: 'add_photo_alternate',
+  send: 'send', more: 'more_horiz', review: 'person_search', cal: 'calendar_month', group: 'diversity_3', timeline: 'timeline', chev: 'chevron_right', back: 'arrow_back',
+  heart: 'favorite', movie: 'movie', trash: 'delete', share: 'ios_share', album: 'library_add', copy: 'content_copy', selfie: 'camera_front', smile: 'sentiment_very_satisfied',
+  beach: 'beach_access', food: 'restaurant', sunset: 'wb_twilight', screen: 'screenshot', chat: 'chat', pin: 'place', dup: 'auto_delete', id: 'badge', hq: 'hd',
+  sync: 'sync', lock: 'lock', island: 'call_to_action', disk: 'storage', hidden: 'visibility_off', backup: 'backup', restore: 'restore', wipe: 'delete_sweep',
+  code: 'code', user: 'person', tune: 'tune', join: 'join_inner', bubble: 'bubble_chart', gridv: 'grid_view', gear: 'settings', file: 'draft', folder: 'folder',
+  text: 'notes', clip: 'content_paste', apps: 'apps', wifi: 'wifi_tethering', phone: 'smartphone', laptop: 'computer', bt: 'bluetooth', qr: 'qr_code_2',
+  outbox: 'outbox', history: 'history', check: 'check', play: 'play_arrow', merge: 'merge', blur: 'blur_on',
+};
+const ic = (n, sz = 22, cls = '') => `<span class="i ${cls}" style="font-size:${sz}px" aria-hidden="true">${M[n] || n}</span>`;
+const SIL = '<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMax meet"><circle cx="50" cy="40" r="20" fill="currentColor"/><path d="M12 100c2-22 18-34 38-34s36 12 38 34z" fill="currentColor"/></svg>';
+const FACES = [['#C98F72','#C98F72'],['#7F98AE','#7F98AE'],['#C9A46E','#C9A46E'],['#8EA37E','#8EA37E'],['#B98593','#B98593'],['#9A8BC2','#9A8BC2'],['#C88866','#C88866'],['#6FA39B','#6FA39B'],['#BFA161','#BFA161'],['#A97B8A','#A97B8A'],['#7D86C2','#7D86C2'],['#B48C74','#B48C74']];
+const PH = [['#C98B6B'],['#7E9BB3'],['#D2AE74'],['#8FA77F'],['#B88596'],['#9C8CC4'],['#CF9461'],['#6FA8A0'],['#C27C7C']];
+const face = (k, size) => `<div class="face" style="--f1:${FACES[k % 12][0]};--f2:${FACES[k % 12][1]};${size ? `width:${size}px;height:${size}px` : ''}">${SIL}</div>`;
+const ph = (k, extra = '', cls = '') => `<div class="ph ${cls}" style="--a:${PH[k % 9][0]};--b:${PH[k % 9][1]}">${extra}</div>`;
+
+const PEOPLE = [
+  { n: 'Maya', c: 248, k: 0 }, { n: 'Ravi', c: 196, k: 1 }, { n: 'Sofia', c: 171, k: 4 }, { n: 'Ayaan', c: 133, k: 2 }, { n: 'Leo', c: 97, k: 3 },
+  { n: 'Nadia', c: 88, k: 5 }, { n: null, c: 64, k: 6 }, { n: 'Omar', c: 51, k: 7 }, { n: 'Priya', c: 42, k: 8 }, { n: null, c: 27, k: 9 },
+  { n: 'Kai', c: 19, k: 10 }, { n: null, c: 12, k: 11 },
+];
+const S = { plain: false, light: false, green: false, tab: 'people', stack: [], prevTab: 'people', trip: 0, group: -1, scanning: false, bubbles: false, selecting: false, sel: new Set(),
+            seg: 0, strict: 50, sw: { auto: true, lock: false, island: true }, enter: true };
+const phone = $('#phone'), screens = $('#screens');
+let scale = 1;
+const TABS = [['people', 'People', 'people'], ['photos', 'Photos', 'image'], ['albums', 'Albums', 'albums'], ['explore', 'Explore', 'explore'], ['share', 'Share', 'swap']];
+
+/* ---------- Common bits ---------- */
+const nav = (buttons, back) => `<div class="navrow">${back ? `<button class="back" data-act="back" aria-label="Back">${ic('back', 22)}</button>` : ''}<div class="tcap">${buttons.map(b =>
+  `<button data-act="${b[1]}" aria-label="${b[2]}">${ic(b[0], 21)}${b[3] ? `<span class="badge">${b[3]}</span>` : ''}</button>`).join('')}</div></div>`;
+const row = (t, c, title, opts = {}) => `<div class="row ${opts.cls || ''}" data-act="${opts.act || 'noop'}"><span class="tile" style="--c:${c}">${ic(t, 18, '', 2.2)}</span><div class="mid"><b>${title}</b>${opts.sub ? `<small>${opts.sub}</small>` : ''}</div>${opts.tail || ''}${opts.chev ? ic('chev', 16, 'chev', 2.6) : ''}</div>`;
+const tgl = k => `<span class="tgl ${S.sw[k] ? 'on' : ''}" data-sw="${k}"><i></i></span>`;
+const seg = (labels, i, act) => `<div class="seg" data-segw>${'<div class="thumb" style="width:calc((100% - 4px) / ' + labels.length + ');transform:translateX(' + i * 100 + '%)"></div>'}${labels.map((l, k) => `<button class="${k === i ? 'on' : ''}" data-act="${act}:${k}">${l}</button>`).join('')}</div>`;
+
+/* ---------- People ---------- */
+function peopleScreen() {
+  const trips = [['All trips'], ['Bali 2025', 412], ['Tokyo', 230], ['Lake weekend', 86]];
+  const ring = p => `<div class="pring ${p.n ? (p.c > 90 ? '' : 'plain') : 'unnamed'}">${face(p.k)}${p.c > 150 ? `<span class="stack"><i style="--f1:${FACES[(p.k + 3) % 12][0]};--f2:${FACES[(p.k + 3) % 12][1]}"></i><i style="--f1:${FACES[(p.k + 5) % 12][0]};--f2:${FACES[(p.k + 5) % 12][1]}"></i></span>` : ''}</div>`;
+  const tile = (p, i, style = '') => `<div class="ptile ${p.n ? '' : 'unnamed'}" data-person="${i}" draggable="true" style="${style}">${ring(p)}<b>${p.n || 'Add a name'}</b><small>${p.c} photos</small></div>`;
+  const pos = [[50, 80], [210, 30], [300, 150], [130, 210], [20, 300], [250, 300], [170, 400], [10, 430], [300, 420]];
+  return `${nav([['search', 'search', 'Search'], ['addph', 'scan', 'Scan photos'], ['send', 'sending', 'Sending', 1], ['review', 'review', 'Review faces', 7], ['more', 'menu:people', 'More']])}
+    <h1 class="ttl">People</h1><p class="sub">${PEOPLE.length} people · 1,148 photos</p>
+    <div class="content">
+      <div class="chips" style="margin-top:16px"><button class="chip" data-act="dates">${ic('cal', 16)}All dates</button>${trips.map((t, i) => `<button class="chip ${S.trip === i ? 'on' : ''}" data-act="trip:${i}">${t[0]}${t[1] ? ` <em>${t[1]}</em>` : ''}</button>`).join('')}</div>
+      <div class="chips" style="margin-top:8px">${[['Family', 4], ['Uni friends', 6]].map((g, i) => `<button class="chip ${S.group === i ? 'on' : ''}" data-act="group:${i}">${ic('group', 16)}${g[0]} <em>${g[1]}</em></button>`).join('')}<button class="chip ghost" data-act="newgroup">${ic('plus', 16)}New group</button>${S.trip ? `<button class="chip ghost" data-act="timeline">${ic('timeline', 16)}Trip timeline</button>` : ''}</div>
+      ${S.scanning ? `<div class="pad" style="margin-top:16px"><div class="card scanbar" data-act="scanview"><span class="ringp"><svg viewBox="0 0 44 44" width="44" height="44"><circle class="tr" cx="22" cy="22" r="18"/><circle class="fg" id="scanring" cx="22" cy="22" r="18" stroke-dasharray="113" stroke-dashoffset="70"/></svg><span id="scanpct">38%</span></span><div style="flex:1;min-width:0"><b style="font-size:16px">Scanning Camera</b><small style="display:block;font-size:13px;color:var(--l2)" id="scanmeta">1,140 of 3,000 · 412 faces</small></div>${ic('chev', 16, 'chev', 2.6)}</div></div>` : ''}
+      ${S.trip ? `<div class="pad" style="margin-top:16px"><div class="card"><div class="row" data-act="noop"><span class="tile" style="--c:#FF9F0A">${ic('people', 18)}</span><div class="mid"><b>Needs more photos</b><small>Leo, Kai and Priya have under 5 photos in this trip</small></div>${ic('chev', 16, 'chev', 2.6)}</div></div></div>` : ''}
+      ${S.bubbles ? `<div class="bubbles">${PEOPLE.slice(0, 9).map((p, i) => tile(p, i, `left:${pos[i][0]}px;top:${pos[i][1]}px;animation-delay:${-i * .7}s;transform-origin:center`)).join('')}</div>`
+        : `<p class="foot" style="margin:18px 20px 6px">Drag one person onto another to merge them.</p><div class="pgrid">${PEOPLE.map((p, i) => tile(p, i)).join('')}</div>`}
+    </div>`;
+}
+/* ---------- Person ---------- */
+function personScreen() {
+  const p = PEOPLE[0];
+  const counts = [248, 97, 151];
+  return `${nav([['share', 'toast:Share all of Maya\'s photos', 'Share'], ['more', 'menu:person', 'More']], true)}
+    <div class="content">
+      <div class="phero"><div class="pring">${face(p.k)}</div><h1>${p.n}</h1><p>“Mayu” · ${p.c} photos · 3 trips</p>
+        <div class="pacts"><button class="orbbtn" data-act="toast:Send to Maya's Pixel">${ic('send', 18)}Send to Maya</button><button class="gbtn" data-act="toast:Photos together" aria-label="Photos together">${ic('join', 21)}</button></div></div>
+      <div class="toolrow">${seg([`All <em>${counts[0]}</em>`, `Solo <em>${counts[1]}</em>`, `Group <em>${counts[2]}</em>`], S.seg, 'seg')}<button class="icbtn" data-act="toast:Filters: best shots, eyes open…" aria-label="Filters">${ic('tune', 19)}</button></div>
+      <div class="grid3" style="margin-top:4px">${Array.from({ length: 18 }, (_, i) => ph(i * 2 + S.seg * 3, i === 4 ? `<span class="vd">${ic('play', 10, 'fill')}0:21</span>` : i === 1 ? `<span class="fv">${ic('heart', 14, 'fill')}</span>` : '', i === 0 ? 'big' : '')).join('')}</div>
+      <p class="foot" style="text-align:center;margin-top:14px">Tap a face that isn't Maya to remove it. Touch and hold to make it the cover.</p>
+    </div>`;
+}
+/* ---------- Photos ---------- */
+function photosScreen() {
+  const days = [['Today', 'Sat, 31 Oct', 7], ['Yesterday', 'Lake weekend', 9], ['Sun, 12 Oct', 'Tokyo', 12]];
+  let k = 0;
+  return `${nav([['cal', 'dates', 'Dates'], ['search', 'search', 'Search']])}
+    <h1 class="ttl">Photos</h1><p class="sub">${S.selecting ? `${S.sel.size} selected` : '3,214 photos · 186 videos'}</p>
+    <div class="content">${days.map(([d, s, n]) => `<div><div class="day"><h3>${d}<small>${s}</small></h3><button class="txt" data-act="select">${S.selecting ? 'Done' : 'Select'}</button></div>
+      <div class="grid3">${Array.from({ length: n }, () => { const id = k++; return ph(id, `<span class="chk" ${S.selecting ? '' : 'style="display:none"'}>${ic('check', 14, '', 3)}</span>${id % 5 === 3 ? `<span class="vd">${ic('play', 10, 'fill')}0:${10 + id}</span>` : ''}${id % 7 === 2 ? `<span class="fv">${ic('heart', 14, 'fill')}</span>` : ''}`, S.sel.has(id) ? 'sel' : '').replace('class="ph', `data-ph="${id}" class="ph`); }).join('')}</div></div>`).join('')}</div>`;
+}
+/* ---------- Albums ---------- */
+function albumsScreen() {
+  const albums = [['Camera', 2410, 0], ['ShareBro', 312, 3, 'Received'], ['WhatsApp Images', 864, 6], ['Screenshots', 221, 1], ['Bali 2025', 412, 2, 'Scanned'], ['Downloads', 58, 7]];
+  return `${nav([['cal', 'dates', 'Dates']])}
+    <h1 class="ttl">Albums</h1>
+    <div class="content"><div class="pad" style="margin-top:18px"><div class="smart">
+        <button class="scard" style="--c1:#E8457A" data-act="toast:Favourites"><span class="ic">${ic('heart', 18, 'fill', 1.5)}</span><span><b>Favourites</b><small>142</small></span></button>
+        <button class="scard" style="--c1:#6E5BFF" data-act="toast:Videos"><span class="ic">${ic('movie', 18)}</span><span><b>Videos</b><small>186</small></span></button>
+        <button class="scard" style="--c1:#636366" data-act="toast:Trash"><span class="ic">${ic('trash', 18)}</span><span><b>Trash</b><small>9</small></span></button>
+      </div>
+      <div class="sh2"><h3>My albums <span class="cnt">${albums.length}</span></h3></div>
+      <div class="agrid">${albums.map(([n, c, k, tag]) => `<div class="acard" data-act="toast:Open ${n}"><div class="cov">${ph(k)}${ph(k + 1)}${ph(k + 2)}${tag ? `<span class="tag">${tag === 'Received' ? ic('swap', 12) : ic('people', 12)}${tag}</span>` : ''}</div><b>${n}</b><small>${c.toLocaleString()}</small></div>`).join('')}</div>
+      <p class="foot">Touch and hold an album to scan it for faces.</p></div></div>`;
+}
+/* ---------- Explore ---------- */
+function exploreScreen() {
+  const sect = (title, cards) => `<div class="sh2 pad" style="margin:24px 0 10px;padding:0 20px"><h3>${title}</h3></div><div class="erow">${cards.map(([n, icn, c, k], i) =>
+    `<div class="ecard" data-act="toast:Open ${n}">${ph(k)}<span class="ic">${ic(icn, 17)}</span><div class="lb"><b>${n}</b><small>${c} photos</small></div></div>`).join('')}</div>`;
+  return `${nav([['cal', 'dates', 'Dates']])}
+    <h1 class="ttl">Explore</h1>
+    <div class="content"><div class="pad" style="margin-top:18px"><div class="card">${row('dup', '#5E5CE6', 'Clean up duplicates', { sub: '14 sets · 23 extra photos', chev: true, act: 'toast:Duplicates' })}</div></div>
+      ${sect('People', [['Selfies', 'selfie', 214, 0], ['Groups', 'group', 388, 2], ['Smiles', 'smile', 502, 4], ['Two people', 'people', 167, 6]])}
+      ${sect('Places & things', [['Beach', 'beach', 96, 1], ['Food', 'food', 143, 6], ['Sunset', 'sunset', 58, 8], ['With location', 'pin', 1204, 3]])}
+      ${sect('Photo types', [['Screenshots', 'screen', 221, 5], ['WhatsApp', 'chat', 864, 7], ['Blurry', 'blur', 37, 2]])}</div>`;
+}
+/* ---------- Share (summary) ---------- */
+function shareScreen() {
+  return `${nav([['outbox', 'toast:Sending', 'Sending'], ['history', 'toast:History', 'History']])}
+    <h1 class="ttl">Share</h1>
+    <div class="content"><div class="pad"><div class="seg" style="margin-top:12px"><div class="thumb" style="width:calc(50% - 2px)"></div><button class="on">Send</button><button data-act="toast:Receive (see the Share demo)">Receive</button></div>
+      <div class="card" style="margin-top:18px"><div class="acts6">${[['image', 'Media'], ['file', 'Files'], ['folder', 'Folder'], ['text', 'Text'], ['clip', 'Paste'], ['apps', 'Apps']].map(([i, l]) => `<button class="act6"><span class="sq">${ic(i, 23, '', 1.9)}</span>${l}</button>`).join('')}</div></div>
+      <div class="sh2"><h3>Nearby</h3></div>
+      <div class="card"><div class="orb"><div class="plane"><div class="r r1"></div><div class="r r2"></div><div class="r r3"></div><div class="sw"></div></div><div class="core">${ic('wifi', 30)}</div>
+        <div class="dv" style="left:285px;top:95px;--d1:#E0684E"><i>${ic('phone', 24)}</i><span>Maya's Pixel</span></div>
+        <div class="dv" style="left:80px;top:96px;--d1:#6E5BFF"><i>${ic('laptop', 24)}</i><span>Energetic Avocado</span></div>
+        <div class="dv" style="left:300px;top:225px;--d1:#1F9E92"><i>${ic('bt', 24)}</i><span>Ravi's Galaxy</span></div></div></div>
+      <p class="foot">This tab is already built in the app; it's here so you can see it next to the others.</p></div></div>`;
+}
+/* ---------- Settings ---------- */
+function settingsScreen() {
+  const n = Math.round(14 + S.strict * 0.36);
+  return `${nav([], true).replace('<div class="tcap"></div>', '')}
+    <h1 class="ttl">Settings</h1>
+    <div class="content"><div class="pad" style="margin-top:18px">
+      <div class="card strict"><h4>Grouping strictness</h4><p>Loose puts more faces together (may mix people up). Strict keeps groups clean (may split one person into several).</p>
+        <input type="range" min="0" max="100" value="${S.strict}" id="strict" style="--p:${S.strict}%"><div class="lr"><span>Loose</span><span>Strict</span></div>
+        <div class="big" id="bign">≈ ${n} <small>people</small></div><button class="btn grey" data-act="toast:Regrouping faces…" style="margin-top:10px">Regroup with this setting</button>
+        <p style="margin-top:12px;text-align:center">Named people and faces you fixed by hand are never changed.</p></div>
+      <div class="sh2"><h3>Sharing</h3></div>
+      <div class="card">${row('id', '#0A84FF', 'Name on other phones', { tail: '<span class="val">ShareBro</span>', chev: true, act: 'toast:Rename' })}${row('hq', '#5E5CE6', 'Default send quality', { tail: '<span class="val">Original</span>', chev: true, act: 'toast:Quality' })}</div>
+      <div class="sh2"><h3>General</h3></div>
+      <div class="card">${row('sync', '#30B0C7', 'Auto-scan new photos', { sub: 'Scan new photos in scanned albums', tail: tgl('auto'), act: 'sw:auto' })}${row('lock', '#8E8E93', 'App lock', { sub: 'Fingerprint, face or screen lock', tail: tgl('lock'), act: 'sw:lock' })}${row('island', '#48484A', 'Island at the top', { sub: 'Sending, receiving and scanning in a pill', tail: tgl('island'), act: 'sw:island' })}</div>
+      <div class="sh2"><h3>Your data</h3></div>
+      <div class="card">${row('disk', '#FF9F0A', 'Storage', { tail: '<span class="val">212 MB</span>', chev: true, act: 'toast:Storage' })}${row('hidden', '#AF52DE', 'Not in our group', { sub: 'People you hid, to bring back', chev: true, act: 'toast:Hidden people' })}${row('backup', '#34C759', 'Back up', { chev: true, act: 'toast:Back up' })}${row('restore', '#30B0C7', 'Restore from backup', { sub: "Replaces what's in the app now", chev: true, act: 'toast:Restore' })}</div>
+      <div class="card" style="margin-top:22px">${row('wipe', '#FF453A', 'Clear all face data', { sub: 'Photos are not affected', cls: 'danger', act: 'toast:Asks before clearing' })}</div>
+      <div class="sh2"><h3>About</h3></div>
+      <div class="card"><div class="about"><span class="appic">${ic('swap', 26, '', 2.4)}</span><div><b style="font-size:18px">ShareBro</b><small style="display:block;color:var(--l2);font-size:13.5px">Version 1.0.2 · Made by Md Yeamin Talukder</small></div></div>
+        ${row('user', '#636366', 'Developer', { sub: 'github.com/Yeamin-Talukder', chev: true })}${row('code', '#636366', 'Source code', { sub: 'github.com/Yeamin-Talukder/ShareBro', chev: true })}</div>
+    </div></div>`;
+}
+const SCREENS = { people: peopleScreen, photos: photosScreen, albums: albumsScreen, explore: exploreScreen, share: shareScreen, settings: settingsScreen, person: personScreen };
+
+/* ---------- Render ---------- */
+function render(anim) {
+  phone.classList.toggle('light', S.light); phone.classList.toggle('green', S.green); phone.classList.toggle('plain', S.plain);
+  $$('#bgset button').forEach(b => b.classList.toggle('on', (b.dataset.bg === 'plain') === S.plain));
+  const top = S.stack[S.stack.length - 1];
+  const keep = $('#screens .scr.base');
+  const scrollTop = keep && keep.dataset.tab === S.tab && !anim ? keep.scrollTop : 0;
+  screens.innerHTML = `<div class="scr base ${anim === 'tab' || S.enter ? 'fade-in' : ''}" data-tab="${S.tab}">${SCREENS[S.tab]()}</div>` +
+    (top ? `<div class="scr pushed ${anim === 'push' ? 'slide-in' : ''}"><div class="pushbg"><div class="aur" style="inset:-10%"><b></b><b></b><b></b><b></b><b></b></div><div class="veil"></div></div>${SCREENS[top]()}</div>` : '');
+  const base = $('.scr.base'); base.scrollTop = scrollTop;
+  S.enter = false;
+  // Dock
+  const idx = TABS.findIndex(t => t[0] === S.tab);
+  const dock = $('#dock');
+  if (!dock.firstChild) dock.innerHTML = '<div class="drop"></div>' + TABS.map(([k, l, i]) => `<button class="tab" data-tab="${k}">${ic(i, 24)}<span>${l}</span></button>`).join('');
+  $$('.tab', dock).forEach(t => t.classList.toggle('on', t.dataset.tab === S.tab));
+  $('.drop', dock).style.left = `calc(6px + (100% - 12px) * ${idx / 5})`;
+  dock.classList.toggle('hide', !!top || S.selecting);
+  $('#fab').classList.toggle('hide', S.tab !== 'people' || !!top || S.scanning);
+  $('#fab').innerHTML = `<button class="orbbtn" data-act="scan">${ic('addph', 19)}Scan album</button>`;
+  $('#selbar').innerHTML = [['send', 'Send', 'send'], ['share', 'Share', ''], ['heart', 'Favourite', ''], ['album', 'Album', ''], ['trash', 'Trash', 'del']].map(([i, l, c]) => `<button class="${c}" data-act="toast:${l} ${S.sel.size} photos">${ic(i, 21)}${l}</button>`).join('');
+  $('#selbar').classList.toggle('show', S.selecting && S.tab === 'photos' && !top);
+  $$('#theme button').forEach(b => b.classList.toggle('on', (b.dataset.th === 'green') === S.green));
+  $$('#appear button').forEach(b => b.classList.toggle('on', (b.dataset.ap === 'light') === S.light));
+  const r = $('#strict'); if (r) r.oninput = () => { S.strict = +r.value; r.style.setProperty('--p', r.value + '%'); $('#bign').innerHTML = `≈ ${Math.round(14 + S.strict * 0.36)} <small>people</small>`; };
+  bindDrag();
+}
+function toast(msg, icon = 'check') {
+  const t = $('#toast'); t.innerHTML = ic(icon, 16) + `<span>${msg}</span>`;
+  t.classList.remove('show'); void t.offsetWidth; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2200);
+}
+const MENUS = {
+  people: [['Photos together', 'join', 'toast:Photos together'], [S => S.bubbles ? 'Grid view' : 'Bubble view', S => S.bubbles ? 'gridv' : 'bubble', 'bubbles'], ['Settings', 'gear', 'push:settings']],
+  person: [['Set nickname', 'id', 'toast:Nickname'], ['Photos with someone…', 'join', 'toast:Pick someone'], ['Send all photos', 'send', 'toast:Send']],
+};
+function openMenu(k) {
+  const m = $('#menu');
+  m.innerHTML = MENUS[k].map(([l, i, a]) => `<button data-act="${a}">${typeof l === 'function' ? l(S) : l}${ic(typeof i === 'function' ? i(S) : i, 19)}</button>`).join('');
+  m.style.top = k === 'person' ? '100px' : '100px';
+  m.classList.add('open'); $('#scrim').classList.add('on');
+}
+const closeMenu = () => { $('#menu').classList.remove('open'); $('#scrim').classList.remove('on'); };
+
+function act(a, el) {
+  const [k, v] = [a.slice(0, a.indexOf(':') < 0 ? a.length : a.indexOf(':')), a.indexOf(':') < 0 ? '' : a.slice(a.indexOf(':') + 1)];
+  if (k !== 'menu') closeMenu();
+  switch (k) {
+    case 'noop': break;
+    case 'toast': toast(v); break;
+    case 'menu': openMenu(v); break;
+    case 'menuclose': closeMenu(); break;
+    case 'push': S.stack.push(v); render('push'); break;
+    case 'back': popScreen(); break;
+    case 'trip': S.trip = +v; render(); break;
+    case 'group': S.group = S.group === +v ? -1 : +v; render(); break;
+    case 'bubbles': S.bubbles = !S.bubbles; render('tab'); break;
+    case 'scan': S.scanning = true; render(); runScan(); toast('Scanning Camera for faces', 'addph'); break;
+    case 'scanview': toast('Opens the scan screen'); break;
+    case 'select': S.selecting = !S.selecting; if (!S.selecting) S.sel.clear(); render(); break;
+    case 'seg': S.seg = +v; render(); break;
+    case 'sw': S.sw[v] = !S.sw[v]; $(`[data-sw="${v}"]`).classList.toggle('on', S.sw[v]); break;
+    case 'dates': toast('Pick dates: a trip, a month, or a range', 'cal'); break;
+    case 'search': toast('Search people by name or nickname', 'search'); break;
+    case 'sending': toast('Opens Sending'); break;
+    case 'review': toast('Review 7 faces the app is unsure about', 'review'); break;
+    case 'newgroup': toast('New group: pick people', 'group'); break;
+    case 'timeline': toast('Trip timeline', 'timeline'); break;
+  }
+}
+function popScreen() {
+  const p = $('.scr.pushed'); if (!p) return;
+  p.classList.remove('slide-in'); p.classList.add('slide-out');
+  setTimeout(() => { S.stack.pop(); render(); }, 300);
+}
+let scanT;
+function runScan() {
+  clearInterval(scanT); let p = 0.38;
+  scanT = setInterval(() => {
+    p = Math.min(1, p + 0.012);
+    const r = $('#scanring'); if (r) r.style.strokeDashoffset = 113 * (1 - p);
+    const t = $('#scanpct'); if (t) t.textContent = Math.round(p * 100) + '%';
+    const m = $('#scanmeta'); if (m) m.textContent = `${Math.round(p * 3000).toLocaleString()} of 3,000 · ${Math.round(p * 1080)} faces`;
+    if (p >= 1) { clearInterval(scanT); S.scanning = false; render(); toast('Scan done · 4 new people', 'people'); }
+  }, 120);
+}
+phone.addEventListener('click', e => {
+  const t = e.target.closest('[data-tab]');
+  if (t && t.closest('#dock')) { if (S.tab !== t.dataset.tab) { S.tab = t.dataset.tab; S.selecting = false; S.sel.clear(); render('tab'); } return; }
+  const ph = e.target.closest('[data-ph]');
+  if (ph && S.selecting) { const id = +ph.dataset.ph; S.sel.has(id) ? S.sel.delete(id) : S.sel.add(id); ph.classList.toggle('sel', S.sel.has(id)); render(); return; }
+  if (ph) { toast('Opens the photo viewer'); return; }
+  const pe = e.target.closest('[data-person]');
+  if (pe) { S.stack.push('person'); render('push'); return; }
+  const a = e.target.closest('[data-act]'); if (a) act(a.dataset.act, a);
+});
+// Drag one person onto another to merge.
+function bindDrag() {
+  $$('.ptile[draggable]').forEach(t => {
+    t.ondragstart = e => { e.dataTransfer.setData('text', t.dataset.person); t.classList.add('dragging'); };
+    t.ondragend = () => { t.classList.remove('dragging'); $$('.ptile.target').forEach(x => x.classList.remove('target')); };
+    t.ondragover = e => { e.preventDefault(); t.classList.add('target'); };
+    t.ondragleave = () => t.classList.remove('target');
+    t.ondrop = e => {
+      e.preventDefault(); t.classList.remove('target');
+      const from = +e.dataTransfer.getData('text'), to = +t.dataset.person; if (from === to) return;
+      const a = PEOPLE[from], b = PEOPLE[to];
+      b.c += a.c; PEOPLE.splice(from, 1); render();
+      const nt = $(`.ptile[data-person="${PEOPLE.indexOf(b)}"]`); nt?.classList.add('merged');
+      toast(`Merged into ${b.n || 'this person'}`, 'merge');
+    };
+  });
+}
+$$('[data-th]').forEach(b => b.onclick = () => { S.green = b.dataset.th === 'green'; render(); });
+$$('[data-bg]').forEach(b => b.onclick = () => { S.plain = b.dataset.bg === 'plain'; render(); });
+$$('[data-ap]').forEach(b => b.onclick = () => { S.light = b.dataset.ap === 'light'; render(); });
+$$('[data-go]').forEach(b => b.onclick = () => {
+  const g = b.dataset.go; S.stack = []; S.selecting = false; S.sel.clear(); S.bubbles = false; clearInterval(scanT); S.scanning = false;
+  if (g === 'scan') { S.tab = 'people'; S.scanning = true; render('tab'); runScan(); return; }
+  if (g === 'bubbles') { S.tab = 'people'; S.bubbles = true; render('tab'); return; }
+  if (g === 'person' || g === 'settings') { S.tab = 'people'; render(); S.stack = [g]; render('push'); return; }
+  if (g === 'select') { S.tab = 'photos'; S.selecting = true; [1, 2, 5].forEach(i => S.sel.add(i)); render('tab'); return; }
+  S.tab = g; render('tab');
+});
+$('#sicons').innerHTML = `<svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>${ic('wifi', 16)}<svg width="26" height="12" viewBox="0 0 26 12"><rect x=".5" y=".5" width="22" height="11" rx="3" fill="none" stroke="currentColor" opacity=".5"/><rect x="2" y="2" width="15" height="8" rx="1.5" fill="currentColor"/></svg>`;
+function fit() {
+  const avail = Math.min(window.innerHeight - 48, 900) / 916, w = Math.min(window.innerWidth - 32, 460) / 436;
+  scale = Math.max(.5, Math.min(1, avail, w));
+  const st = $('#stage'); st.style.width = 436 * scale + 'px'; st.style.height = 916 * scale + 'px';
+  Object.assign(phone.style, { transform: `scale(${scale})`, left: 12 * scale + 'px', top: 12 * scale + 'px' });
+}
+window.addEventListener('resize', fit);
+fit(); render('tab');
+</script>
+</body>
+</html>

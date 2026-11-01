@@ -13,6 +13,7 @@ import 'glass.dart';
 import 'motion.dart';
 import 'photo_viewer.dart';
 import 'reel_screen.dart';
+import 'sections.dart';
 import 'send_sheet.dart';
 import 'together_screen.dart';
 import 'widgets.dart';
@@ -550,13 +551,7 @@ class _PersonScreenState extends State<PersonScreen> {
                 ],
                 flexibleSpace: FlexibleSpaceBar(
                   background: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [scheme.primaryContainer, scheme.surface],
-                      ),
-                    ),
+                    decoration: BoxDecoration(color: scheme.surface),
                     child: SafeArea(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -566,10 +561,15 @@ class _PersonScreenState extends State<PersonScreen> {
                           GestureDetector(
                             onTap: _playReel,
                             child: Stack(key: _avatarKey, clipBehavior: Clip.none, children: [
-                              FaceAvatar(
-                                  personId: person.id,
-                                  thumb: person.coverThumb,
-                                  radius: 52),
+                              // A solid ring in the accent, as on People.
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(shape: BoxShape.circle, color: scheme.primary),
+                                child: FaceAvatar(
+                                    personId: person.id,
+                                    thumb: person.coverThumb,
+                                    radius: 52),
+                              ),
                               Positioned(
                                 right: -2,
                                 bottom: -2,
@@ -771,18 +771,10 @@ class _PersonScreenState extends State<PersonScreen> {
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
       child: Row(children: [
         Expanded(
-          child: SegmentedButton<PhotoKind>(
-            showSelectedIcon: false,
-            segments: const [
-              ButtonSegment(value: PhotoKind.all, label: Text('All')),
-              ButtonSegment(value: PhotoKind.solo, icon: Icon(Icons.person, size: 18), label: Text('Solo')),
-              ButtonSegment(value: PhotoKind.group, icon: Icon(Icons.groups, size: 18), label: Text('Group')),
-            ],
-            selected: {_kind},
-            onSelectionChanged: (s) {
-              Haptics.tick();
-              setState(() => _kind = s.first);
-            },
+          child: CapsuleSwitch<PhotoKind>(
+            value: _kind,
+            options: const [(PhotoKind.all, 'All', null), (PhotoKind.solo, 'Solo', null), (PhotoKind.group, 'Group', null)],
+            onChanged: (k) => setState(() => _kind = k),
           ),
         ),
         const SizedBox(width: 8),

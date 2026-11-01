@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../data/db.dart';
 import 'discovery.dart';
+import 'group.dart';
 import '../scan/background.dart';
 import 'nearby.dart';
 import 'net.dart';
@@ -29,7 +30,16 @@ class SendJob {
     required this.deviceAlias,
     required this.quality,
     this.nearby = false,
+    this.groupId,
   });
+
+  /// Part of a trip group's send: busy or briefly unreachable phones are
+  /// tried again by themselves.
+  final String? groupId;
+  int retriesLeft = 0;
+
+  /// Not tried again before this.
+  DateTime? notBefore;
 
   /// Sent over Nearby Connections (no Wi-Fi) to the phone named
   /// [deviceAlias], instead of LocalSend.
@@ -89,6 +99,10 @@ class SendJob {
 
 const _qualityKey = 'share_quality';
 
+/// Group sends retry this often, this far apart, before showing a failure.
+const _groupRetries = 20;
+const _groupRetryGap = Duration(seconds: 6);
+
 /// Everything sharing: our identity, discovery, the server for web
 /// galleries, and the queue of sends to friends' phones.
 class SendCenter extends ChangeNotifier {
@@ -107,6 +121,9 @@ class SendCenter extends ChangeNotifier {
   final LsSender _sender;
 
   final List<SendJob> jobs = [];
+
+  /// Trip groups: set up in [create].
+  late final GroupHub groups;
   int _nextId = 1;
   bool _running = false;
   bool _holdingDiscovery = false;
@@ -119,6 +136,8 @@ class SendCenter extends ChangeNotifier {
     await receiver.load();
     final center = SendCenter._(db, identity, discovery, receiver,
         ShareServer(identity, discovery, receiver), NearbyLink(receiver, identity.alias));
+    center.groups = GroupHub(identity, discovery, open: center.open, close: center.close);
+    center.server.groups = center.groups;
     final q = await db.setting(_qualityKey);
     center.defaultQuality =
         SendQuality.values.firstWhere((v) => v.name == q, orElse: () => SendQuality.original);
@@ -189,6 +208,7 @@ class SendCenter extends ChangeNotifier {
     List<SendItem> items = const [],
     required LsDevice device,
     SendQuality? quality,
+    String? groupId,
   }) async {
     if (personId != null) {
       await pair(device, personId);
@@ -203,7 +223,8 @@ class SendCenter extends ChangeNotifier {
       fingerprint: device.fingerprint,
       deviceAlias: device.alias,
       quality: quality ?? defaultQuality,
-    );
+      groupId: groupId,
+    )..retriesLeft = groupId == null ? 0 : _groupRetries;
     jobs.add(job);
     notifyListeners();
     _kick();
@@ -340,19 +361,32 @@ class SendCenter extends ChangeNotifier {
       }
       // Phones that don't announce themselves get knocked on now and then.
       _retry?.cancel();
-      if (waiting) _retry = Timer(const Duration(seconds: 20), _kick);
+      if (waiting) _retry = Timer(_nextTry(), _kick);
     }
   }
 
   Timer? _retry;
 
+  /// When to look again: 20 s, or sooner when a group send is due.
+  Duration _nextTry() {
+    var wait = const Duration(seconds: 20);
+    final now = DateTime.now();
+    for (final j in jobs.where((j) => j.status == JobStatus.waiting && j.notBefore != null)) {
+      final d = j.notBefore!.difference(now);
+      if (d < wait) wait = d.isNegative ? const Duration(seconds: 1) : d;
+    }
+    return wait;
+  }
+
   /// The next waiting job whose phone we can reach right now.
   Future<SendJob?> _nextReady() async {
+    final now = DateTime.now();
     for (final job in jobs.where((j) => j.status == JobStatus.waiting)) {
       if (job.cancel.cancelled) {
         job.status = JobStatus.cancelled;
         continue;
       }
+      if (job.notBefore?.isAfter(now) ?? false) continue;
       if (await _reach(job) != null) return job;
     }
     notifyListeners();
@@ -481,6 +515,15 @@ class SendCenter extends ChangeNotifier {
         ..status = JobStatus.failed
         ..message = '$e';
     } finally {
+      // Group sends: the friend's phone may just be busy receiving from
+      // someone else. Try again shortly instead of giving up.
+      if (job.groupId != null && job.status == JobStatus.failed && job.retriesLeft > 0 && !job.cancel.cancelled) {
+        job
+          ..retriesLeft -= 1
+          ..status = JobStatus.waiting
+          ..message = 'Busy · trying again'
+          ..notBefore = DateTime.now().add(_groupRetryGap);
+      }
       if (await tmp.exists()) await tmp.delete(recursive: true);
       notifyListeners();
     }

@@ -8,6 +8,8 @@ import '../scan/scan_controller.dart';
 import 'motion.dart';
 import 'review_screen.dart';
 import 'aurora.dart';
+import 'glass.dart';
+import 'sections.dart';
 import 'widgets.dart';
 
 /// Full-screen scan progress: a rolling photo count and a live stream of
@@ -78,7 +80,20 @@ class _ScanScreenState extends State<ScanScreen> {
       intensity: 0.7,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(title: Text(c.albumName ?? 'Scan')),
+        appBar: AppBar(
+          leadingWidth: 64,
+          leading: Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: Center(
+              child: GlassIconButton(
+                tooltip: 'Back',
+                size: 44,
+                icon: const Icon(Icons.arrow_back_rounded),
+                onPressed: () => Navigator.maybePop(context),
+              ),
+            ),
+          ),
+        ),
         body: Stack(
           children: [
             AnimatedSwitcher(
@@ -108,118 +123,152 @@ class _ScanScreenState extends State<ScanScreen> {
     final text = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
     final eta = c.eta;
-    return Column(
+    final faces = c.recentFaces.take(7).toList();
+    return CustomScrollView(
       key: const ValueKey('running'),
-      children: [
-        const SizedBox(height: 4),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.baseline,
-          textBaseline: TextBaseline.alphabetic,
-          children: [
-            RollingCount(
-              value: c.done,
-              style: text.displayMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: scheme.primary,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text('of ${c.total} photos', style: text.titleMedium),
-          ],
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(32, 10, 32, 8),
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(end: c.total == 0 ? 0 : c.done / c.total),
-            duration: 400.ms,
-            builder: (_, v, _) => ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(value: v, minHeight: 10),
-            ),
-          ),
-        ),
-        Wrap(
-          spacing: 8,
-          children: [
-            Chip(
-              avatar: const Icon(Icons.face, size: 18),
-              label: Text('${c.facesFound} faces'),
-            ),
-            if (c.peopleSoFar > 0)
-              Chip(
-                    avatar: const Icon(Icons.groups_outlined, size: 18),
-                    label: Text('≈ ${c.peopleSoFar} people so far'),
-                  )
-                  // Pops every time a new person turns up.
-                  .animate(key: ValueKey(c.peopleSoFar))
-                  .scaleXY(
-                    begin: 1.25,
-                    duration: 450.ms,
-                    curve: Curves.elasticOut,
+      slivers: [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text('Scanning', style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.7)),
+              if (c.albumName != null)
+                Row(children: [
+                  Icon(Icons.photo_album_rounded, size: 16, color: scheme.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(c.albumName!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant)),
                   ),
-            if (eta != null)
-              Chip(
-                avatar: const Icon(Icons.schedule, size: 18),
-                label: Text(
-                  eta.inMinutes > 0
-                      ? '~${eta.inMinutes} min left'
-                      : '~${eta.inSeconds} s left',
+                ]),
+              const SizedBox(height: 16),
+              SectionCard(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  height: 208,
+                  child: c.preview == null
+                      ? Center(
+                          child: Column(mainAxisSize: MainAxisSize.min, children: [
+                            const SizedBox.square(dimension: 28, child: CircularProgressIndicator(strokeWidth: 3)),
+                            const SizedBox(height: 12),
+                            Text('Getting ready…', style: TextStyle(color: scheme.onSurfaceVariant)),
+                          ]),
+                        )
+                      : _LivePreview(controller: c),
                 ),
               ),
-          ],
-        ),
-        if (c.preview != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: _LivePreview(controller: c),
-          ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
-          child: Text(
-            'You can lock your phone — scanning continues in the background.',
-            textAlign: TextAlign.center,
-            style: text.bodySmall,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.center,
-              children: [
-                for (final thumb in c.recentFaces)
-                  ClipOval(
-                        key: ObjectKey(thumb),
-                        child: Image.memory(
-                          thumb,
-                          width: 56,
-                          height: 56,
-                          fit: BoxFit.cover,
-                        ),
-                      )
-                      .animate()
-                      .scale(
-                        begin: const Offset(0.2, 0.2),
-                        duration: 500.ms,
-                        curve: Curves.elasticOut,
-                      )
-                      .fadeIn(duration: 200.ms),
-              ],
-            ),
-          ),
-        ),
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: OutlinedButton.icon(
-              onPressed: c.cancel,
-              icon: const Icon(Icons.stop_rounded),
-              label: const Text('Stop scanning'),
-            ),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  RollingCount(
+                    value: c.done,
+                    style: text.displaySmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -1.5,
+                      color: scheme.primary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text('of ${c.total} photos', style: TextStyle(fontSize: 16, color: scheme.onSurfaceVariant)),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(end: c.total == 0 ? 0 : c.done / c.total),
+                  duration: 500.ms,
+                  curve: Curves.easeOutCubic,
+                  builder: (_, v, _) => ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(value: v, minHeight: 8, backgroundColor: capsuleFill(context)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SectionCard(
+                child: IntrinsicHeight(
+                  child: Row(children: [
+                    _Stat(icon: Icons.face_rounded, color: const Color(0xFFFF9F0A), value: '${c.facesFound}', label: 'faces'),
+                    const VerticalDivider(width: 0.5, thickness: 0.5, indent: 14, endIndent: 14),
+                    _Stat(
+                      icon: Icons.group_rounded,
+                      color: const Color(0xFF5E5CE6),
+                      value: c.peopleSoFar == 0 ? '–' : '≈ ${c.peopleSoFar}',
+                      label: 'people so far',
+                    ),
+                    const VerticalDivider(width: 0.5, thickness: 0.5, indent: 14, endIndent: 14),
+                    _Stat(
+                      icon: Icons.schedule_rounded,
+                      color: const Color(0xFF30B0C7),
+                      value: eta == null ? '–' : eta.inMinutes > 0 ? '${eta.inMinutes} min' : '${eta.inSeconds} s',
+                      label: 'left',
+                    ),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SectionCard(
+                padding: const EdgeInsets.fromLTRB(14, 14, 0, 14),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 14),
+                    child: Row(children: [
+                      const Text('Faces found', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      const Spacer(),
+                      Text('${c.facesFound}', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+                    ]),
+                  ),
+                  const SizedBox(height: 10),
+                  // A conveyor: new faces come in on the left and push the
+                  // others along.
+                  SizedBox(
+                    height: 56,
+                    child: ClipRect(
+                      child: Stack(children: [
+                        for (final (i, thumb) in faces.indexed)
+                          AnimatedPositioned(
+                            key: ObjectKey(thumb),
+                            duration: 450.ms,
+                            curve: Curves.easeOutBack,
+                            left: i * 60.0,
+                            top: 2,
+                            child: Container(
+                              padding: const EdgeInsets.all(2.5),
+                              decoration: BoxDecoration(shape: BoxShape.circle, color: scheme.primary),
+                              child: ClipOval(child: Image.memory(thumb, width: 47, height: 47, fit: BoxFit.cover)),
+                            ).animate().scaleXY(begin: 0.2, duration: 500.ms, curve: Curves.elasticOut).fadeIn(duration: 200.ms),
+                          ),
+                      ]),
+                    ),
+                  ),
+                ]),
+              ),
+              const Spacer(),
+              const SectionFooter('You can lock your phone; scanning keeps going in the background.', align: TextAlign.center),
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 12, 0, 16),
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                      backgroundColor: capsuleFill(context),
+                      foregroundColor: scheme.onSurface,
+                    ),
+                    onPressed: c.cancel,
+                    icon: const Icon(Icons.stop_circle_rounded),
+                    label: const Text('Stop scanning'),
+                  ),
+                ),
+              ),
+            ]),
           ),
         ),
       ],
@@ -245,24 +294,26 @@ class _ScanScreenState extends State<ScanScreen> {
                 alignment: Alignment.center,
                 children: [
                   const ConfettiBurst(count: 56),
-                  Text(
-                    '🎉',
-                    style: const TextStyle(fontSize: 72),
-                  ).animate().scale(
-                    begin: const Offset(0, 0),
-                    duration: 700.ms,
-                    curve: Curves.elasticOut,
-                  ),
+                  Container(
+                    width: 112,
+                    height: 112,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Theme.of(context).colorScheme.primary,
+                      boxShadow: [BoxShadow(color: Theme.of(context).colorScheme.primary.withAlpha(36), spreadRadius: 10)],
+                    ),
+                    child: Icon(Icons.check_rounded, size: 58, color: Theme.of(context).colorScheme.onPrimary),
+                  ).animate().scale(begin: Offset.zero, duration: 800.ms, curve: Curves.elasticOut).rotate(begin: -0.25, duration: 600.ms),
                 ],
               ),
             ),
             Text(
               'Found ${people.length} people',
-              style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
+              style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.7),
             ).animate().fadeIn(delay: 200.ms).moveY(begin: 12),
             Text(
               'in ${c.done} photos · ${c.facesFound} new faces',
-              style: text.bodyMedium,
+              style: text.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ).animate().fadeIn(delay: 300.ms),
             const SizedBox(height: 24),
             // Finale: the faces burst out of the 🎉 and settle into a grid.
@@ -292,11 +343,20 @@ class _ScanScreenState extends State<ScanScreen> {
                         (i ~/ cols) * (tile + gap) + tile / 2,
                       );
                       final delay = (250 + 40 * i.clamp(0, 30)).ms;
-                      return FaceAvatar(
-                            personId: people[i].id,
-                            thumb: people[i].coverThumb,
-                            radius: 34,
-                            hero: false,
+                      return Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: people[i].name == null
+                                  ? Theme.of(context).colorScheme.onSurface.withAlpha(60)
+                                  : Theme.of(context).colorScheme.primary,
+                            ),
+                            child: FaceAvatar(
+                              personId: people[i].id,
+                              thumb: people[i].coverThumb,
+                              radius: 31,
+                              hero: false,
+                            ),
                           )
                           .animate()
                           .fadeIn(delay: delay, duration: 150.ms)
@@ -329,7 +389,12 @@ class _ScanScreenState extends State<ScanScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                          backgroundColor: capsuleFill(context),
+                          foregroundColor: Theme.of(context).colorScheme.onSurface,
+                        ),
                         onPressed: () => Navigator.pop(context),
                         child: const Text('See people'),
                       ),
@@ -339,6 +404,7 @@ class _ScanScreenState extends State<ScanScreen> {
                       child: FutureBuilder<int>(
                         future: _reviewCount,
                         builder: (context, s) => FilledButton(
+                          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
                           onPressed: (s.data ?? 0) == 0
                               ? null
                               : () => Navigator.pushReplacement(
@@ -366,8 +432,9 @@ class _ScanScreenState extends State<ScanScreen> {
   }
 }
 
-/// The photo being scanned, with a box drawing itself around each face it
-/// finds; the faces then drop down toward the face stream below.
+/// The photo being scanned: a scan line sweeps down it, viewfinder corners
+/// snap around each face as the line reaches it, and the faces then drop
+/// down toward the conveyor below.
 class _LivePreview extends StatelessWidget {
   const _LivePreview({required this.controller});
 
@@ -377,100 +444,51 @@ class _LivePreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = controller;
     final scheme = Theme.of(context).colorScheme;
-    return SizedBox(
-      height: 220,
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: c.previewAspect.clamp(0.5, 2.0),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.memory(
+    final still = MediaQuery.disableAnimationsOf(context);
+    return Center(
+      child: AspectRatio(
+        aspectRatio: c.previewAspect.clamp(0.5, 2.0),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.memory(
                 c.preview!,
                 fit: BoxFit.cover,
                 gaplessPlayback: true,
-                // Decode small: the preview is ~220 dp tall, not 1600 px.
+                // Decode small: the preview is ~208 dp tall, not 1600 px.
                 cacheHeight: 480,
               ),
-                // Radar sweep while it looks for faces.
-                IgnorePointer(
-                  child: Transform.scale(
-                    scale: 2.2,
-                    child:
-                        DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: SweepGradient(
-                                  colors: [
-                                    Colors.transparent,
-                                    scheme.primary.withAlpha(0),
-                                    scheme.primary.withAlpha(90),
-                                    Colors.transparent,
-                                  ],
-                                  stops: const [0, 0.72, 0.98, 1],
-                                ),
-                              ),
-                            )
-                            .animate(onPlay: (a) => a.repeat())
-                            .rotate(duration: 1700.ms),
-                  ),
-                ),
-                TweenAnimationBuilder<double>(
-                  key: ValueKey(c.previewId),
-                  tween: Tween(begin: 0, end: 1),
-                  duration: 450.ms,
-                  curve: Curves.easeOutCubic,
-                  builder: (_, t, _) => CustomPaint(
-                    painter: _BoxPainter(c.previewFaces, t, scheme.primary),
-                  ),
-                ),
-                LayoutBuilder(
-                  builder: (context, box) {
-                    return Stack(
-                      children: [
-                        for (
-                          var i = 0;
-                          i < c.previewFaces.length &&
-                              i < c.previewThumbs.length;
-                          i++
-                        )
-                          Positioned(
-                            left:
-                                c.previewFaces[i].center.dx * box.maxWidth - 18,
-                            top:
-                                c.previewFaces[i].center.dy * box.maxHeight -
-                                18,
-                            child:
-                                ClipOval(
-                                      child: Image.memory(
-                                        c.previewThumbs[i],
-                                        width: 36,
-                                        height: 36,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    )
-                                    .animate(key: ValueKey('${c.previewId}-$i'))
-                                    .fadeIn(delay: 380.ms, duration: 120.ms)
-                                    .moveY(
-                                      delay: 420.ms,
-                                      end: box.maxHeight,
-                                      duration: 600.ms,
-                                      curve: Curves.easeInCubic,
-                                    )
-                                    .scaleXY(
-                                      delay: 420.ms,
-                                      end: 1.4,
-                                      duration: 600.ms,
-                                    )
-                                    .fadeOut(delay: 800.ms, duration: 200.ms),
-                          ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
+              TweenAnimationBuilder<double>(
+                key: ValueKey(c.previewId),
+                tween: Tween(begin: still ? 1 : 0, end: 1),
+                duration: 700.ms,
+                curve: Curves.easeInOutSine,
+                builder: (_, t, _) => CustomPaint(painter: _ScanPainter(c.previewFaces, t, scheme.primary)),
+              ),
+              LayoutBuilder(
+                builder: (context, box) {
+                  return Stack(
+                    children: [
+                      for (var i = 0; i < c.previewFaces.length && i < c.previewThumbs.length; i++)
+                        Positioned(
+                          left: c.previewFaces[i].center.dx * box.maxWidth - 18,
+                          top: c.previewFaces[i].center.dy * box.maxHeight - 18,
+                          child: ClipOval(
+                            child: Image.memory(c.previewThumbs[i], width: 36, height: 36, fit: BoxFit.cover),
+                          )
+                              .animate(key: ValueKey('${c.previewId}-$i'))
+                              .fadeIn(delay: 620.ms, duration: 120.ms)
+                              .moveY(delay: 660.ms, end: box.maxHeight, duration: 600.ms, curve: Curves.easeInCubic)
+                              .scaleXY(delay: 660.ms, end: 1.4, duration: 600.ms)
+                              .fadeOut(delay: 1040.ms, duration: 200.ms),
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ],
           ),
         ),
       ),
@@ -478,9 +496,10 @@ class _LivePreview extends StatelessWidget {
   }
 }
 
-/// Rounded face boxes whose outline is traced from 0 to [t] of the way round.
-class _BoxPainter extends CustomPainter {
-  _BoxPainter(this.faces, this.t, this.color);
+/// The scan line at [t] of the way down (with a faint tint behind it), and
+/// viewfinder corners around every face the line has passed.
+class _ScanPainter extends CustomPainter {
+  _ScanPainter(this.faces, this.t, this.color);
 
   final List<Rect> faces;
   final double t;
@@ -488,36 +507,89 @@ class _BoxPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    final y = size.height * t;
+    final fade = t < 0.92 ? 1.0 : (1 - (t - 0.92) / 0.08).clamp(0.0, 1.0);
+    if (fade > 0) {
+      canvas.drawRect(Rect.fromLTWH(0, 0, size.width, y), Paint()..color = color.withValues(alpha: 0.08 * fade));
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(size.width, y),
+        Paint()
+          ..strokeWidth = 2
+          ..color = color.withValues(alpha: fade),
+      );
+    }
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round;
-    final glow = Paint()
-      ..color = Colors.white.withAlpha(160)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
     for (final f in faces) {
-      final r = Rect.fromLTWH(
-        f.left * size.width,
-        f.top * size.height,
-        f.width * size.width,
-        f.height * size.height,
+      // Snap in (from a little bigger) just after the line passes.
+      final a = ((t - f.center.dy) / 0.12).clamp(0.0, 1.0);
+      if (a == 0) continue;
+      final grow = 1 + 0.6 * (1 - Curves.easeOutBack.transform(a));
+      final box = Rect.fromCenter(
+        center: Offset(f.center.dx * size.width, f.center.dy * size.height),
+        width: f.width * size.width * 1.15 * grow,
+        height: f.height * size.height * 1.15 * grow,
       );
-      final path = Path()
-        ..addRRect(RRect.fromRectAndRadius(r, const Radius.circular(10)));
-      for (final m in path.computeMetrics()) {
-        final part = m.extractPath(0, m.length * t);
-        canvas.drawPath(part, glow);
-        canvas.drawPath(part, paint);
+      final arm = (box.shortestSide * 0.28).clamp(8.0, 18.0);
+      paint.color = color.withValues(alpha: a);
+      for (final (corner, dx, dy) in [
+        (box.topLeft, 1.0, 1.0),
+        (box.topRight, -1.0, 1.0),
+        (box.bottomLeft, 1.0, -1.0),
+        (box.bottomRight, -1.0, -1.0),
+      ]) {
+        canvas.drawPath(
+          Path()
+            ..moveTo(corner.dx, corner.dy + dy * arm)
+            ..lineTo(corner.dx, corner.dy)
+            ..lineTo(corner.dx + dx * arm, corner.dy),
+          paint,
+        );
       }
     }
   }
 
   @override
-  bool shouldRepaint(_BoxPainter old) =>
-      old.t != t || old.faces != faces || old.color != color;
+  bool shouldRepaint(_ScanPainter old) => old.t != t || old.faces != faces || old.color != color;
+}
+
+/// One number in the stats card, with a Settings-style icon; it bumps when
+/// it changes.
+class _Stat extends StatelessWidget {
+  const _Stat({required this.icon, required this.color, required this.value, required this.label});
+
+  final IconData icon;
+  final Color color;
+  final String value, label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, size: 17, color: Colors.white),
+          ),
+          const SizedBox(height: 6),
+          Text(value,
+                  maxLines: 1,
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.w800, fontFeatures: [FontFeature.tabularFigures()]))
+              .animate(key: ValueKey(value))
+              .scaleXY(begin: 1.25, alignment: Alignment.centerLeft, duration: 450.ms, curve: Curves.elasticOut),
+          Text(label, maxLines: 1, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        ]),
+      ),
+    );
+  }
 }
 
 /// "1,000 photos scanned!" pill that drops in, sparkles, and leaves.
@@ -536,7 +608,7 @@ class _MilestonePill extends StatelessWidget {
             const ConfettiBurst(count: 16),
             Material(
               elevation: 6,
-              color: scheme.tertiaryContainer,
+              color: Colors.black,
               borderRadius: BorderRadius.circular(30),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -546,12 +618,12 @@ class _MilestonePill extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.emoji_events, color: scheme.onTertiaryContainer),
+                    Icon(Icons.celebration_rounded, color: scheme.primary),
                     const SizedBox(width: 10),
                     Text(
                       text,
-                      style: TextStyle(
-                        color: scheme.onTertiaryContainer,
+                      style: const TextStyle(
+                        color: Colors.white,
                         fontWeight: FontWeight.w700,
                         fontSize: 16,
                       ),

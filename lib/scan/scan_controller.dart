@@ -14,16 +14,22 @@ import 'package:photo_manager/photo_manager.dart';
 import '../data/dates.dart';
 import '../data/db.dart';
 import '../data/gallery.dart';
+import '../data/group_match.dart';
+import '../data/profile.dart';
 import '../face/clustering.dart';
 import '../face/face_engine.dart';
 import '../face/tags.dart';
 import '../share/receive.dart' show receivedAlbum;
 import '../share/send_center.dart';
+import '../share/server.dart' show FindLink, WebShare;
 import 'background.dart';
 
 /// Longest side of the image the face finder looks at. Bigger finds smaller
 /// faces in group shots but is slower.
 const _scanSize = 1600;
+
+/// How far below a sure match a face still gets a "Is this them?".
+const _unsureRange = 0.1;
 const _pageSize = 200;
 
 /// How many of the latest faces the scan screen shows.
@@ -137,10 +143,16 @@ class ScanController extends ChangeNotifier {
   /// Sending to friends' phones and web galleries (LocalSend protocol).
   late final SendCenter sharing;
 
+  /// Your face, set up once in Profile.
+  FaceProfile profile = FaceProfile(faces: const []);
+
   Future<void> load() async {
     sharing = await SendCenter.create(db);
     // Photos friends send us get scanned like any other album.
     sharing.receiver.onSaved = (_) => scanReceived();
+    sharing.server.onSelfie = _answerSelfie;
+    profile = await FaceProfile.load(db);
+    sharing.groups.profile = () => profile;
     final s = await db.setting(_strictnessKey);
     strictness = double.tryParse(s ?? '') ?? GroupingThresholds.defaultStrictness;
     autoScanEnabled = (await db.setting(_autoScanKey)) != '0';
@@ -255,6 +267,171 @@ class ScanController extends ChangeNotifier {
 
   GroupingThresholds get thresholds =>
       GroupingThresholds.fromStrictness(strictness);
+
+  // ---- Profile ----
+
+  /// The biggest face in a photo file (a selfie or an uploaded photo), or
+  /// null if there's no clear one. The file is turned upright and shrunk
+  /// first; the original is never changed.
+  Future<NewFace?> faceInFile(String path) async {
+    final tmp = p.join((await getTemporaryDirectory()).path, 'profile_${DateTime.now().microsecondsSinceEpoch}.jpg');
+    try {
+      final ok = await Isolate.run(() {
+        final src = img.decodeImage(File(path).readAsBytesSync());
+        if (src == null) return false;
+        var im = img.bakeOrientation(src);
+        if (math.max(im.width, im.height) > _scanSize) {
+          im = im.width >= im.height
+              ? img.copyResize(im, width: _scanSize)
+              : img.copyResize(im, height: _scanSize);
+        }
+        File(tmp).writeAsBytesSync(img.encodeJpg(im, quality: 90));
+        return true;
+      });
+      if (!ok) return null;
+      _engine ??= await FaceEngine.load();
+      final faces = await _engine!.analyze(tmp);
+      if (faces.isEmpty) return null;
+      return faces.reduce((a, b) => a.width * a.height >= b.width * b.height ? a : b);
+    } finally {
+      final f = File(tmp);
+      if (await f.exists()) await f.delete();
+    }
+  }
+
+  /// Adds the face in each of [paths] to your profile. Returns how many
+  /// had a clear face.
+  Future<int> addProfilePhotos(List<String> paths, FaceSource source) async {
+    final found = <NewFace>[];
+    for (final path in paths) {
+      try {
+        final f = await faceInFile(path);
+        if (f != null) found.add(f);
+      } catch (e) {
+        debugPrint('No face read from $path: $e');
+      }
+    }
+    if (found.isEmpty) return 0;
+    // The sharpest, biggest face makes the avatar.
+    final best = found.reduce((a, b) => a.width * a.sharpness >= b.width * b.sharpness ? a : b);
+    profile = FaceProfile(
+      faces: [if (profile.personId == null) ...profile.faces],
+      thumb: profile.personId == null ? profile.thumb : null,
+      source: source,
+    ).adding([for (final f in found) f.embedding], thumb: best.thumb, source: source);
+    await profile.save(db);
+    sharing.groups.refreshMe();
+    notifyListeners();
+    return found.length;
+  }
+
+  /// Uses [personId]'s faces from People as your profile: many photos of
+  /// you make a better match than a few selfies.
+  Future<void> profileFromPerson(int personId) async {
+    final faces = [for (final f in await db.allFaces()) if (f.personId == personId) f.embedding];
+    final cover = await db.facesOf(personId, limit: 1);
+    profile = FaceProfile(
+      faces: faces.length > FaceProfile.maxFaces ? faces.sublist(0, FaceProfile.maxFaces) : faces,
+      thumb: cover.firstOrNull?.thumb,
+      source: FaceSource.people,
+      personId: personId,
+    );
+    await profile.save(db);
+    sharing.groups.refreshMe();
+    notifyListeners();
+  }
+
+  Future<void> clearProfile() async {
+    profile = FaceProfile(faces: const []);
+    await profile.save(db);
+    sharing.groups.refreshMe();
+    notifyListeners();
+  }
+
+  // ---- Trip groups ----
+
+  /// Who gets which of [assetIds]: the faces in each photo against every
+  /// member's profile ([members] includes you as [me]). Photos not scanned
+  /// yet are looked at now.
+  Future<GroupPlan> planGroupSend(Map<String, List<Float32List>> members, String me, List<String> assetIds,
+      {void Function(int done, int total)? onProgress}) async {
+    final photos = <String, List<PhotoFace>>{};
+    for (final f in await db.facesIn(assetIds)) {
+      photos.putIfAbsent(f.assetId, () => []).add(PhotoFace(f.assetId, f.embedding, f.thumb));
+    }
+    final scanned = await db.scannedAssetIds();
+    final todo = [for (final id in assetIds) if (!scanned.contains(id)) id];
+    if (todo.isNotEmpty) {
+      _engine ??= await FaceEngine.load();
+      final tmp = File(p.join((await getTemporaryDirectory()).path, 'group_${DateTime.now().microsecondsSinceEpoch}.jpg'));
+      try {
+        for (final (i, id) in todo.indexed) {
+          onProgress?.call(i, todo.length);
+          final asset = await AssetEntity.fromId(id);
+          if (asset == null) continue;
+          final bytes = await asset.thumbnailDataWithSize(_sizeFor(asset), quality: 90);
+          if (bytes == null) continue;
+          await tmp.writeAsBytes(bytes, flush: true);
+          try {
+            photos[id] = [for (final f in await _engine!.analyze(tmp.path)) PhotoFace(id, f.embedding, f.thumb)];
+          } catch (e) {
+            debugPrint('Skipping $id: $e');
+          }
+        }
+      } finally {
+        if (await tmp.exists()) await tmp.delete();
+      }
+    }
+    final t = thresholds;
+    final input = GroupPlanInput(
+      {for (final e in members.entries) if (e.value.isNotEmpty) e.key: e.value},
+      me,
+      assetIds,
+      photos,
+      t.assign,
+      t.assign - _unsureRange,
+    );
+    return Isolate.run(() => planGroup(input));
+  }
+
+  /// "Find my photos": who the biggest face in [selfie] is, if they look
+  /// enough like someone here, and the photos they're in (newest first).
+  Future<({int personId, String? name, List<String> photos})?> findInSelfie(
+      File selfie, {int? tripId}) async {
+    _engine ??= await FaceEngine.load();
+    final faces = await _engine!.analyze(selfie.path);
+    if (faces.isEmpty) return null;
+    final face = faces.reduce((a, b) => a.width * a.height >= b.width * b.height ? a : b);
+    final people = {for (final p in await db.people(tripId: tripId)) p.id: p};
+    final byPerson = <int, List<Float32List>>{};
+    for (final f in await db.allFaces()) {
+      if (f.personId != null && people.containsKey(f.personId)) {
+        byPerson.putIfAbsent(f.personId!, () => []).add(f.embedding);
+      }
+    }
+    if (byPerson.isEmpty) return null;
+    final input = SuggestInput(byPerson, {0: face.embedding}, thresholds.assign);
+    final best = await Isolate.run(() => suggestMatches(input));
+    if (best.isEmpty) return null;
+    final id = best.first.personId;
+    final photos = await db.photosOf(id, tripId: tripId);
+    return (personId: id, name: people[id]!.name, photos: [for (final p in photos) p.assetId]);
+  }
+
+  /// A selfie from a "Find my photos" link: open (or reopen) a gallery of
+  /// that person's photos.
+  Future<({WebShare share, String name})?> _answerSelfie(FindLink link, File selfie) async {
+    final found = await findInSelfie(selfie, tripId: link.tripId);
+    if (found == null || found.photos.isEmpty) return null;
+    final name = found.name ?? 'you';
+    final open = sharing.server.shares[link.galleries[found.personId]];
+    if (open != null) return (share: open, name: name);
+    final title = found.name == null ? 'Your photos' : "${found.name}'s photos";
+    final share = await sharing.openWebShare(
+        link.tripId == null ? title : '$title · ${link.title}', found.photos);
+    link.galleries[found.personId] = share.id;
+    return (share: share, name: name);
+  }
 
   Duration? get eta {
     final start = _startedAt;
@@ -388,18 +565,22 @@ class ScanController extends ChangeNotifier {
     }
   }
 
+  /// The scan copy's size: the long side [_scanSize], same shape as the photo.
+  static ThumbnailSize _sizeFor(AssetEntity asset) {
+    final w = asset.width, h = asset.height;
+    return (w <= 0 || h <= 0)
+        ? const ThumbnailSize.square(_scanSize)
+        : w >= h
+            ? ThumbnailSize(_scanSize, _scanSize * h ~/ w)
+            : ThumbnailSize(_scanSize * w ~/ h, _scanSize);
+  }
+
   Future<void> _scanOne(AssetEntity asset, File tmp,
       {required bool facesDone}) async {
     try {
       // A downscaled, already-rotated JPEG from the photo library. The
       // original photo is never touched.
-      final w = asset.width, h = asset.height;
-      final size = (w <= 0 || h <= 0)
-          ? const ThumbnailSize.square(_scanSize)
-          : w >= h
-              ? ThumbnailSize(_scanSize, _scanSize * h ~/ w)
-              : ThumbnailSize(_scanSize * w ~/ h, _scanSize);
-      final bytes = await asset.thumbnailDataWithSize(size, quality: 90);
+      final bytes = await asset.thumbnailDataWithSize(_sizeFor(asset), quality: 90);
       if (bytes == null) return;
       await tmp.writeAsBytes(bytes, flush: true);
       preview = bytes;

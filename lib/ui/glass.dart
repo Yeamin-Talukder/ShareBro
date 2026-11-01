@@ -21,8 +21,9 @@ const _saturate = ColorFilter.matrix(<double>[
 ]);
 
 /// The glass material for the floating layer: backdrop blur with a light
-/// saturation boost, a translucent fill, and a hairline highlight that's
-/// brighter on the top edge, like light catching the rim.
+/// saturation boost, a mostly solid flat fill and a hairline rim. The
+/// background is plain, so the fill (not the blur) has to set the glass
+/// apart from it; the blur matters only once content slides underneath.
 class Glass extends StatelessWidget {
   const Glass({
     super.key,
@@ -33,6 +34,7 @@ class Glass extends StatelessWidget {
     this.tint,
     this.shadow = true,
     this.shape = BoxShape.rectangle,
+    this.fade = 1,
   });
 
   final Widget child;
@@ -45,8 +47,14 @@ class Glass extends StatelessWidget {
   final bool shadow;
   final BoxShape shape;
 
+  /// 0..1: fades the glass in. Fade with this, never an [Opacity] around
+  /// the glass: a blur inside an opacity layer can drop out and leave the
+  /// glass invisible.
+  final double fade;
+
   @override
   Widget build(BuildContext context) {
+    if (fade <= 0) return Padding(padding: padding, child: child);
     final dark = Theme.of(context).brightness == Brightness.dark || kind == GlassKind.clear;
     final scheme = Theme.of(context).colorScheme;
     final solid = solidSurfaces(context);
@@ -59,34 +67,21 @@ class Glass extends StatelessWidget {
             ? scheme.surfaceContainerHighest
             : switch (kind) {
                 GlassKind.regular => Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0x9E1C1A22)
-                    : const Color(0xA8FFFFFF),
+                    ? const Color(0xE6252329)
+                    : const Color(0xEBFFFFFF),
                 // Over photos: smoky, with the 35% dim Apple suggests.
                 GlassKind.clear => const Color(0x59000000),
               };
 
+    // A light rim in the dark, a dark one in the light: a white rim on a
+    // near-white page doesn't show.
+    final rim = solid ? scheme.outline : (dark ? Colors.white.withAlpha(34) : Colors.black.withAlpha(20));
     final decorated = DecoratedBox(
       decoration: BoxDecoration(
-        color: fill,
+        color: fill.withValues(alpha: fill.a * fade),
         shape: shape,
         borderRadius: borderRadius,
-        border: Border.all(
-          color: solid
-              ? scheme.outline
-              : (dark ? Colors.white.withAlpha(40) : Colors.white.withAlpha(170)),
-          width: solid ? 1.5 : 1,
-        ),
-        gradient: solid || tint != null
-            ? null
-            : LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.white.withAlpha(dark ? 26 : 70),
-                  Colors.white.withAlpha(0),
-                ],
-                stops: const [0, 0.55],
-              ),
+        border: Border.all(color: rim.withValues(alpha: rim.a * fade), width: solid ? 1.5 : 1),
       ),
       child: Padding(padding: padding, child: child),
     );
@@ -97,8 +92,8 @@ class Glass extends StatelessWidget {
             filter: ImageFilter.compose(
               outer: ImageFilter.blur(
                 // Strong enough to read as glass; lighter blurs cost less.
-                sigmaX: kind == GlassKind.regular ? 18 : 10,
-                sigmaY: kind == GlassKind.regular ? 18 : 10,
+                sigmaX: (kind == GlassKind.regular ? 18 : 10) * fade,
+                sigmaY: (kind == GlassKind.regular ? 18 : 10) * fade,
               ),
               inner: _saturate,
             ),
@@ -109,7 +104,7 @@ class Glass extends StatelessWidget {
         ? ClipOval(child: blurred)
         : ClipRRect(borderRadius: borderRadius!, child: blurred);
 
-    if (!shadow) return clipped;
+    if (!shadow || fade < 1) return clipped;
     return DecoratedBox(
       decoration: BoxDecoration(
         shape: shape,
@@ -178,13 +173,8 @@ class GlassTopBar extends StatelessWidget {
   final double visible;
 
   @override
-  Widget build(BuildContext context) {
-    if (visible <= 0) return const SizedBox.expand();
-    return Opacity(
-      opacity: visible.clamp(0, 1),
-      child: const Glass(radius: 0, shadow: false, child: SizedBox.expand()),
-    );
-  }
+  Widget build(BuildContext context) =>
+      Glass(radius: 0, shadow: false, fade: visible.clamp(0, 1), child: const SizedBox.expand());
 }
 
 /// A top-level page: a large title that scrolls away, and a pinned bar that
@@ -195,9 +185,18 @@ class GlassScrollView extends StatefulWidget {
     required this.title,
     required this.slivers,
     this.actions = const [],
+    this.subtitle,
+    this.physics,
   });
 
   final String title;
+
+  /// A quiet line under the large title ("12 people").
+  final String? subtitle;
+
+  /// Pass [NeverScrollableScrollPhysics] when the content takes the
+  /// finger itself.
+  final ScrollPhysics? physics;
   final List<Widget> actions;
   final List<Widget> slivers;
 
@@ -207,6 +206,29 @@ class GlassScrollView extends StatefulWidget {
 
 class _GlassScrollViewState extends State<GlassScrollView> {
   bool _scrolled = false;
+  final _scroll = ScrollController();
+
+  @override
+  void didUpdateWidget(GlassScrollView old) {
+    super.didUpdateWidget(old);
+    // Content that takes the finger itself fits on one screen. Bring the
+    // page back to the top, or it stays stuck wherever it was scrolled to,
+    // with no way to scroll back up.
+    final locked = widget.physics is NeverScrollableScrollPhysics;
+    if (locked && old.physics is! NeverScrollableScrollPhysics && _scroll.hasClients && _scroll.offset != 0) {
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _scroll.jumpTo(0);
+      } else {
+        _scroll.animateTo(0, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   bool _onScroll(ScrollNotification n) {
     if (n.depth != 0 || n.metrics.axis != Axis.vertical) return false;
@@ -220,7 +242,7 @@ class _GlassScrollViewState extends State<GlassScrollView> {
     final text = Theme.of(context).textTheme;
     return NotificationListener<ScrollNotification>(
       onNotification: _onScroll,
-      child: CustomScrollView(slivers: [
+      child: CustomScrollView(controller: _scroll, physics: widget.physics, slivers: [
         SliverAppBar(
           pinned: true,
           backgroundColor: Colors.transparent,
@@ -231,10 +253,10 @@ class _GlassScrollViewState extends State<GlassScrollView> {
             child: Text(widget.title),
           ),
           actions: [...widget.actions, const SizedBox(width: 4)],
-          flexibleSpace: AnimatedOpacity(
-            opacity: _scrolled ? 1 : 0,
+          flexibleSpace: TweenAnimationBuilder<double>(
+            tween: Tween(end: _scrolled ? 1 : 0),
             duration: const Duration(milliseconds: 220),
-            child: const Glass(radius: 0, shadow: false, child: SizedBox.expand()),
+            builder: (context, fade, _) => Glass(radius: 0, shadow: false, fade: fade, child: const SizedBox.expand()),
           ),
         ),
         SliverToBoxAdapter(
@@ -243,7 +265,12 @@ class _GlassScrollViewState extends State<GlassScrollView> {
             child: AnimatedOpacity(
               opacity: _scrolled ? 0 : 1,
               duration: const Duration(milliseconds: 160),
-              child: Text(widget.title, style: text.displaySmall),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(widget.title, style: text.displaySmall),
+                if (widget.subtitle != null)
+                  Text(widget.subtitle!,
+                      style: text.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              ]),
             ),
           ),
         ),

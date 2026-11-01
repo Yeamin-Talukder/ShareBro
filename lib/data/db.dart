@@ -68,6 +68,26 @@ class PersonGroup {
   final Set<int> members;
 }
 
+/// One face in a group photo, for picking a burst's best shot. Eye and
+/// smile readings are null when the face is too small to read.
+class ShotFace {
+  ShotFace(this.width, this.eyesOpen, this.smile, this.sharpness);
+
+  final double width;
+  final double? eyesOpen, smile, sharpness;
+}
+
+/// A photo with two or more faces.
+class GroupShot {
+  GroupShot(this.assetId, this.takenAt, this.faces);
+
+  final String assetId;
+
+  /// Milliseconds since epoch.
+  final int takenAt;
+  final List<ShotFace> faces;
+}
+
 /// What the duplicate finder needs to know about each photo.
 class PhotoFingerprint {
   PhotoFingerprint(this.assetId, this.hash, this.takenAt, this.quality, this.hidden);
@@ -765,6 +785,31 @@ class AppDb {
     ];
   }
 
+  /// Photos with two or more faces, in time order, with every face's
+  /// readings. Hidden photos are left out.
+  Future<List<GroupShot>> groupShots({int? tripId}) async {
+    final trip = tripId == null ? '' : 'JOIN trip_photos tp ON tp.asset_id = ph.asset_id AND tp.trip_id = ?';
+    final rows = await _db.rawQuery('''
+      SELECT ph.asset_id, ph.taken_at, f.width, f.eyes_open, f.smile, f.sharpness
+      FROM photos ph JOIN faces f ON f.asset_id = ph.asset_id $trip
+      WHERE ph.face_count >= 2 AND ph.hidden = 0 AND ph.taken_at IS NOT NULL
+      ORDER BY ph.taken_at, ph.asset_id''', [?tripId]);
+    final out = <GroupShot>[];
+    for (final r in rows) {
+      final id = r['asset_id'] as String;
+      if (out.isEmpty || out.last.assetId != id) out.add(GroupShot(id, r['taken_at'] as int, []));
+      final w = (r['width'] as num).toDouble();
+      final readable = w >= eyeReadableWidth;
+      out.last.faces.add(ShotFace(
+        w,
+        readable ? (r['eyes_open'] as num?)?.toDouble() : null,
+        readable ? (r['smile'] as num?)?.toDouble() : null,
+        (r['sharpness'] as num?)?.toDouble(),
+      ));
+    }
+    return [for (final s in out) if (s.faces.length >= 2) s];
+  }
+
   /// Hidden photos stay on the phone but leave people, best-of and Explore.
   Future<void> setHidden(Iterable<String> assetIds, bool hidden) async {
     final batch = _db.batch();
@@ -797,6 +842,19 @@ class AppDb {
       WHERE f.person_id IN ($marks) AND ph.hidden = 0
       GROUP BY f.asset_id HAVING COUNT(DISTINCT f.person_id) = ?
       ORDER BY MAX(ph.taken_at) DESC''', [...args, ...personIds, personIds.length]);
+    return [for (final r in rows) r['asset_id'] as String];
+  }
+
+  /// Scanned photos, newest first, optionally only in [tripId] / [dates].
+  Future<List<String>> photosIn({int? tripId, DaySpan? dates}) async {
+    final trip = tripId == null ? '' : 'JOIN trip_photos tp ON tp.asset_id = ph.asset_id AND tp.trip_id = ?';
+    final rows = await _db.rawQuery('''
+      SELECT ph.asset_id FROM photos ph $trip
+      WHERE ph.hidden = 0 ${dates == null ? '' : 'AND ph.taken_at BETWEEN ? AND ?'}
+      ORDER BY ph.taken_at DESC''', [
+      ?tripId,
+      if (dates != null) ...[dates.start.millisecondsSinceEpoch, dates.end.millisecondsSinceEpoch],
+    ]);
     return [for (final r in rows) r['asset_id'] as String];
   }
 
@@ -897,6 +955,22 @@ class AppDb {
             );
 
   // ---- Grouping ----
+
+  /// Every face in [assetIds] (scanned photos only), with its fingerprint
+  /// and crop.
+  Future<List<({String assetId, Float32List embedding, Uint8List thumb})>> facesIn(List<String> assetIds) async {
+    final out = <({String assetId, Float32List embedding, Uint8List thumb})>[];
+    for (var i = 0; i < assetIds.length; i += 500) {
+      final chunk = assetIds.sublist(i, (i + 500).clamp(0, assetIds.length));
+      final marks = List.filled(chunk.length, '?').join(',');
+      final rows = await _db.rawQuery(
+          'SELECT asset_id, embedding, thumb FROM faces WHERE asset_id IN ($marks)', chunk);
+      for (final r in rows) {
+        out.add((assetId: r['asset_id'] as String, embedding: _floats(r['embedding']), thumb: r['thumb'] as Uint8List));
+      }
+    }
+    return out;
+  }
 
   Future<List<FaceRecord>> allFaces() async {
     final rows = await _db.query(

@@ -1,25 +1,24 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-/// One full loop of the flow. Every movement repeats a whole number of
+/// One full loop of the drift. Every movement repeats a whole number of
 /// times per loop, so it never jumps when the loop starts over.
-const _cycle = Duration(seconds: 60);
+const _cycle = Duration(seconds: 90);
 
-/// The colours move so slowly that ~15 updates a second look the same as
-/// 60, at a quarter of the work (and the glass above re-blurs less often).
-const _frame = Duration(milliseconds: 66);
+/// The lines move so slowly that ~12 updates a second look smooth.
+const _frame = Duration(milliseconds: 80);
 
-/// How soft the colour shapes are: they melt into one another.
-const _softness = 42.0;
+/// Every this many lines is an "index" line, drawn in the brand coral.
+const _index = 5;
 
-/// The background: big soft shapes in the brand's sunset colours slowly
-/// melting into each other, like an animated wallpaper. Dimmed by
-/// [intensity] on busy screens; paused while hidden, still when animations
-/// are turned off. [Aurora.celebrate] sends a warm wave across (a transfer
+/// The background: a faint contour map, like a trail map of the places the
+/// trip went, its lines slowly reshaping on a plain ground. No blur, so it's
+/// cheap and the glass above stays crisp. Dimmed by [intensity] on busy
+/// screens; paused while hidden, still when animations are turned off.
+/// [Aurora.celebrate] sends a coral ripple out across the lines (a transfer
 /// finished).
 class Aurora extends StatefulWidget {
   const Aurora({super.key, required this.child, this.intensity = 1});
@@ -31,7 +30,7 @@ class Aurora extends StatefulWidget {
 
   static final _waves = ValueNotifier<int>(0);
 
-  /// A warm wave washes across every visible background.
+  /// A coral ripple runs across every visible background.
   static void celebrate() => _waves.value++;
 
   @override
@@ -43,7 +42,7 @@ class _AuroraState extends State<Aurora> with SingleTickerProviderStateMixin {
   final _clock = Stopwatch();
   Timer? _timer;
   ValueListenable<TickerModeData>? _visible;
-  late final AnimationController _wave = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400));
+  late final AnimationController _wave = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600));
 
   @override
   void initState() {
@@ -63,7 +62,7 @@ class _AuroraState extends State<Aurora> with SingleTickerProviderStateMixin {
     _sync();
   }
 
-  /// Runs the flow only while this screen is visible and motion is allowed.
+  /// Runs the drift only while this screen is visible and motion is allowed.
   void _sync() {
     final run = mounted && (_visible?.value.enabled ?? true) && !MediaQuery.disableAnimationsOf(context);
     if (run && _timer == null) {
@@ -90,32 +89,30 @@ class _AuroraState extends State<Aurora> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final base = Theme.of(context).colorScheme.surface;
+    final scheme = Theme.of(context).colorScheme;
+    final dark = scheme.brightness == Brightness.dark;
     return Stack(children: [
       Positioned.fill(
         child: RepaintBoundary(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(end: widget.intensity),
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeOut,
-            builder: (context, strength, _) => Stack(fit: StackFit.expand, children: [
-              // The base sits outside the blur, so the edges never fade out.
-              ColoredBox(
-                color: dark
-                    ? Color.lerp(base, const Color(0xFF050309), 0.85)!
-                    : Color.lerp(base, const Color(0xFFFFF6F0), 0.7)!,
-              ),
-              // The colour shapes, melted together by a heavy blur.
-              ImageFiltered(
-                imageFilter: ImageFilter.blur(sigmaX: _softness, sigmaY: _softness, tileMode: TileMode.clamp),
-                child: CustomPaint(
-                  painter: _FlowPainter(t: _t, wave: _wave, dark: dark, strength: strength, base: base),
+          child: ColoredBox(
+            color: dark
+                ? Color.lerp(scheme.surface, const Color(0xFF0B0A0F), 0.85)!
+                : Color.lerp(scheme.surface, const Color(0xFFF3F1F5), 0.7)!,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(end: widget.intensity),
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeOut,
+              builder: (context, strength, _) => CustomPaint(
+                size: Size.infinite,
+                painter: _ContourPainter(
+                  t: _t,
+                  wave: _wave,
+                  strength: strength,
+                  line: dark ? Colors.white.withValues(alpha: 0.085) : const Color(0xFF1A1820).withValues(alpha: 0.085),
+                  accent: scheme.primary.withValues(alpha: dark ? 0.22 : 0.2),
                 ),
               ),
-              // Calm, readable ground on top (no blur needed).
-              CustomPaint(painter: _ShadePainter(dark: dark, base: base)),
-            ]),
+            ),
           ),
         ),
       ),
@@ -124,103 +121,121 @@ class _AuroraState extends State<Aurora> with SingleTickerProviderStateMixin {
   }
 }
 
-/// Sunset coral, rose, violet, teal and a warm peach, as in the app icon:
-/// colour, x, y, radius (share of the width), x and y loop counts, phase.
-const _shapes = [
-  (Color(0xFFFF7A50), 0.32, 0.16, 0.48, 1, 1, 0.0),
-  (Color(0xFFE8457A), 0.80, 0.30, 0.44, 1, 2, 1.3),
-  (Color(0xFF7B61FF), 0.22, 0.60, 0.52, 2, 1, 2.6),
-  (Color(0xFF22C3B0), 0.82, 0.82, 0.46, 1, 1, 3.9),
-  (Color(0xFFFFB478), 0.55, 0.44, 0.30, 2, 2, 5.1),
+/// Hills of the map: where each sits (share of width and height), how wide
+/// (share of the shorter side), how high, and its drift phase. Peaks near
+/// the corners keep the middle, where the content is, the calmest.
+const _peaks = [
+  (0.10, 0.10, 0.55, 1.0, 0.0),
+  (1.02, 0.50, 0.45, 0.85, 2.1),
+  (0.20, 0.96, 0.42, 0.8, 4.2),
+  (0.70, 0.80, 0.30, 0.35, 1.3),
 ];
 
-/// Dark mode's own, deeper jewel tones (same order as [_shapes]): wine,
-/// rose-plum, midnight indigo, deep teal and a low ember. Rich, but dark
-/// enough that the screen stays calm and text pops.
-const _darkColors = [
-  Color(0xFF8E1F3E), // wine
-  Color(0xFF6E1A62), // plum
-  Color(0xFF3A27A6), // midnight indigo
-  Color(0xFF0C6A6E), // deep teal
-  Color(0xFF9C4614), // ember
-];
+/// Heights the lines are drawn at, from low ground to the peaks.
+const _levels = 19;
+const _lowest = 0.06, _step = 0.055;
 
-class _FlowPainter extends CustomPainter {
-  _FlowPainter({required this.t, required this.wave, required this.dark, required this.strength, required this.base})
+/// Grid the height map is sampled on (logical pixels).
+const _cell = 9.0;
+
+/// Traces the map's contour lines: a smooth height map (a few gentle hills
+/// plus a slow ripple) cut at even heights with marching squares, so the
+/// lines nest like a real map and never cross.
+class _ContourPainter extends CustomPainter {
+  _ContourPainter({required this.t, required this.wave, required this.strength, required this.line, required this.accent})
       : super(repaint: Listenable.merge([t, wave]));
 
   final ValueNotifier<double> t;
   final Animation<double> wave;
-  final bool dark;
   final double strength;
-  final Color base;
+  final Color line, accent;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width, h = size.height;
+    if (size.isEmpty || strength <= 0) return;
     final a = 2 * math.pi * t.value;
-    final alpha = (dark ? 0.8 : 0.42) * strength;
-    final paint = Paint();
-    for (final (i, (light, bx, by, r, fx, fy, ph)) in _shapes.indexed) {
-      final color = dark ? _darkColors[i] : light;
-      final x = w * (bx + 0.16 * math.sin(a * fx + ph));
-      final y = h * (by + 0.10 * math.cos(a * fy + ph * 0.7));
-      final rx = w * r, ry = rx * (0.8 + 0.2 * math.sin(a * 2 + ph));
-      paint.color = color.withValues(alpha: alpha);
-      canvas
-        ..save()
-        ..translate(x, y)
-        ..rotate(a + ph);
-      canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: rx * 2, height: ry * 2), paint);
-      canvas.restore();
+    final cols = (size.width / _cell).ceil() + 1, rows = (size.height / _cell).ceil() + 1;
+    final unit = size.shortestSide;
+    final hills = [
+      for (final (cx, cy, w, h, ph) in _peaks)
+        (
+          size.width * cx + unit * 0.05 * math.sin(a + ph),
+          size.height * cy + unit * 0.04 * math.cos(a * 2 + ph),
+          -1 / (2 * math.pow(unit * w, 2)),
+          h,
+        ),
+    ];
+    final field = Float64List(cols * rows);
+    for (var j = 0; j < rows; j++) {
+      final y = j * _cell;
+      for (var i = 0; i < cols; i++) {
+        final x = i * _cell;
+        var v = 0.06 * math.sin(x / unit * 4.2 + a) * math.cos(y / unit * 3.1 - a);
+        for (final (hx, hy, k, h) in hills) {
+          final dx = x - hx, dy = y - hy;
+          v += h * math.exp((dx * dx + dy * dy) * k);
+        }
+        field[j * cols + i] = v;
+      }
     }
-    // "Sent!": a warm wave sweeps across, then fades.
-    final p = wave.value;
-    if (p > 0 && p < 1) {
-      paint.color = const Color(0xFFFFBE8C).withValues(alpha: (dark ? 0.6 : 0.45) * math.sin(p * math.pi));
-      canvas
-        ..save()
-        ..translate(w * (-0.3 + 1.6 * Curves.easeInOut.transform(p)), h * 0.5)
-        ..rotate(0.3);
-      canvas.drawOval(Rect.fromCenter(center: Offset.zero, width: w * 0.9, height: h * 1.4), paint);
-      canvas.restore();
+
+    // "Sent!": a coral glow climbs the hills, level by level.
+    final w = wave.value;
+    final ripple = w > 0 && w < 1 ? w * (_levels + 2) - 1 : null;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1;
+    for (var l = 0; l < _levels; l++) {
+      final level = _lowest + l * _step;
+      final path = Path();
+      for (var j = 0; j < rows - 1; j++) {
+        for (var i = 0; i < cols - 1; i++) {
+          final v0 = field[j * cols + i], v1 = field[j * cols + i + 1];
+          final v2 = field[(j + 1) * cols + i + 1], v3 = field[(j + 1) * cols + i];
+          final c = (v0 > level ? 8 : 0) | (v1 > level ? 4 : 0) | (v2 > level ? 2 : 0) | (v3 > level ? 1 : 0);
+          if (c == 0 || c == 15) continue;
+          final x = i * _cell, y = j * _cell;
+          double f(double p, double q) => (level - p) / (q - p);
+          final top = Offset(x + _cell * f(v0, v1), y);
+          final right = Offset(x + _cell, y + _cell * f(v1, v2));
+          final bottom = Offset(x + _cell * f(v3, v2), y + _cell);
+          final left = Offset(x, y + _cell * f(v0, v3));
+          void seg(Offset p, Offset q) => path
+            ..moveTo(p.dx, p.dy)
+            ..lineTo(q.dx, q.dy);
+          switch (c) {
+            case 1 || 14:
+              seg(left, bottom);
+            case 2 || 13:
+              seg(bottom, right);
+            case 3 || 12:
+              seg(left, right);
+            case 4 || 11:
+              seg(top, right);
+            case 5:
+              seg(left, top);
+              seg(bottom, right);
+            case 6 || 9:
+              seg(top, bottom);
+            case 7 || 8:
+              seg(left, top);
+            case 10:
+              seg(top, right);
+              seg(left, bottom);
+          }
+        }
+      }
+      var color = l % _index == _index - 1 ? accent : line;
+      if (ripple != null) {
+        final near = 1 - ((l - ripple).abs() / 2).clamp(0.0, 1.0);
+        if (near > 0) color = Color.lerp(color, accent.withValues(alpha: 0.75), near)!;
+      }
+      paint.color = color.withValues(alpha: color.a * strength);
+      canvas.drawPath(path, paint);
     }
   }
 
   @override
-  bool shouldRepaint(_FlowPainter old) =>
-      old.dark != dark || old.strength != strength || old.base != base || old.t != t || old.wave != wave;
-}
-
-/// Keeps text readable: the flow toned down a little everywhere, a bit more
-/// behind the big titles at the top and the nav bar at the bottom.
-class _ShadePainter extends CustomPainter {
-  _ShadePainter({required this.dark, required this.base});
-
-  final bool dark;
-  final Color base;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final shade = dark ? const Color(0xFF030208) : base;
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            shade.withValues(alpha: dark ? 0.6 : 0.45),
-            shade.withValues(alpha: dark ? 0.32 : 0.30),
-            shade.withValues(alpha: dark ? 0.42 : 0.30),
-            shade.withValues(alpha: dark ? 0.7 : 0.50),
-          ],
-          stops: const [0, 0.3, 0.65, 1],
-        ).createShader(rect),
-    );
-  }
-
-  @override
-  bool shouldRepaint(_ShadePainter old) => old.dark != dark || old.base != base;
+  bool shouldRepaint(_ContourPainter old) =>
+      old.strength != strength || old.line != line || old.accent != accent || old.t != t || old.wave != wave;
 }

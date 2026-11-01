@@ -12,6 +12,8 @@ import 'gallery_view.dart';
 import 'glass.dart';
 import 'motion.dart';
 import 'scan_screen.dart';
+import 'search_screen.dart';
+import 'sections.dart';
 import 'trash_screen.dart';
 import 'widgets.dart';
 
@@ -76,8 +78,14 @@ class _PhotosTabState extends State<PhotosTab> {
           shadow: false,
           child: SizedBox.expand(),
         ),
-        title: const Text('Photos'),
+        title: const Text('Photos', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.6)),
         actions: [
+          IconButton(
+            tooltip: 'Search',
+            icon: const Icon(Icons.search_rounded),
+            onPressed: () => Navigator.push(
+                context, MaterialPageRoute(builder: (_) => SearchScreen(controller: widget.controller))),
+          ),
           DateChip(value: _dates, onChanged: (d) => setState(() => _dates = d)),
           const SizedBox(width: 12),
         ],
@@ -135,143 +143,125 @@ class _AlbumsTabState extends State<AlbumsTab> {
 
   @override
   Widget build(BuildContext context) {
+    // Large title that scrolls away, with the dates in the top bar.
+    Widget page(List<Widget> slivers) => GlassScrollView(
+          title: 'Albums',
+          actions: [DateChip(value: _dates, onChanged: _setDates), const SizedBox(width: 12)],
+          slivers: slivers,
+        );
     return Scaffold(
-      extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        flexibleSpace: const Glass(
-          radius: 0,
-          shadow: false,
-          child: SizedBox.expand(),
-        ),
-        title: const Text('Albums'),
-        actions: [
-          DateChip(value: _dates, onChanged: _setDates),
-          const SizedBox(width: 12),
-        ],
-      ),
       body: _AccessGate(
         child: FutureBuilder<List<AssetPathEntity>>(
           future: _albums,
           builder: (context, snap) {
             final albums = snap.data;
             if (albums == null) {
-              return const Center(child: CircularProgressIndicator());
+              return page(const [SliverFillRemaining(child: Center(child: CircularProgressIndicator()))]);
             }
             if (albums.isEmpty) {
-              return const EmptyIllustration(message: 'No albums found.');
+              return page(const [
+                SliverFillRemaining(hasScrollBody: false, child: EmptyIllustration(message: 'No albums found.')),
+              ]);
             }
             return FaceRefresh(
               onRefresh: () async {
                 _setDates(_dates);
                 await _albums;
               },
-              child: CustomScrollView(
-                slivers: [
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      16,
-                      MediaQuery.paddingOf(context).top + 8,
-                      16,
-                      16,
-                    ),
-                    sliver: SliverToBoxAdapter(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: _SmartCard(
-                              icon: Icons.favorite_rounded,
-                              title: 'Favourites',
-                              colors: const [
-                                Color(0xFFFF8A5C),
-                                Color(0xFFE8457A),
-                              ],
-                              onTap: () => _openSmart(
-                                'Favourites',
-                                (_) => Gallery.favourites(),
-                                'Tap the heart on a photo to add it here.',
-                              ),
+              child: page([
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _SmartCard(
+                            icon: Icons.favorite_rounded,
+                            title: 'Favourites',
+                            color: const Color(0xFFE8457A),
+                            onTap: () => _openSmart(
+                              'Favourites',
+                              (_) => Gallery.favourites(),
+                              'Tap the heart on a photo to add it here.',
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _SmartCard(
-                              icon: Icons.movie_rounded,
-                              title: 'Videos',
-                              colors: const [
-                                Color(0xFF6E5BFF),
-                                Color(0xFF2BB5A6),
-                              ],
-                              onTap: () => _openSmart(
-                                'Videos',
-                                (d) => Gallery.videos(dates: d ?? _dates),
-                                'No videos here.',
-                              ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _SmartCard(
+                            icon: Icons.movie_rounded,
+                            title: 'Videos',
+                            color: const Color(0xFF6E5BFF),
+                            onTap: () => _openSmart(
+                              'Videos',
+                              (d) => Gallery.videos(dates: d ?? _dates),
+                              'No videos here.',
                             ),
                           ),
-                          // The phone's trash (Android 11+ only).
-                          FutureBuilder<bool>(
-                            future: Trash.available(),
-                            builder: (context, snap) => snap.data != true
-                                ? const SizedBox.shrink()
-                                : Expanded(
-                                    child: Padding(
-                                      padding: const EdgeInsets.only(left: 12),
-                                      child: _SmartCard(
-                                        icon: Icons.delete_outline_rounded,
-                                        title: 'Trash',
-                                        colors: const [Color(0xFF5B6474), Color(0xFF2E3440)],
-                                        onTap: () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => TrashScreen(controller: widget.controller),
-                                          ),
+                        ),
+                        // The phone's trash (Android 11+ only).
+                        FutureBuilder<bool>(
+                          future: Trash.available(),
+                          builder: (context, snap) => snap.data != true
+                              ? const SizedBox.shrink()
+                              : Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(left: 10),
+                                    child: _SmartCard(
+                                      icon: Icons.delete_rounded,
+                                      title: 'Trash',
+                                      color: const Color(0xFF636366),
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => TrashScreen(controller: widget.controller),
                                         ),
                                       ),
                                     ),
                                   ),
-                          ),
-                        ],
-                      ).animate().fadeIn().moveY(begin: 10),
-                    ),
-                  ),
-                  SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      16,
-                      0,
-                      16,
-                      MediaQuery.paddingOf(context).bottom + 16,
-                    ),
-                    sliver: SliverGrid.builder(
-                      gridDelegate:
-                          const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 200,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 0.82,
-                          ),
-                      itemCount: albums.length,
-                      itemBuilder: (context, i) =>
-                          _AlbumCard(
-                                album: albums[i],
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => AlbumScreen(
-                                      controller: widget.controller,
-                                      album: albums[i],
-                                      dates: _dates,
-                                    ),
-                                  ),
                                 ),
-                              )
-                              .animate()
-                              .fadeIn(delay: (40 * i.clamp(0, 12)).ms)
-                              .scaleXY(begin: 0.92, curve: Curves.easeOutBack),
+                        ),
+                      ],
+                    ).animate().fadeIn().moveY(begin: 10),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverToBoxAdapter(
+                    child: SectionHeader(
+                      title: 'My albums',
+                      badge: Text('${albums.length}',
+                          style: TextStyle(fontSize: 15, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                     ),
                   ),
-                ],
-              ),
+                ),
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.paddingOf(context).bottom + 16),
+                  sliver: SliverGrid.builder(
+                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 200,
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 14,
+                      childAspectRatio: 0.8,
+                    ),
+                    itemCount: albums.length,
+                    itemBuilder: (context, i) => _AlbumCard(
+                      album: albums[i],
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AlbumScreen(
+                            controller: widget.controller,
+                            album: albums[i],
+                            dates: _dates,
+                          ),
+                        ),
+                      ),
+                    ).animate().fadeIn(delay: (40 * i.clamp(0, 12)).ms).scaleXY(begin: 0.92, curve: Curves.easeOutBack),
+                  ),
+                ),
+              ]),
             );
           },
         ),
@@ -306,8 +296,7 @@ class _AlbumCardState extends State<_AlbumCard> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
+    return Pressable(
       onTap: widget.onTap,
       child: FutureBuilder<(AssetEntity?, int)>(
         future: _cover,
@@ -318,7 +307,7 @@ class _AlbumCardState extends State<_AlbumCard> {
             children: [
               Expanded(
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(22),
                   child: SizedBox.expand(
                     child: cover == null
                         ? ColoredBox(
@@ -338,14 +327,14 @@ class _AlbumCardState extends State<_AlbumCard> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 9),
               Text(
                 album.isAll ? 'All photos' : album.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: text.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                style: text.titleSmall?.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
               ),
-              Text(snap.hasData ? '$count items' : '…', style: text.bodySmall),
+              Text(snap.hasData ? '$count' : '…', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
             ],
           );
         },
@@ -453,53 +442,41 @@ class _SmartCard extends StatelessWidget {
   const _SmartCard({
     required this.icon,
     required this.title,
-    required this.colors,
+    required this.color,
     required this.onTap,
   });
 
   final IconData icon;
   final String title;
-  final List<Color> colors;
+  final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Pressable(
       onTap: onTap,
-      child: Container(
-        height: 84,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          gradient: LinearGradient(
-            colors: colors,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: colors.last.withValues(alpha: 0.35),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Icon(icon, color: Colors.white, size: 26),
-            Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 15,
+      child: SectionCard(
+        padding: const EdgeInsets.all(12),
+        child: SizedBox(
+          height: 76,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(11)),
+                child: Icon(icon, color: Colors.white, size: 20),
               ),
-            ),
-          ],
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+              ),
+            ],
+          ),
         ),
       ),
     );

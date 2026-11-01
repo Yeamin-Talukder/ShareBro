@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,19 +12,24 @@ import '../scan/scan_controller.dart';
 import '../share/native_files.dart';
 import '../share/net.dart';
 import '../share/prepare.dart';
+import '../share/protocol.dart';
 import '../share/receive.dart';
 import 'app_picker.dart';
 import 'devices.dart';
 import 'file_icons.dart';
+import 'find_me_screen.dart';
 import 'gallery_view.dart';
+import 'group_screen.dart';
 import 'glass.dart';
 import 'motion.dart';
 import 'photo_viewer.dart';
 import 'receive_screen.dart';
 import 'send_center_screen.dart';
+import 'sections.dart';
 import 'send_to_sheet.dart';
 import 'transfer_view.dart';
 import 'web_share_screen.dart';
+import 'widgets.dart';
 
 /// LocalSend-style sharing for anything: Receive (be findable, quick save,
 /// PIN) and Send (pick photos, files, a folder or text, then tap a nearby
@@ -133,44 +140,38 @@ class _ShareTabState extends State<ShareTab> {
     return GlassScrollView(
       title: 'Share',
       actions: [
-        ListenableBuilder(
-          listenable: s,
-          builder: (context, _) => IconButton(
-            tooltip: 'Sending',
-            onPressed: () =>
-                Navigator.push(context, MaterialPageRoute(builder: (_) => SendCenterScreen(controller: c))),
-            icon: Badge(
-              isLabelVisible: s.activeCount > 0,
-              label: Text('${s.activeCount}'),
-              child: const Icon(Icons.outbox_rounded),
-            ),
-          ),
-        ),
-        IconButton(
-          tooltip: 'History',
-          onPressed: () =>
-              Navigator.push(context, MaterialPageRoute(builder: (_) => TransferHistoryScreen(controller: c))),
-          icon: const Icon(Icons.history_rounded),
-        ),
+        ToolbarCapsule(children: [
+              ListenableBuilder(
+                listenable: s,
+                builder: (context, _) => IconButton(
+                  tooltip: 'Sending',
+                  onPressed: () =>
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => SendCenterScreen(controller: c))),
+                  icon: Badge(
+                    isLabelVisible: s.activeCount > 0,
+                    label: Text('${s.activeCount}'),
+                    child: const Icon(Icons.outbox_rounded),
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'History',
+                onPressed: () =>
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => TransferHistoryScreen(controller: c))),
+                icon: const Icon(Icons.history_rounded),
+              ),
+        ]),
       ],
       slivers: [
         SliverPadding(
           // Clear the floating nav bar so the last buttons stay reachable.
           padding: EdgeInsets.fromLTRB(16, 4, 16, MediaQuery.paddingOf(context).bottom + 24),
           sliver: SliverList.list(children: [
-            SegmentedButton<bool>(
-              showSelectedIcon: false,
-              segments: const [
-                ButtonSegment(value: false, icon: Icon(Icons.north_east_rounded), label: Text('Send')),
-                ButtonSegment(value: true, icon: Icon(Icons.south_west_rounded), label: Text('Receive')),
-              ],
-              selected: {_receive},
-              onSelectionChanged: (v) {
-                Haptics.tick();
-                setState(() => _receive = v.first);
-              },
+            CapsuleSwitch<bool>(
+              value: _receive,
+              options: const [(false, 'Send', null), (true, 'Receive', null)],
+              onChanged: (v) => setState(() => _receive = v),
             ),
-            const SizedBox(height: 16),
             AnimatedSwitcher(
               duration: 320.ms,
               switchInCurve: Curves.easeOutCubic,
@@ -193,141 +194,153 @@ class _ShareTabState extends State<ShareTab> {
   }
 
   Widget _sendPanel(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final scheme = Theme.of(context).colorScheme;
+    final picked = describeItems(_items);
     return Column(key: const ValueKey('send'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Text('Selection', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-      const SizedBox(height: 10),
-      Row(children: [
-        _PickButton(icon: Icons.photo_library_rounded, label: 'Media', color: const Color(0xFFE8457A), onTap: _pickMedia),
-        _PickButton(icon: Icons.insert_drive_file_rounded, label: 'Files', color: const Color(0xFF2B6CD9), onTap: _pickFiles),
-        _PickButton(icon: Icons.folder_rounded, label: 'Folder', color: const Color(0xFFB8860B), onTap: _pickFolder),
-        _PickButton(icon: Icons.notes_rounded, label: 'Text', color: const Color(0xFF2BB5A6), onTap: _writeText),
-        _PickButton(icon: Icons.content_paste_rounded, label: 'Paste', color: const Color(0xFF6E5BFF), onTap: _paste),
-        _PickButton(icon: Icons.apps_rounded, label: 'Apps', color: const Color(0xFF3DDC84), onTap: _pickApps),
-      ]),
-      AnimatedSize(
-        duration: 260.ms,
-        curve: Curves.easeOutCubic,
-        alignment: Alignment.topCenter,
-        child: _items.isEmpty
-            ? const SizedBox(width: double.infinity)
-            : Padding(
-                padding: const EdgeInsets.only(top: 14),
-                child: Card(
-                  margin: EdgeInsets.zero,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
-                        Text('${describeItems(_items)} selected', style: const TextStyle(fontWeight: FontWeight.w700)),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: () {
-                            Haptics.remove();
-                            setState(_items.clear);
-                          },
-                          child: const Text('Clear'),
-                        ),
-                      ]),
-                      const SizedBox(height: 4),
-                      ItemStrip(items: List.of(_items), onRemove: (i) => setState(() => _items.remove(i)), height: 76),
-                    ]),
-                  ),
-                ),
-              ),
-      ),
       const SizedBox(height: 18),
+      SectionCard(
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 16, 8, 14),
+            child: Row(children: [
+              _PickButton(icon: Icons.photo_library_outlined, label: 'Media', onTap: _pickMedia),
+              _PickButton(icon: Icons.insert_drive_file_outlined, label: 'Files', onTap: _pickFiles),
+              _PickButton(icon: Icons.folder_outlined, label: 'Folder', onTap: _pickFolder),
+              _PickButton(icon: Icons.notes_rounded, label: 'Text', onTap: _writeText),
+              _PickButton(icon: Icons.content_paste_rounded, label: 'Paste', onTap: _paste),
+              _PickButton(icon: Icons.apps_rounded, label: 'Apps', onTap: _pickApps),
+            ]),
+          ),
+          // What's picked appears in the same card, ready to send.
+          AnimatedSize(
+            duration: 300.ms,
+            curve: Curves.easeOutCubic,
+            alignment: Alignment.topCenter,
+            child: _items.isEmpty
+                ? const SizedBox(width: double.infinity)
+                : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    const Divider(height: 0.5, thickness: 0.5),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 8, 14),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Text('${picked[0].toUpperCase()}${picked.substring(1)}',
+                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: () {
+                              Haptics.remove();
+                              setState(_items.clear);
+                            },
+                            child: const Text('Clear'),
+                          ),
+                        ]),
+                        ItemStrip(items: List.of(_items), onRemove: (i) => setState(() => _items.remove(i)), height: 64),
+                      ]),
+                    ),
+                  ]),
+          ),
+        ]),
+      ),
       DevicePicker(
         sharing: c.sharing,
-        enabled: _items.isNotEmpty,
+        count: _items.length,
         onPick: (t) async {
           final items = List.of(_items);
           setState(_items.clear);
-          await sendItemsTo(context, c, t, items);
+          // Progress shows on the device in the orbit; tap it to open the send.
+          await sendItemsTo(context, c, t, items, open: false);
         },
+        onOpenJob: (job) =>
+            Navigator.push(context, MaterialPageRoute(builder: (_) => TransferScreen(controller: c, job: job))),
       ),
-      if (_items.isEmpty)
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text('Pick something above, then tap a device to send it.',
-              textAlign: TextAlign.center, style: text.bodySmall),
-        ),
-      const SizedBox(height: 12),
-      Row(children: [
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _items.isEmpty
-                ? null
-                : () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => WebShareScreen(
-                          controller: c,
-                          title: 'Shared with ShareBro',
-                          items: List.of(_items),
-                        ),
-                      ),
-                    ),
-            icon: const Icon(Icons.qr_code_2_rounded),
-            label: const Text('Link / QR'),
+      const SizedBox(height: 22),
+      SectionCard.rows(rows: [
+        SectionRow(
+          leading: const IconTile(icon: Icons.qr_code_2_rounded, color: Color(0xFF5E5CE6)),
+          title: 'Link or QR code',
+          subtitle: 'Opens in any browser',
+          chevron: true,
+          enabled: _items.isNotEmpty,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => WebShareScreen(controller: c, title: 'Shared with ShareBro', items: List.of(_items)),
+            ),
           ),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _items.isEmpty ? null : () => shareItemsWithApps(List.of(_items)),
-            icon: const Icon(Icons.ios_share_rounded),
-            label: const Text('Other apps'),
+        SectionRow(
+          leading: const IconTile(icon: Icons.ios_share_rounded, color: Color(0xFF0A84FF)),
+          title: 'Other apps',
+          subtitle: 'Quick Share, WhatsApp and more',
+          chevron: true,
+          enabled: _items.isNotEmpty,
+          onTap: () => shareItemsWithApps(List.of(_items)),
+        ),
+        SectionRow(
+          leading: const IconTile(icon: Icons.diversity_3_rounded, color: Color(0xFF30D158)),
+          title: 'Trip group',
+          subtitle: c.sharing.groups.group == null
+              ? 'Everyone gets the photos they\'re in'
+              : 'In ${c.sharing.groups.group!.name}',
+          chevron: true,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => TripGroupScreen(controller: c)),
+          ),
+        ),
+        SectionRow(
+          leading: const IconTile(icon: Icons.face_retouching_natural_rounded, color: Color(0xFFFF9F0A)),
+          title: 'Find my photos',
+          subtitle: 'Friends take a selfie and get the photos they\'re in',
+          chevron: true,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => FindMeScreen(controller: c)),
           ),
         ),
       ]),
-      const SizedBox(height: 8),
-      Text(
-        'Works with the free LocalSend app on Android, iPhone, Windows, Mac and Linux on the same Wi-Fi or hotspot, '
-        'and with ShareBro phones over Nearby (no Wi-Fi). The link works in any browser.',
-        style: text.bodySmall?.copyWith(color: scheme.outline),
+      const SectionFooter(
+        'Works with the free LocalSend app on Android, iPhone, Windows, Mac and Linux on the same Wi‑Fi or hotspot, '
+        'and with ShareBro phones over Nearby, no Wi‑Fi needed. The link works in any browser.',
       ),
     ]);
   }
 }
 
 class _PickButton extends StatelessWidget {
-  const _PickButton({required this.icon, required this.label, required this.color, required this.onTap});
+  const _PickButton({required this.icon, required this.label, required this.onTap});
 
   final IconData icon;
   final String label;
-  final Color color;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Expanded(
       child: Pressable(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Column(children: [
-            Container(
-              height: 56,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: color.withValues(alpha: 0.35)),
-              ),
-              child: Center(child: Icon(icon, color: color, size: 26)),
+        scale: 0.9,
+        child: Column(children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: capsuleFill(context),
+              borderRadius: BorderRadius.circular(15),
             ),
-            const SizedBox(height: 6),
-            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-          ]),
-        ),
+            child: Icon(icon, size: 23, color: scheme.onSurface),
+          ),
+          const SizedBox(height: 7),
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: scheme.onSurfaceVariant)),
+        ]),
       ),
     );
   }
 }
 
-/// Being findable: your name and address, on/off, quick save and PIN,
-/// and the transfer in progress.
+/// Being findable: you in the middle of the orbit, on/off, quick save and
+/// PIN, the transfer in progress and what arrived lately.
 class _ReceivePanel extends StatefulWidget {
   const _ReceivePanel({super.key, required this.controller});
 
@@ -339,6 +352,8 @@ class _ReceivePanel extends StatefulWidget {
 
 class _ReceivePanelState extends State<_ReceivePanel> {
   String? _ip;
+  AppDb get _db => widget.controller.db;
+  late Future<List<Transfer>> _recent = _db.transfers(limit: 3);
 
   @override
   void initState() {
@@ -346,6 +361,85 @@ class _ReceivePanelState extends State<_ReceivePanel> {
     localIp().then((ip) {
       if (mounted) setState(() => _ip = ip);
     });
+    _db.transfersChanged.addListener(_reload);
+  }
+
+  @override
+  void dispose() {
+    _db.transfersChanged.removeListener(_reload);
+    super.dispose();
+  }
+
+  void _reload() {
+    if (mounted) setState(() => _recent = _db.transfers(limit: 3));
+  }
+
+  void _openLive() =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => ReceiveLiveScreen(controller: widget.controller)));
+
+  void _openHistory() =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => TransferHistoryScreen(controller: widget.controller)));
+
+  Future<void> _editPin(Receiver r) async {
+    final ctrl = TextEditingController(text: r.pin ?? (1000 + math.Random.secure().nextInt(9000)).toString());
+    final pin = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('PIN'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Senders type this code before anything arrives.'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: ctrl,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            decoration: const InputDecoration(hintText: '4 to 6 digits'),
+          ),
+        ]),
+        actions: [
+          if (r.pin != null) TextButton(onPressed: () => Navigator.pop(context, ''), child: const Text('Turn off')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, ctrl.text.trim()), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (pin == null) return;
+    await r.setPin(pin.isEmpty ? null : pin);
+  }
+
+  static double _progress(ReceiveSession x) {
+    final total = x.totalBytes;
+    return x.finished ? 1 : total == 0 ? 0 : x.bytes / total;
+  }
+
+  OrbitNode _sender(ReceiveSession x) {
+    final p = _progress(x);
+    return OrbitNode(
+      key: 'incoming',
+      name: x.from,
+      subtitle: x.finished ? 'Sent to you' : 'Sending ${(p * 100).round()}%',
+      icon: Icons.devices_rounded,
+      color: deviceColor(x.from),
+      angle: 50,
+      progress: x.finished ? null : p,
+      done: x.finished,
+      status: true,
+      flowing: !x.finished,
+    );
+  }
+
+  /// Your orb: grey while off, glowing while ready, filling up as files
+  /// arrive.
+  Widget _inbox(ReceiveSession? x, bool on) {
+    if (x != null) {
+      final p = _progress(x);
+      return OrbitTank(
+        progress: p,
+        child: x.finished ? const Icon(Icons.check_rounded, size: 36) : Text('${(p * 100).round()}%'),
+      );
+    }
+    return OrbitCore(size: 96, idle: !on, child: const Icon(Icons.download_rounded, size: 34));
   }
 
   @override
@@ -358,89 +452,114 @@ class _ReceivePanelState extends State<_ReceivePanel> {
       listenable: Listenable.merge([s, r]),
       builder: (context, _) {
         final session = r.session;
+        final on = r.enabled;
+        void toggle() {
+          Haptics.tick();
+          s.setReceiving(!on);
+        }
+
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Glass(
-            radius: 32,
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+          const SizedBox(height: 18),
+          SectionCard(
+            padding: const EdgeInsets.only(bottom: 20),
             child: Column(children: [
-              SizedBox(
-                height: 150,
-                child: r.enabled
-                    ? const Radar(icon: Icons.download_rounded)
-                    : Center(
-                        child: CircleAvatar(
-                          radius: 40,
-                          backgroundColor: scheme.surfaceContainerHighest,
-                          child: Icon(Icons.download_rounded, size: 38, color: scheme.outline),
-                        ),
-                      ),
+              Orbit(
+                height: 300,
+                centreY: 150,
+                centreSize: 96,
+                scanning: on,
+                inflow: true,
+                nodes: [if (session != null) _sender(session)],
+                centre: _inbox(session, on),
+                onCentreTap: session == null ? null : _openLive,
+                onTap: (_, _) => _openLive(),
               ),
-              const SizedBox(height: 8),
-              Text(s.identity.alias, style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 2),
+              Text(s.identity.alias, style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 3),
               AnimatedSwitcher(
                 duration: 250.ms,
-                child: Text(
-                  r.enabled ? 'Ready to receive${_ip == null ? '' : ' · $_ip'}' : 'Receiving is off',
-                  key: ValueKey(r.enabled),
-                  style: text.bodyMedium,
-                ),
+                child: Row(key: ValueKey(on), mainAxisSize: MainAxisSize.min, children: [
+                  if (on) ...[const _LiveDot(), const SizedBox(width: 7)],
+                  Text(on ? 'Visible to nearby devices' : 'Receiving is off',
+                      style: TextStyle(fontSize: 15, color: scheme.onSurfaceVariant)),
+                ]),
               ),
+              const SizedBox(height: 3),
+              Text('${_ip ?? 'No network'} · port $lsPort',
+                  style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
               const SizedBox(height: 16),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(minimumSize: const Size(220, 50)),
-                onPressed: () {
-                  Haptics.tick();
-                  s.setReceiving(!r.enabled);
-                },
-                icon: Icon(r.enabled ? Icons.stop_rounded : Icons.play_arrow_rounded),
-                label: Text(r.enabled ? 'Stop receiving' : 'Start receiving'),
-              ),
+              on
+                  ? FilledButton.tonal(
+                      style: FilledButton.styleFrom(minimumSize: const Size(220, 50)),
+                      onPressed: toggle,
+                      child: const Text('Stop receiving'),
+                    )
+                  : FilledButton(
+                      style: FilledButton.styleFrom(minimumSize: const Size(220, 50)),
+                      onPressed: toggle,
+                      child: const Text('Start receiving'),
+                    ),
             ]),
           ),
           if (session != null)
             Padding(
               padding: const EdgeInsets.only(top: 14),
-              child: GestureDetector(
-                onTap: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => ReceiveLiveScreen(controller: widget.controller))),
-                child: _LiveSession(session: session),
-              ),
+              child: _LiveSession(session: session, onTap: _openLive),
             ).animate().fadeIn().moveY(begin: 8),
-          const SizedBox(height: 14),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            FilterChip(
-              avatar: const Icon(Icons.bolt_rounded, size: 18),
-              label: const Text('Quick save'),
-              selected: r.quickSave,
-              onSelected: r.setQuickSave,
+          const SectionHeader(title: 'Options'),
+          SectionCard.rows(rows: [
+            SectionRow(
+              leading: const IconTile(icon: Icons.bolt_rounded, color: Color(0xFFFF9F0A)),
+              title: 'Quick save',
+              trailing: Switch(value: r.quickSave, onChanged: r.setQuickSave),
+              onTap: () => r.setQuickSave(!r.quickSave),
             ),
-            FilterChip(
-              avatar: const Icon(Icons.favorite_rounded, size: 18),
-              label: const Text('Auto-accept favourites'),
-              selected: r.autoAcceptPaired,
-              onSelected: r.quickSave ? null : r.setAutoAccept,
+            SectionRow(
+              leading: const IconTile(icon: Icons.star_rounded, color: Color(0xFFFFCC00), iconColor: Color(0xFF3D2E00)),
+              title: 'Auto-accept favourites',
+              enabled: !r.quickSave,
+              trailing: Switch(value: r.autoAcceptPaired, onChanged: r.quickSave ? null : r.setAutoAccept),
+              onTap: () => r.setAutoAccept(!r.autoAcceptPaired),
             ),
-            FilterChip(
-              avatar: const Icon(Icons.pin_rounded, size: 18),
-              label: Text(r.pin == null ? 'PIN' : 'PIN ${r.pin}'),
-              selected: r.pin != null,
-              onSelected: (_) => Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => ReceiveScreen(controller: widget.controller))),
+            SectionRow(
+              leading: const IconTile(icon: Icons.lock_rounded, color: Color(0xFF8E8E93)),
+              title: 'PIN',
+              trailing: Text(r.pin ?? 'Off', style: TextStyle(fontSize: 16, color: scheme.onSurfaceVariant)),
+              chevron: true,
+              onTap: () => _editPin(r),
             ),
           ]),
-          const SizedBox(height: 10),
-          Text(
-            r.quickSave
-                ? 'Everything is accepted without asking.'
-                : 'You\'re asked before anything is saved (favourites and paired phones skip the question).',
-            style: text.bodySmall,
+          SectionFooter(r.quickSave
+              ? 'Everything is saved without asking.'
+              : 'You\'re asked before anything is saved. Favourites and paired phones skip the question.'),
+          FutureBuilder<List<Transfer>>(
+            future: _recent,
+            builder: (context, snap) {
+              final list = snap.data ?? const <Transfer>[];
+              if (list.isEmpty) return const SizedBox.shrink();
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                SectionHeader(
+                  title: 'Recent',
+                  trailing: TextButton(onPressed: _openHistory, child: const Text('See all')),
+                ),
+                SectionCard.rows(rows: [
+                  for (final t in list)
+                    SectionRow(
+                      leading: FileBadge(mime: t.mime, name: t.fileName, size: 32),
+                      title: t.isText ? t.text! : t.fileName,
+                      subtitle: '${t.incoming ? 'From' : 'To'} ${t.peer} · ${formatTime(t.at)}'
+                          '${t.isText ? '' : ' · ${formatBytes(t.size)}'}',
+                      trailing: Icon(t.incoming ? Icons.south_west_rounded : Icons.north_east_rounded,
+                          size: 18, color: scheme.onSurfaceVariant),
+                      onTap: _openHistory,
+                    ),
+                ]),
+              ]);
+            },
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Photos and videos go to the "$receivedAlbum" album and are scanned for faces; other files to '
-            'Download/$receivedAlbum; messages pop up to copy. Keeps working in the background.',
-            style: text.bodySmall?.copyWith(color: scheme.outline),
+          SectionFooter(
+            'Photos and videos go to the "$receivedAlbum" album and are scanned for faces; other files go to '
+            'Download/$receivedAlbum; messages pop up so you can copy them. Receiving keeps working in the background.',
           ),
         ]);
       },
@@ -448,35 +567,79 @@ class _ReceivePanelState extends State<_ReceivePanel> {
   }
 }
 
-class _LiveSession extends StatelessWidget {
-  const _LiveSession({required this.session});
-
-  final ReceiveSession session;
+/// A softly pulsing green dot: "on and visible".
+class _LiveDot extends StatelessWidget {
+  const _LiveDot();
 
   @override
   Widget build(BuildContext context) {
+    final dot = Container(
+      width: 8,
+      height: 8,
+      decoration: const BoxDecoration(color: Color(0xFF30D158), shape: BoxShape.circle),
+    );
+    if (MediaQuery.disableAnimationsOf(context)) return dot;
+    return dot
+        .animate(onPlay: (c) => c.repeat(reverse: true))
+        .fade(begin: 1, end: 0.35, duration: 900.ms, curve: Curves.easeInOut);
+  }
+}
+
+class _LiveSession extends StatelessWidget {
+  const _LiveSession({required this.session, required this.onTap});
+
+  final ReceiveSession session;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final total = session.totalBytes;
-    final card = Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(session.finished ? 'Got ${session.done.length} from ${session.from} ✓' : 'Receiving from ${session.from}',
-              style: const TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(end: session.finished ? 1 : (total == 0 ? 0 : session.bytes / total)),
-              duration: 300.ms,
-              builder: (context, v, _) => LinearProgressIndicator(value: v, minHeight: 8),
+    final from = session.from;
+    final initials = from.split(' ').where((w) => w.isNotEmpty).take(2).map((w) => w[0]).join().toUpperCase();
+    final card = SectionCard(
+      child: Column(children: [
+        SectionRow(
+          leading: CircleAvatar(
+            radius: 16,
+            backgroundColor: deviceColor(from),
+            child: Text(initials, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+          ),
+          title: session.finished ? 'Got ${session.done.length} from $from' : 'Receiving from $from',
+          subtitle: '${session.done.length} of ${session.tokens.length} · ${formatBytes(session.bytes)} of ${formatBytes(total)}',
+          trailing: session.finished
+              ? Icon(Icons.check_circle_rounded, size: 28, color: scheme.primary)
+              : SizedBox.square(
+                  dimension: 28,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(end: total == 0 ? 0 : session.bytes / total),
+                    duration: 300.ms,
+                    builder: (context, v, _) => CircularProgressIndicator(
+                      value: v,
+                      strokeWidth: 3,
+                      strokeCap: StrokeCap.round,
+                      backgroundColor: scheme.onSurface.withAlpha(30),
+                    ),
+                  ),
+                ),
+          chevron: true,
+          onTap: onTap,
+        ),
+        if (session.savedIds.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(62, 0, 16, 12),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(spacing: 4, runSpacing: 4, children: [
+                for (final id in session.savedIds.take(14))
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: SizedBox.square(dimension: 22, child: AssetThumb(id: id, size: 80)),
+                  ),
+              ]),
             ),
           ),
-          const SizedBox(height: 6),
-          Text('${session.done.length} of ${session.tokens.length} · ${formatBytes(session.bytes)} of ${formatBytes(total)}',
-              style: Theme.of(context).textTheme.bodySmall),
-        ]),
-      ),
+      ]),
     );
     // A shimmer sweeps across once everything has arrived.
     return card

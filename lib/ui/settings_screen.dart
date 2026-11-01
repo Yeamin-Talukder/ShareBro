@@ -16,8 +16,12 @@ import '../share/net.dart';
 import '../share/prepare.dart';
 import 'app_lock.dart';
 import 'island.dart';
+import 'profile_screen.dart';
+import 'sections.dart';
 import 'storage_screen.dart';
+import 'theme.dart';
 import 'aurora.dart';
+import 'glass.dart';
 import 'widgets.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -216,261 +220,258 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final text = Theme.of(context).textTheme;
     final scheme = Theme.of(context).colorScheme;
     final changed = (_value - c.strictness).abs() > 0.001;
+    Future<void> setLock(bool v) async {
+      // Prove it's you before turning the lock on or off.
+      if (!await confirmOwner(v ? 'Turn on app lock' : 'Turn off app lock')) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Set up a screen lock on the phone first.')),
+        );
+        return;
+      }
+      await c.setAppLock(v);
+      setState(() {});
+    }
+
+    Future<void> setAutoScan(bool v) async {
+      await c.setAutoScan(v);
+      setState(() {});
+    }
+
+    Future<void> setIsland(bool v) async {
+      await Island.setEnabled(c.db, v);
+      setState(() {});
+    }
+
     return Aurora(
       intensity: 0.7,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppBar(title: const Text('Settings')),
-        body: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Grouping strictness',
-                      style: text.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+        body: GlassScrollView(
+          title: 'Settings',
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.paddingOf(context).bottom + 24),
+              sliver: SliverList.list(children: [
+                ListenableBuilder(
+                  listenable: c,
+                  builder: (context, _) => SectionCard(
+                    child: SectionRow(
+                      leading: CircleAvatar(
+                        radius: 20,
+                        backgroundColor: scheme.surfaceContainerHighest,
+                        backgroundImage: c.profile.thumb == null ? null : MemoryImage(c.profile.thumb!),
+                        child: c.profile.thumb == null ? Icon(Icons.face_rounded, color: scheme.onSurfaceVariant) : null,
                       ),
+                      title: 'Profile',
+                      subtitle: c.profile.isSet ? 'Your face is set · ${c.sharing.identity.alias}' : 'Set up your face for trip groups',
+                      chevron: true,
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(controller: c))),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Loose puts more faces together (may mix people up). '
-                      'Strict keeps groups clean (may split one person into several).',
-                      style: text.bodySmall,
-                    ),
-                    const SizedBox(height: 16),
-                    Slider(
-                      value: _value,
-                      divisions: 20,
-                      onChanged: _applying || c.running ? null : _onSlide,
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          Text('Loose', style: text.labelMedium),
-                          const Spacer(),
-                          Text('Strict', style: text.labelMedium),
-                        ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SectionCard(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Grouping strictness', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Loose puts more faces together (may mix people up). '
+                        'Strict keeps groups clean (may split one person into several).',
+                        style: text.bodySmall?.copyWith(fontSize: 13.5, color: scheme.onSurfaceVariant),
                       ),
-                    ),
-                    const SizedBox(height: 20),
-                    Center(
-                      child: AnimatedSwitcher(
-                        duration: 250.ms,
-                        transitionBuilder: (child, a) => ScaleTransition(
-                          scale: a,
-                          child: FadeTransition(opacity: a, child: child),
+                      const SizedBox(height: 16),
+                      Slider(
+                        value: _value,
+                        divisions: 20,
+                        onChanged: _applying || c.running ? null : _onSlide,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          children: [
+                            Text('Loose', style: text.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                            const Spacer(),
+                            Text('Strict', style: text.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                          ],
                         ),
-                        child: _preview == null || _previewing
-                            ? const SizedBox(
-                                key: ValueKey('busy'),
-                                height: 56,
-                                child: Center(
-                                  child: CircularProgressIndicator(),
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: AnimatedSwitcher(
+                          duration: 250.ms,
+                          transitionBuilder: (child, a) => ScaleTransition(
+                            scale: a,
+                            child: FadeTransition(opacity: a, child: child),
+                          ),
+                          child: _preview == null || _previewing
+                              ? const SizedBox(
+                                  key: ValueKey('busy'),
+                                  height: 56,
+                                  child: Center(child: CircularProgressIndicator()),
+                                )
+                              : Column(
+                                  key: ValueKey(_preview),
+                                  children: [
+                                    Text(
+                                      '≈ $_preview people',
+                                      style: text.displaySmall?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: scheme.primary,
+                                      ),
+                                    ),
+                                    if (_current != null && _preview != _current)
+                                      Text('now $_current', style: text.bodySmall),
+                                  ],
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      AnimatedSize(
+                        duration: 250.ms,
+                        child: changed
+                            ? SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.icon(
+                                  onPressed: _applying ? null : _apply,
+                                  icon: _applying
+                                      ? const SizedBox.square(
+                                          dimension: 18,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        )
+                                      : const Icon(Icons.auto_fix_high),
+                                  label: const Text('Regroup with this setting'),
                                 ),
                               )
-                            : Column(
-                                key: ValueKey(_preview),
-                                children: [
-                                  Text(
-                                    '≈ $_preview people',
-                                    style: text.headlineMedium?.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                      color: scheme.primary,
-                                    ),
-                                  ),
-                                  if (_current != null && _preview != _current)
-                                    Text(
-                                      'now $_current',
-                                      style: text.bodySmall,
-                                    ),
-                                ],
-                              ),
+                            : const SizedBox(width: double.infinity),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    AnimatedSize(
-                      duration: 250.ms,
-                      child: changed
-                          ? SizedBox(
-                              width: double.infinity,
-                              child: FilledButton.icon(
-                                onPressed: _applying ? null : _apply,
-                                icon: _applying
-                                    ? const SizedBox.square(
-                                        dimension: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Icon(Icons.auto_fix_high),
-                                label: const Text('Regroup with this setting'),
-                              ),
-                            )
-                          : const SizedBox(width: double.infinity),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Named people and faces you fixed by hand are never changed.',
-                      style: text.bodySmall,
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        'Named people and faces you fixed by hand are never changed.',
+                        style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Card(
-          clipBehavior: Clip.antiAlias,
-          child: Column(children: [
-            ListTile(
-              leading: const Icon(Icons.badge_outlined),
-              title: const Text('Name on other phones'),
-              subtitle: Text(c.sharing.identity.alias),
-              onTap: _renameDevice,
-            ),
-            ListTile(
-              leading: const Icon(Icons.high_quality_outlined),
-              title: const Text('Default send quality'),
-              subtitle: Text(switch (c.sharing.defaultQuality) {
-                SendQuality.original => 'Original',
-                SendQuality.noLocation => 'Original without location',
-                SendQuality.smaller => 'Smaller (2048 px)',
-              }),
-              onTap: _pickQuality,
-            ),
-          ]),
-        ),
-        const SizedBox(height: 16),
-        Card(
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    secondary: const Icon(Icons.autorenew),
-                    title: const Text('Auto-scan new photos'),
-                    subtitle: const Text(
-                      'When a scanned album gets new photos, scan just those',
+                const SectionHeader(title: 'Appearance'),
+                SectionCard(
+                  padding: const EdgeInsets.all(8),
+                  child: ValueListenableBuilder<ThemeMode>(
+                    valueListenable: Appearance.mode,
+                    builder: (context, mode, _) => CapsuleSwitch<ThemeMode>(
+                      value: mode,
+                      height: 44,
+                      options: const [
+                        (ThemeMode.system, 'System', null),
+                        (ThemeMode.light, 'Light', null),
+                        (ThemeMode.dark, 'Dark', null),
+                      ],
+                      onChanged: (m) => Appearance.set(c.db, m),
                     ),
-                    value: c.autoScanEnabled,
-                    onChanged: (v) async {
-                      await c.setAutoScan(v);
-                      setState(() {});
-                    },
                   ),
-                  SwitchListTile(
-                    secondary: const Icon(Icons.lock_outline),
-                    title: const Text('App lock'),
-                    subtitle: const Text(
-                      'Fingerprint, face or screen lock to open the app',
-                    ),
-                    value: c.appLock,
-                    onChanged: (v) async {
-                      // Prove it's you before turning the lock on or off.
-                      if (!await confirmOwner(
-                        v ? 'Turn on app lock' : 'Turn off app lock',
-                      )) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Set up a screen lock on the phone first.',
-                            ),
-                          ),
-                        );
-                        return;
-                      }
-                      await c.setAppLock(v);
-                      setState(() {});
-                    },
+                ),
+                const SectionFooter('System follows your phone\'s dark mode setting.'),
+                const SectionHeader(title: 'Sharing'),
+                SectionCard.rows(rows: [
+                  SectionRow(
+                    leading: const IconTile(icon: Icons.badge_rounded, color: Color(0xFF0A84FF)),
+                    title: 'Name on other phones',
+                    subtitle: c.sharing.identity.alias,
+                    chevron: true,
+                    onTap: _renameDevice,
                   ),
-                  SwitchListTile(
-                    secondary: const Icon(Icons.horizontal_rule_rounded),
-                    title: const Text('Island at the top'),
-                    subtitle: const Text(
-                      'Shows sending, receiving, scanning and requests in a pill. '
-                      'Off: requests ask in a popup, messages show at the bottom',
-                    ),
-                    value: Island.enabled.value,
-                    onChanged: (v) async {
-                      await Island.setEnabled(c.db, v);
-                      setState(() {});
+                  SectionRow(
+                    leading: const IconTile(icon: Icons.hd_rounded, color: Color(0xFF5E5CE6)),
+                    title: 'Default send quality',
+                    subtitle: switch (c.sharing.defaultQuality) {
+                      SendQuality.original => 'Original',
+                      SendQuality.noLocation => 'Original without location',
+                      SendQuality.smaller => 'Smaller (2048 px)',
                     },
+                    chevron: true,
+                    onTap: _pickQuality,
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Card(
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.pie_chart_outline),
-                    title: const Text('Storage'),
-                    subtitle: const Text(
-                      'Space used by trips, duplicates and screenshots',
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
+                ]),
+                const SectionHeader(title: 'General'),
+                SectionCard.rows(rows: [
+                  SectionRow(
+                    leading: const IconTile(icon: Icons.sync_rounded, color: Color(0xFF30B0C7)),
+                    title: 'Auto-scan new photos',
+                    subtitle: 'When a scanned album gets new photos, scan just those',
+                    trailing: Switch(value: c.autoScanEnabled, onChanged: setAutoScan),
+                    onTap: () => setAutoScan(!c.autoScanEnabled),
+                  ),
+                  SectionRow(
+                    leading: const IconTile(icon: Icons.lock_rounded, color: Color(0xFF8E8E93)),
+                    title: 'App lock',
+                    subtitle: 'Fingerprint, face or screen lock to open the app',
+                    trailing: Switch(value: c.appLock, onChanged: setLock),
+                    onTap: () => setLock(!c.appLock),
+                  ),
+                  SectionRow(
+                    leading: const IconTile(icon: Icons.call_to_action_rounded, color: Color(0xFF48484A)),
+                    title: 'Island at the top',
+                    subtitle: 'Shows sending, receiving, scanning and requests in a pill. '
+                        'Off: requests ask in a popup, messages show at the bottom',
+                    trailing: Switch(value: Island.enabled.value, onChanged: setIsland),
+                    onTap: () => setIsland(!Island.enabled.value),
+                  ),
+                ]),
+                const SectionHeader(title: 'Your data'),
+                SectionCard.rows(rows: [
+                  SectionRow(
+                    leading: const IconTile(icon: Icons.pie_chart_rounded, color: Color(0xFFFF9F0A)),
+                    title: 'Storage',
+                    subtitle: 'Space used by trips, duplicates and screenshots',
+                    chevron: true,
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => StorageScreen(controller: c),
-                      ),
+                      MaterialPageRoute(builder: (_) => StorageScreen(controller: c)),
                     ),
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.person_off_outlined),
-                    title: const Text('Not in our group'),
-                    subtitle: const Text('People you hid, to bring back'),
-                    trailing: const Icon(Icons.chevron_right),
+                  SectionRow(
+                    leading: const IconTile(icon: Icons.person_off_rounded, color: Color(0xFFAF52DE)),
+                    title: 'Not in our group',
+                    subtitle: 'People you hid, to bring back',
+                    chevron: true,
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => _IgnoredScreen(controller: c),
-                      ),
+                      MaterialPageRoute(builder: (_) => _IgnoredScreen(controller: c)),
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Card(
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.backup_outlined),
-                    title: const Text('Back up'),
-                    subtitle: const Text(
-                      'Names, faces, trips and groups to one file (not the photos)',
-                    ),
-                    onTap: c.running ? null : _backup,
+                  SectionRow(
+                    leading: const IconTile(icon: Icons.backup_rounded, color: Color(0xFF34C759)),
+                    title: 'Back up',
+                    subtitle: 'Names, faces, trips and groups to one file (not the photos)',
+                    enabled: !c.running,
+                    onTap: _backup,
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.settings_backup_restore),
-                    title: const Text('Restore from backup'),
-                    subtitle: const Text('Replaces what\'s in the app now'),
-                    onTap: c.running ? null : _restore,
+                  SectionRow(
+                    leading: const IconTile(icon: Icons.settings_backup_restore_rounded, color: Color(0xFF30B0C7)),
+                    title: 'Restore from backup',
+                    subtitle: 'Replaces what\'s in the app now',
+                    enabled: !c.running,
+                    onTap: _restore,
                   ),
-                ],
-              ),
+                ]),
+                const SizedBox(height: 22),
+                SectionCard(
+                  child: SectionRow(
+                    leading: IconTile(icon: Icons.delete_sweep_rounded, color: scheme.error),
+                    title: 'Clear all face data',
+                    subtitle: 'Photos are not affected',
+                    destructive: true,
+                    enabled: !c.running,
+                    onTap: _confirmClear,
+                  ),
+                ),
+                const SectionHeader(title: 'About'),
+                const _AboutCard(),
+              ]),
             ),
-            const SizedBox(height: 16),
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.delete_sweep_outlined),
-                title: const Text('Clear all face data'),
-                subtitle: const Text('Photos are not affected'),
-                onTap: c.running ? null : _confirmClear,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const _AboutCard(),
           ],
         ),
       ),
@@ -488,11 +489,10 @@ class _AboutCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    return Card(
-      clipBehavior: Clip.antiAlias,
+    return SectionCard(
       child: Column(children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
           child: Row(children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(14),
@@ -507,17 +507,19 @@ class _AboutCard extends StatelessWidget {
             ),
           ]),
         ),
-        ListTile(
-          leading: const Icon(Icons.person_outline_rounded),
-          title: const Text('Developer'),
-          subtitle: const Text('github.com/Yeamin-Talukder'),
+        const Divider(height: 0.5, thickness: 0.5, indent: 16),
+        SectionRow(
+          leading: const IconTile(icon: Icons.person_rounded, color: Color(0xFF636366)),
+          title: 'Developer',
+          subtitle: 'github.com/Yeamin-Talukder',
           trailing: const Icon(Icons.open_in_new_rounded, size: 18),
           onTap: () => NativeFiles.open(_profile),
         ),
-        ListTile(
-          leading: const Icon(Icons.code_rounded),
-          title: const Text('Source code'),
-          subtitle: const Text('github.com/Yeamin-Talukder/ShareBro'),
+        const Divider(height: 0.5, thickness: 0.5, indent: 62),
+        SectionRow(
+          leading: const IconTile(icon: Icons.code_rounded, color: Color(0xFF636366)),
+          title: 'Source code',
+          subtitle: 'github.com/Yeamin-Talukder/ShareBro',
           trailing: const Icon(Icons.open_in_new_rounded, size: 18),
           onTap: () => NativeFiles.open(_repo),
         ),

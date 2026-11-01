@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShareBro · Trip group</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block">
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { background:#050407; }
+  body { color:#F2F1F5; font-family:Roboto, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;
+         display:flex; flex-wrap:wrap; gap:36px; justify-content:center; align-items:flex-start; padding:24px 16px 48px; }
+  button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+  .i { display:inline-block; flex:none; font-family:'Material Symbols Rounded'; font-weight:400; font-style:normal; line-height:1; white-space:nowrap;
+       font-feature-settings:'liga'; font-variation-settings:'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; width:1em; height:1em; overflow:hidden; }
+  .i.fill { font-variation-settings:'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+
+  /* Side panel */
+  .side { width:340px; max-width:100%; }
+  .side h1 { font-size:24px; font-weight:800; letter-spacing:-.5px; }
+  .side .lead { color:rgba(242,241,245,.65); font-size:13.5px; line-height:1.6; margin-top:6px; }
+  .side h4 { font-size:11.5px; letter-spacing:1.2px; text-transform:uppercase; color:rgba(242,241,245,.42); margin:22px 0 10px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chips button { padding:8px 13px; border-radius:999px; border:1px solid rgba(255,255,255,.13); font-size:12.5px; background:rgba(255,255,255,.04); }
+  .chips button.on { background:#F2F1F5; color:#111; border-color:#F2F1F5; font-weight:700; }
+  .chips button.go { background:#FF8A6B; color:#2A0D06; border-color:#FF8A6B; font-weight:700; }
+  .tips { list-style:none; display:grid; gap:8px; }
+  .tips li { font-size:12.8px; color:rgba(242,241,245,.65); line-height:1.5; padding-left:16px; position:relative; }
+  .tips li::before { content:''; position:absolute; left:2px; top:8px; width:5px; height:5px; border-radius:50%; background:#FF8A6B; }
+  .tips b { color:#F2F1F5; font-weight:600; }
+
+  /* Phone shell */
+  .stage { position:relative; flex:none; }
+  .phone { position:absolute; width:412px; height:892px; transform-origin:0 0; border-radius:54px; overflow:hidden; isolation:isolate; user-select:none;
+           box-shadow:0 0 0 11px #0c0a0e, 0 0 0 12px rgba(255,255,255,.09), 0 50px 140px rgba(110,26,98,.32);
+           --card:rgba(28,28,31,.78); --fill:rgba(118,118,128,.24); --l2:rgba(235,235,245,.62); --l3:rgba(235,235,245,.32); --sep:rgba(84,84,88,.55);
+           --g:#FF8A6B; --onG:#2A0D06; --glass:rgba(36,34,42,.55); --glassb:rgba(255,255,255,.14); background:#050309; color:#F2EFF5; }
+  .aur { position:absolute; inset:-10%; z-index:0; }
+  .aur b { position:absolute; width:80%; height:55%; border-radius:50%; filter:blur(55px); animation:drift 24s ease-in-out infinite alternate; }
+  .aur b:nth-child(1) { left:-18%; top:-6%; background:radial-gradient(#8E1F3E 0, transparent 68%); }
+  .aur b:nth-child(2) { left:42%; top:10%; background:radial-gradient(#6E1A62 0, transparent 68%); animation-delay:-7s; }
+  .aur b:nth-child(3) { left:-20%; top:48%; background:radial-gradient(#3A27A6 0, transparent 68%); animation-delay:-12s; }
+  .aur b:nth-child(4) { left:40%; top:68%; background:radial-gradient(#0C6A6E 0, transparent 68%); animation-delay:-3s; }
+  @keyframes drift { 50% { transform:translate(9%,6%) scale(1.12); } 100% { transform:translate(-7%,-5%) scale(.95); } }
+  .veil { position:absolute; inset:0; z-index:1; background:radial-gradient(120% 85% at 50% 35%, rgba(5,3,9,.25), rgba(5,3,9,.82)); }
+  .sbar { position:absolute; left:0; right:0; top:0; height:46px; z-index:20; display:flex; justify-content:space-between; padding:15px 30px 0; font-size:15px; font-weight:600; }
+  .cam { position:absolute; top:12px; left:50%; width:20px; height:20px; margin-left:-10px; border-radius:50%; background:#000; z-index:21; }
+  .home { position:absolute; bottom:8px; left:50%; width:124px; height:4px; margin-left:-62px; border-radius:2px; background:#fff; opacity:.8; z-index:21; }
+  .scr { position:absolute; inset:0; z-index:2; padding:46px 16px 0; display:flex; flex-direction:column; overflow-y:auto; scrollbar-width:none; }
+  .scr::-webkit-scrollbar { display:none; }
+  .scr.in > * { animation:rise .45s cubic-bezier(.2,.9,.3,1) both; }
+  .scr.in > *:nth-child(2) { animation-delay:.03s } .scr.in > *:nth-child(3) { animation-delay:.06s } .scr.in > *:nth-child(n+4) { animation-delay:.09s }
+  @keyframes rise { from { opacity:0; transform:translateY(12px); } }
+  .pad { height:40px; flex:none; }
+
+  /* Shared pieces (sections.dart look) */
+  .nav { display:flex; align-items:center; justify-content:space-between; min-height:48px; flex:none; }
+  .back, .tcap button { width:44px; height:44px; display:grid; place-items:center; }
+  .back { border-radius:50%; background:var(--glass); border:1px solid var(--glassb); }
+  .tcap { display:flex; border-radius:24px; background:var(--glass); border:1px solid var(--glassb); }
+  .tcap .txt { width:auto; padding:0 16px; font-size:15px; font-weight:600; }
+  .ttl { font-size:30px; font-weight:800; letter-spacing:-.7px; margin:6px 4px 0; flex:none; }
+  .sub { font-size:14px; color:var(--l2); margin:2px 4px 0; flex:none; }
+  .card { background:var(--card); border-radius:26px; border:1px solid rgba(255,255,255,.055); position:relative; overflow:hidden; flex:none; }
+  .sh2 { display:flex; justify-content:space-between; align-items:center; margin:24px 4px 8px; flex:none; }
+  .sh2 h3 { font-size:20px; font-weight:700; letter-spacing:-.3px; }
+  .badge { font-size:13px; font-weight:700; padding:3px 9px; border-radius:99px; background:var(--fill); color:var(--l2); }
+  .foot { font-size:13px; color:var(--l2); margin:8px 16px 0; line-height:1.45; flex:none; }
+  .row { display:flex; align-items:center; gap:14px; padding:11px 16px; min-height:60px; position:relative; }
+  .row + .row::before { content:''; position:absolute; left:62px; right:0; top:0; height:.5px; background:var(--sep); }
+  .itile { width:32px; height:32px; border-radius:9px; display:grid; place-items:center; color:#fff; background:var(--c); flex:none; }
+  .row .t { flex:1; min-width:0; }
+  .row .t b { font-size:16px; font-weight:600; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row .t small { font-size:13px; color:var(--l2); display:block; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:color .3s; }
+  .row .t small.hot { color:var(--g); }
+  .chev { color:var(--l3); }
+  .btn { height:52px; border-radius:26px; background:var(--g); color:var(--onG); font-weight:700; font-size:16px; display:flex; align-items:center;
+         justify-content:center; gap:8px; width:100%; flex:none; transition:transform .12s, opacity .3s; }
+  .btn:active { transform:scale(.97); }
+  .btn.tonal { background:var(--fill); color:#F2EFF5; }
+  .btn[disabled] { opacity:.35; pointer-events:none; }
+  .cc { height:36px; padding:0 14px; border-radius:18px; background:var(--fill); font-size:14px; font-weight:600; display:inline-flex; align-items:center;
+        gap:6px; white-space:nowrap; flex:none; transition:background .2s, color .2s, transform .12s; }
+  .cc:active { transform:scale(.94); }
+  .cc.on { background:var(--g); color:var(--onG); }
+  .cc em { font-style:normal; font-weight:500; font-size:12.5px; opacity:.7; }
+  .chiprow { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; margin:14px -16px 0; padding:0 16px; flex:none; }
+  .chiprow::-webkit-scrollbar { display:none; }
+  .av { border-radius:50%; display:grid; place-items:center; font-weight:700; background:var(--c); color:var(--fg); flex:none; position:relative; }
+
+  /* Flat placeholder photos: a sky, the ground, and people as simple shapes */
+  .ph { position:relative; overflow:hidden; border-radius:10px; background:var(--sky); aspect-ratio:1; }
+  .ph .gr { position:absolute; left:0; right:0; bottom:0; height:30%; background:var(--gr); }
+  .ph .sun { position:absolute; width:15%; height:15%; border-radius:50%; background:var(--sun); left:14%; top:13%; }
+  .ph .mt { position:absolute; bottom:28%; height:42%; background:var(--mt); clip-path:polygon(50% 0,100% 100%,0 100%); }
+  .ph .hd, .ph .bd { position:absolute; background:var(--c); }
+  .ph .hd { border-radius:50%; }
+  .ph .bd { border-radius:48% 48% 8% 8% / 70% 70% 8% 8%; background:var(--b); }
+  .ph .gl { position:absolute; background:#0B0B0E; border-radius:3px; }
+
+  /* Group */
+  .qrcard { padding:22px 20px 18px; text-align:center; margin-top:16px; }
+  .qr { width:184px; height:184px; margin:0 auto; background:#fff; border-radius:22px; padding:12px; position:relative; }
+  .qr svg { width:100%; height:100%; display:block; }
+  .qr .mid { position:absolute; left:50%; top:50%; width:44px; height:44px; margin:-22px; border-radius:12px; background:var(--g); color:var(--onG); display:grid; place-items:center; box-shadow:0 0 0 5px #fff; }
+  .qrcard b { display:block; font-size:17px; font-weight:700; margin-top:14px; }
+  .qrcard small { font-size:13px; color:var(--l2); }
+  .members { display:grid; grid-template-columns:repeat(5,1fr); gap:14px 4px; padding:18px 10px 16px; }
+  .mem { text-align:center; }
+  .mem .av { width:52px; height:52px; margin:0 auto; font-size:20px; }
+  .mem .empty { width:52px; height:52px; margin:0 auto; border-radius:50%; border:1.5px dashed rgba(235,235,245,.22); }
+  .mem b { display:block; font-size:12px; font-weight:600; margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mem small { display:block; font-size:10.5px; color:var(--l3); margin-top:1px; white-space:nowrap; }
+  .mem small.ok { color:var(--g); }
+  .tick { position:absolute; right:-3px; bottom:-3px; width:20px; height:20px; border-radius:50%; background:var(--g); color:var(--onG); display:grid; place-items:center;
+          box-shadow:0 0 0 2.5px #1c1c1f; }
+  .pop { animation:pop .5s cubic-bezier(.3,1.6,.5,1) both; }
+  @keyframes pop { from { transform:scale(0); } }
+
+  /* This is me */
+  .vf { position:relative; width:300px; height:300px; margin:18px auto 0; flex:none; }
+  .vf svg { position:absolute; inset:0; }
+  .vf line { stroke:rgba(235,235,245,.18); stroke-width:3.2; stroke-linecap:round; transition:stroke .25s; }
+  .vf line.on { stroke:var(--g); }
+  .lens { position:absolute; left:40px; top:40px; width:220px; height:220px; border-radius:50%; overflow:hidden; background:#24222B; }
+  .sil { position:absolute; left:50%; bottom:-6px; width:150px; margin-left:-75px; transition:transform .6s cubic-bezier(.3,.8,.3,1), opacity .4s; }
+  .sil .h { width:86px; height:100px; margin:0 auto; border-radius:46% 46% 44% 44%; background:#55525E; }
+  .sil .s { width:150px; height:70px; margin-top:8px; border-radius:75px 75px 0 0; background:#55525E; }
+  .sweep { position:absolute; left:0; right:0; height:3px; background:var(--g); opacity:0; top:20%; }
+  .cap .sweep { opacity:.9; animation:sweep 1.4s ease-in-out infinite alternate; }
+  @keyframes sweep { to { top:78%; } }
+  .orb { position:absolute; left:50%; top:50%; width:96px; height:96px; margin:-48px; border-radius:50%; background:var(--g); color:var(--onG); display:none; place-items:center; }
+  .done .orb { display:grid; animation:pop .55s cubic-bezier(.3,1.6,.5,1) both; }
+  .done .sil { opacity:.25; }
+  .prompt { text-align:center; margin-top:16px; flex:none; min-height:72px; }
+  .prompt b { display:block; font-size:21px; font-weight:750; letter-spacing:-.3px; }
+  .prompt small { font-size:14px; color:var(--l2); }
+  .steps { display:flex; justify-content:center; gap:7px; margin-top:10px; }
+  .steps i { width:8px; height:8px; border-radius:4px; background:rgba(235,235,245,.2); transition:all .3s; }
+  .steps i.on { background:var(--g); width:22px; }
+  .fp { display:grid; grid-template-columns:repeat(16,1fr); gap:5px; padding:16px; }
+  .fp i { aspect-ratio:1; border-radius:50%; background:var(--g); opacity:0; transform:scale(.3); transition:opacity .4s, transform .4s; }
+  .fpon .fp i { transform:scale(1); }
+
+  /* Pick */
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:3px; margin:14px -12px 0; flex:none; }
+  .gt { position:relative; transition:transform .22s cubic-bezier(.3,.8,.3,1); cursor:pointer; }
+  .gt .ph { border-radius:4px; transition:border-radius .22s; }
+  .gt .ck { position:absolute; top:6px; right:6px; width:24px; height:24px; border-radius:50%; border:2px solid #fff; background:rgba(0,0,0,.25); display:grid; place-items:center;
+            color:transparent; transition:all .2s; }
+  .gt.sel { transform:scale(.9); }
+  .gt.sel .ph { border-radius:14px; }
+  .gt.sel .ck { background:var(--g); border-color:var(--g); color:var(--onG); transform:scale(1.08); }
+  .gt .who { position:absolute; left:6px; bottom:6px; display:flex; }
+  .gt .who i { width:16px; height:16px; border-radius:50%; background:var(--c); box-shadow:0 0 0 1.5px rgba(0,0,0,.45); margin-right:-4px; font-style:normal; font-size:9px; font-weight:800;
+               color:var(--fg); display:grid; place-items:center; }
+  .fbar { position:sticky; bottom:30px; margin-top:auto; padding-top:14px; flex:none; z-index:3; }
+  .fbar > div { display:flex; align-items:center; gap:10px; padding:8px 8px 8px 20px; border-radius:32px; background:var(--glass); border:1px solid var(--glassb);
+                backdrop-filter:blur(24px) saturate(1.5); -webkit-backdrop-filter:blur(24px) saturate(1.5); }
+  .fbar .n { flex:1; font-weight:700; font-size:15px; }
+  .fbar .n small { display:block; font-weight:400; font-size:12px; color:var(--l2); }
+  .fbar .btn { width:auto; padding:0 20px; height:48px; }
+
+  /* Match */
+  .orbit { height:396px; margin-top:14px; }
+  .orbit svg.rings { position:absolute; inset:0; }
+  .orbit circle.ring { fill:none; stroke:rgba(235,235,245,.08); stroke-width:1.5; }
+  .om { position:absolute; width:64px; margin:-26px 0 0 -32px; text-align:center; }
+  .om .av { width:52px; height:52px; margin:0 auto; font-size:19px; transition:box-shadow .3s; }
+  .om .av.glow { box-shadow:0 0 0 4px rgba(255,138,107,.35); }
+  .om b { display:block; font-size:11.5px; font-weight:600; margin-top:5px; }
+  .om .cnt { position:absolute; top:-4px; right:2px; min-width:22px; height:22px; padding:0 6px; border-radius:11px; background:var(--g); color:var(--onG);
+             font-size:12px; font-weight:800; display:grid; place-items:center; box-shadow:0 0 0 2.5px #1c1c1f; transform:scale(0); transition:transform .3s cubic-bezier(.3,1.6,.5,1); }
+  .om .cnt.show { transform:scale(1); }
+  .bump { animation:bump .35s ease-out; }
+  @keyframes bump { 40% { transform:scale(1.18); } }
+  .center { position:absolute; left:50%; top:50%; width:124px; height:124px; margin:-62px; }
+  .center .ph { position:absolute; inset:0; border-radius:16px; box-shadow:0 10px 40px rgba(0,0,0,.45); }
+  .fb { position:absolute; border:2px solid var(--g); border-radius:7px; opacity:0; transform:scale(1.4); transition:all .25s; }
+  .fb.on { opacity:1; transform:none; }
+  .fb.q { border-style:dashed; border-color:#fff; }
+  .fb.q::after { content:'?'; position:absolute; top:-15px; right:-9px; width:16px; height:16px; border-radius:50%; background:#fff; color:#111; font-size:11px; font-weight:800; display:grid; place-items:center; }
+  .fly { position:absolute; width:40px; height:40px; margin:-20px; z-index:4; pointer-events:none; }
+  .fly .ph { border-radius:8px; height:100%; box-shadow:0 4px 14px rgba(0,0,0,.4); }
+  .scanline { position:absolute; left:-6px; right:-6px; height:2px; background:var(--g); top:0; opacity:0; }
+  .scanning .scanline { animation:scan .45s ease-in-out both; }
+  @keyframes scan { 0% { top:0; opacity:1; } 100% { top:100%; opacity:0; } }
+  .stats { display:grid; grid-template-columns:repeat(3,1fr); margin-top:12px; }
+  .stats > div { padding:14px 8px; text-align:center; position:relative; }
+  .stats > div + div::before { content:''; position:absolute; left:0; top:14px; bottom:14px; width:.5px; background:var(--sep); }
+  .stats b { display:block; font-size:24px; font-weight:800; letter-spacing:-.5px; font-variant-numeric:tabular-nums; }
+  .stats small { font-size:12px; color:var(--l2); }
+  .status { text-align:center; font-size:14px; color:var(--l2); margin:14px 0 0; min-height:20px; flex:none; }
+
+  /* Review */
+  .rv { position:relative; height:410px; margin-top:16px; flex:none; }
+  .rcard { position:absolute; inset:0; padding:26px 20px 20px; background:#1C1B20; text-align:center; transition:transform .45s cubic-bezier(.4,.1,.3,1), opacity .45s; }
+  .pair { display:flex; align-items:center; justify-content:center; gap:14px; }
+  .crop { width:118px; height:118px; border-radius:50%; overflow:hidden; position:relative; background:var(--sky); flex:none; }
+  .crop .ph { border-radius:0; width:100%; height:100%; }
+  .pair .av { width:118px; height:118px; font-size:44px; }
+  .pair .q { width:34px; height:34px; border-radius:50%; background:var(--fill); display:grid; place-items:center; font-weight:800; color:var(--l2); flex:none; }
+  .rcard h2 { font-size:26px; font-weight:800; letter-spacing:-.5px; margin-top:22px; }
+  .rcard p { font-size:14px; color:var(--l2); line-height:1.45; margin:6px 10px 0; }
+  .rcard .acts { display:flex; gap:10px; position:absolute; left:20px; right:20px; bottom:20px; }
+  .rcard .acts .btn { flex:1; width:auto; font-size:15px; }
+  .rcard .acts .btn.tonal { flex:.6; }
+  .rcard .stamp { position:absolute; top:22px; right:22px; padding:6px 12px; border-radius:99px; font-weight:800; font-size:14px; opacity:0; transform:scale(.6); transition:all .25s; }
+  .rcard .stamp.yes { background:var(--g); color:var(--onG); }
+  .rcard .stamp.no { background:#fff; color:#111; left:22px; right:auto; }
+  .rcard.y .stamp.yes, .rcard.n .stamp.no { opacity:1; transform:none; }
+  .rcard.y { transform:translateX(440px) rotate(14deg); opacity:0; }
+  .rcard.n { transform:translateX(-440px) rotate(-14deg); opacity:0; }
+  .rcard.under { transform:scale(.94) translateY(14px); opacity:.5; }
+  .counter { text-align:center; font-size:13px; color:var(--l3); margin-top:12px; flex:none; }
+
+  /* Send */
+  .hero { text-align:center; padding:22px 18px 18px; margin-top:16px; }
+  .hero .big { font-size:54px; font-weight:800; letter-spacing:-2px; font-variant-numeric:tabular-nums; line-height:1; }
+  .hero .big small { font-size:22px; letter-spacing:-.5px; color:var(--l2); margin-left:4px; }
+  .hero p { font-size:14px; color:var(--l2); margin-top:6px; }
+  .bar { height:8px; border-radius:4px; background:var(--fill); overflow:hidden; margin-top:16px; }
+  .bar i { display:block; height:100%; width:0; background:var(--g); border-radius:4px; transition:width .3s linear; }
+  .ringp { width:32px; height:32px; flex:none; position:relative; }
+  .ringp svg { width:32px; height:32px; transform:rotate(-90deg); }
+  .ringp circle { fill:none; stroke-width:3.5; }
+  .ringp .bg { stroke:var(--fill); }
+  .ringp .fg { stroke:var(--g); stroke-linecap:round; transition:stroke-dashoffset .3s linear; }
+  .ringp .ok { position:absolute; inset:0; border-radius:50%; background:var(--g); color:var(--onG); display:grid; place-items:center; }
+  .row .av { width:36px; height:36px; font-size:15px; }
+  .row .av.dim { opacity:.45; }
+
+  /* Got */
+  .burstwrap { position:relative; width:120px; height:120px; margin:26px auto 0; flex:none; }
+  .burstwrap .orb2 { position:absolute; inset:0; border-radius:50%; background:var(--g); color:var(--onG); display:grid; place-items:center; }
+  .dot { position:absolute; left:50%; top:50%; width:10px; height:10px; margin:-5px; border-radius:50%; }
+  .gh { text-align:center; margin-top:18px; flex:none; }
+  .gh h2 { font-size:30px; font-weight:800; letter-spacing:-.7px; }
+  .gh p { font-size:14px; color:var(--l2); margin-top:4px; }
+  .mosaic { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; padding:4px; }
+  .mosaic .ph { border-radius:12px; }
+  .mosaic .more { border-radius:12px; background:var(--fill); display:grid; place-items:center; font-weight:800; font-size:18px; aspect-ratio:1; }
+
+  @media (prefers-reduced-motion:reduce) { .aur b, .cap .sweep { animation:none; } .scr.in > * { animation:none; } }
+</style>
+</head>
+<body>
+<aside class="side">
+  <h1>Trip group · demo</h1>
+  <p class="lead">Everyone in the group has ShareBro. Each phone learns its owner's face from a selfie, everyone picks the photos they're happy to share, and each photo goes only to the people who are in it. Photos with nobody from the group in them aren't sent.</p>
+  <h4>Play</h4>
+  <div class="chips"><button class="go" id="play">▶ Play the whole trip</button></div>
+  <h4>Screen</h4>
+  <div class="chips" id="screens">
+    <button data-s="group">1 · Group</button><button data-s="me">2 · This is me</button><button data-s="pick">3 · Pick photos</button>
+    <button data-s="match">4 · Who's in it</button><button data-s="review">5 · Quick check</button><button data-s="send">6 · Sending</button><button data-s="got">7 · Your photos</button>
+  </div>
+  <h4>How it works</h4>
+  <ul class="tips">
+    <li><b>Group:</b> one phone shows a QR code; the others scan it with ShareBro. Members pop in as they join and get a tick once their face is set up.</li>
+    <li><b>This is me:</b> three quick angles fill a ring of ticks, like setting up face unlock. Only a face fingerprint (numbers, not the selfie) is shared, and only inside this group.</li>
+    <li><b>Pick photos:</b> nothing is shared unless you select it. Small dots show who the app thinks is in each photo; day chips help pick fast.</li>
+    <li><b>Who's in it:</b> your phone checks each photo against the group's faces. A copy flies to each person in it; photos with nobody from the group stay with you.</li>
+    <li><b>Quick check:</b> faces the app isn't sure about (sunglasses, turned away) are asked once, Yes or No, so nothing goes to the wrong person.</li>
+    <li><b>Sending:</b> every friend's phone gets only their photos, accepted automatically because they're in the group. A friend out of range gets theirs when they're back.</li>
+    <li><b>Your photos:</b> on your side, the photos friends took of you arrive in one album, sorted by who sent them.</li>
+  </ul>
+</aside>
+
+<div class="stage" id="stage">
+  <div class="phone" id="phone">
+    <div class="aur"><b></b><b></b><b></b><b></b></div><div class="veil"></div>
+    <div class="scr" id="scr"></div>
+    <div class="sbar"><span>4:12</span><span>●●● ▮</span></div><div class="cam"></div><div class="home"></div>
+  </div>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const ic = (n, s = 20, c = '') => `<span class="i ${c}" style="font-size:${s}px">${n}</span>`;
+const phone = $('#phone'), scr = $('#scr');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---- People (placeholders) ----
+const M = [
+  { n: 'You', d: 'Pixel 8', c: '#FF8A6B' },
+  { n: 'Maya', d: "Maya's Pixel", c: '#5E9BFF' },
+  { n: 'Leo', d: "Leo's Galaxy", c: '#30D158' },
+  { n: 'Priya', d: "Priya's OnePlus", c: '#BF5AF2' },
+  { n: 'Sam', d: "Sam's Pixel", c: '#FFD60A' },
+  { n: 'Kenji', d: "Kenji's Galaxy", c: '#64D2FF' },
+  { n: 'Zoe', d: "Zoe's Nothing", c: '#FF375F' },
+  { n: 'Omar', d: "Omar's Moto", c: '#FF9F0A' },
+  { n: 'Ana', d: "Ana's Pixel", c: '#AC8E68' },
+  { n: 'Ben', d: "Ben's Xiaomi", c: '#7D7AFF' },
+];
+const hex = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+const fg = c => { const [r, g, b] = hex(c); return .299 * r + .587 * g + .114 * b > 150 ? '#141216' : '#fff'; };
+const shade = (c, k) => '#' + hex(c).map(v => Math.round(v * k).toString(16).padStart(2, '0')).join('');
+const avStyle = m => `--c:${m.c};--fg:${fg(m.c)}`;
+const av = (i, s = 52, extra = '') => `<div class="av" style="${avStyle(M[i])};width:${s}px;height:${s}px;font-size:${s * .38}px">${M[i].n[0]}${extra}</div>`;
+
+// ---- Flat placeholder photos ----
+const DAYS = [
+  { n: 'Beach', sky: '#2E5C86', gr: '#B8955E', sun: '#F2C14E' },
+  { n: 'Fort', sky: '#7E4636', gr: '#4A3530', sun: '#F29E4E', mt: '#5E3529' },
+  { n: 'Market', sky: '#3A3463', gr: '#76472F' },
+  { n: 'Hills', sky: '#33607A', gr: '#3B6948', mt: '#2C4D3A', sun: '#EADFB4' },
+];
+// Who's in each photo: member index, -1 for a stranger, {m, g} for sunglasses (hard to tell).
+const WHO = [
+  [0, 1, 2], [1, 3], [0, 4, 5, 6], [], [2, -1], [0], [1, 2, 3, 4], [7, 8], [-1, -1], [0, 9], [5, 6, { m: 2, g: 1 }], [1],
+  [], [3, 4, 0], [8, 9, 7], [0, 1], [-1], [2, 5, { m: 7, g: 1 }], [6, 9], [0, 3, 4], [], [1, 8], [4, 5], [0, 2, 6, 9],
+];
+const PHOTOS = WHO.map((who, k) => ({ k, day: k % 4, who: who.map(h => typeof h === 'object' ? h : { m: h }) }));
+PHOTOS.forEach(p => {
+  p.to = [...new Set(p.who.filter(h => h.m > 0 && !h.g).map(h => h.m))];
+  p.unsure = p.who.filter(h => h.g);
+});
+function people(n) {
+  const w = n >= 4 ? 15 : n === 3 ? 18 : n === 2 ? 22 : 26, gap = n >= 4 ? 20 : n === 3 ? 25 : 30;
+  return Array.from({ length: n }, (_, i) => ({ x: 50 + (i - (n - 1) / 2) * gap, w }));
+}
+function photo(p) {
+  const d = DAYS[p.day], pos = people(p.who.length);
+  let h = `<div class="ph" style="--sky:${d.sky};--gr:${d.gr};--sun:${d.sun || 'transparent'};--mt:${d.mt || 'transparent'}">`;
+  if (d.sun) h += '<div class="sun"></div>';
+  if (d.mt) h += `<div class="mt" style="left:-8%;width:62%"></div><div class="mt" style="left:40%;width:74%;height:34%"></div>`;
+  h += '<div class="gr"></div>';
+  p.who.forEach((who, i) => {
+    const { x, w } = pos[i], c = who.m < 0 ? '#8E8A96' : M[who.m].c;
+    h += `<div class="bd" style="--b:${shade(c, .72)};left:${x - w * .78}%;bottom:8%;width:${w * 1.56}%;height:${w * .86}%"></div>`;
+    h += `<div class="hd" style="--c:${c};left:${x - w / 2}%;bottom:${9 + w * .86}%;width:${w}%;height:${w}%"></div>`;
+    if (who.g) h += `<div class="gl" style="left:${x - w * .4}%;bottom:${9 + w * 1.36}%;width:${w * .8}%;height:${w * .2}%"></div>`;
+  });
+  return h + '</div>';
+}
+// Face box of person i in percent of the photo.
+function faceBox(p, i) {
+  const { x, w } = people(p.who.length)[i], s = w * 1.45;
+  return { left: x - s / 2, top: 100 - (9 + w * .86 + w / 2) - s / 2, size: s };
+}
+
+// ---- State ----
+const S = { joined: 7, ready: 5, selected: new Set(PHOTOS.map(p => p.k).filter(k => k !== 7 && k !== 16)), counts: {}, answers: {} };
+let screen = 'group', gen = 0, playing = false;
+const sleep = (ms, g = gen) => new Promise(r => setTimeout(r, reduce ? Math.min(ms, 60) : ms)).then(() => { if (g !== gen) throw 'stop'; });
+const ORDER = ['group', 'me', 'pick', 'match', 'review', 'send', 'got'];
+
+function go(name, { keepPlay = false } = {}) {
+  gen++;
+  if (!keepPlay) playing = false;
+  screen = name;
+  $$('#screens button').forEach(b => b.classList.toggle('on', b.dataset.s === name));
+  scr.className = 'scr';
+  scr.innerHTML = SCREENS[name]();
+  scr.scrollTop = 0;
+  void scr.offsetWidth;
+  scr.classList.add('in');
+  wire(name);
+  ENTER[name]?.(gen).catch(e => { if (e !== 'stop') console.error(e); });
+}
+const nav = (right = '') => `<div class="nav"><button class="back" data-back aria-label="Back">${ic('arrow_back_ios_new', 20)}</button>${right}</div>`;
+
+// ---- Screens ----
+const SCREENS = {
+  group() {
+    const cells = M.map((m, i) => i < S.joined
+      ? `<div class="mem" data-m="${i}">${av(i, 52, i < S.ready ? `<span class="tick">${ic('check', 14)}</span>` : '')}<b>${m.n}</b><small class="${i < S.ready ? 'ok' : ''}">${i < S.ready ? 'Ready' : 'Setting up'}</small></div>`
+      : `<div class="mem" data-m="${i}"><div class="empty"></div><b style="color:var(--l3)">…</b><small>Waiting</small></div>`).join('');
+    return nav(`<div class="tcap"><button aria-label="More">${ic('more_horiz', 22)}</button></div>`) +
+      `<div class="ttl">Goa trip</div><div class="sub">Trip group · you started it</div>
+      <div class="card qrcard"><div class="qr">${qrSvg()}<div class="mid">${ic('diversity_3', 26, 'fill')}</div></div>
+        <b>Scan to join</b><small>Open ShareBro on each phone and scan this</small></div>
+      <div class="sh2"><h3>Members</h3><span class="badge" id="jc">${S.joined} of 10</span></div>
+      <div class="card"><div class="members" id="mems">${cells}</div></div>
+      <p class="foot">Everyone needs to be on the same Wi‑Fi or your hotspot, or nearby for offline sending. Face fingerprints stay inside this group and are deleted when it ends.</p>
+      <div style="height:18px;flex:none"></div><button class="btn" data-next>Next: set up your face ${ic('arrow_forward', 20)}</button><div class="pad"></div>`;
+  },
+  me() {
+    let ticks = '';
+    for (let i = 0; i < 72; i++) {
+      const a = i / 72 * Math.PI * 2 - Math.PI / 2, c = Math.cos(a), s = Math.sin(a);
+      ticks += `<line x1="${150 + c * 128}" y1="${150 + s * 128}" x2="${150 + c * 142}" y2="${150 + s * 142}"/>`;
+    }
+    return nav() + `<div class="ttl">This is me</div><div class="sub">So friends' phones know which photos are yours</div>
+      <div class="vf" id="vf"><svg viewBox="0 0 300 300">${ticks}</svg>
+        <div class="lens"><div class="sil" id="sil"><div class="h"></div><div class="s"></div></div><div class="sweep"></div></div>
+        <div class="orb">${ic('check', 52)}</div></div>
+      <div class="prompt"><b id="pb">Ready when you are</b><small id="ps">Hold the phone at arm's length</small>
+        <div class="steps"><i></i><i></i><i></i></div></div>
+      <div class="card" id="fpc" style="display:none"><div class="row" style="min-height:52px">
+        <div class="itile" style="--c:#5E5CE6">${ic('fingerprint', 20)}</div><div class="t"><b>Face fingerprint</b><small>128 numbers · not your photo</small></div></div>
+        <div class="fp">${'<i></i>'.repeat(64)}</div></div>
+      <div class="card" style="margin-top:12px"><div class="row"><div class="itile" style="--c:#FF9F0A">${ic('person_search', 20)}</div>
+        <div class="t"><b>Use my face from People</b><small>More accurate: built from many photos of you</small></div>${ic('chevron_right', 22, 'chev')}</div></div>
+      <div style="height:16px;flex:none"></div><button class="btn" id="mebtn">${ic('photo_camera', 20, 'fill')} Take selfies</button><div class="pad"></div>`;
+  },
+  pick() {
+    const tiles = PHOTOS.map(p => {
+      const known = p.who.filter(h => h.m >= 0);
+      const dots = known.slice(0, 4).map(h => `<i style="${avStyle(M[h.m])}">${M[h.m].n[0]}</i>`).join('');
+      return `<div class="gt ${S.selected.has(p.k) ? 'sel' : ''}" data-k="${p.k}">${photo(p)}<span class="ck">${ic('check', 15)}</span><span class="who">${dots}</span></div>`;
+    }).join('');
+    return nav(`<div class="tcap"><button class="txt" id="all">Select all</button></div>`) +
+      `<div class="ttl">Pick photos to share</div><div class="sub">Only people in a photo will get it</div>
+      <div class="chiprow"><button class="cc on">All days <em>24</em></button>${DAYS.map((d, i) => `<button class="cc">Day ${i + 1} · ${d.n} <em>6</em></button>`).join('')}</div>
+      <div class="grid" id="grid">${tiles}</div>
+      <p class="foot">Dots show who's in each photo. Photos with only strangers, or nobody, never leave your phone.</p>
+      <div class="fbar"><div><div class="n" id="selN"></div><button class="btn" data-next>${ic('send', 18, 'fill')} Share</button></div></div>`;
+  },
+  match() {
+    const pts = orbitPts();
+    const mems = pts.map(({ x, y }, i) => `<div class="om" id="om${i + 1}" style="left:${x}px;top:${y}px">${av(i + 1, 52)}<b>${M[i + 1].n}</b><span class="cnt">0</span></div>`).join('');
+    return nav() + `<div class="ttl">Who's in each photo</div><div class="sub">Checked on this phone, nothing sent yet</div>
+      <div class="card orbit" id="orbit"><svg class="rings" viewBox="0 0 380 396"><circle class="ring" cx="190" cy="198" r="148"/><circle class="ring" cx="190" cy="198" r="88"/></svg>
+        ${mems}<div class="center" id="center"></div></div>
+      <div class="card stats"><div><b id="sC">0</b><small>Checked</small></div><div><b id="sO">0</b><small>Copies to send</small></div><div><b id="sK">0</b><small>Stay with you</small></div></div>
+      <div class="status" id="mst">Looking at faces…</div>
+      <div style="height:14px;flex:none"></div><button class="btn" data-next id="mnext" disabled>${ic('help', 20, 'fill')} Check 2 faces</button><div class="pad"></div>`;
+  },
+  review() {
+    const qs = unsureList();
+    const cards = qs.map((q, i) => `<div class="card rcard ${i ? 'under' : ''}" data-i="${i}" style="z-index:${10 - i}">
+        <span class="stamp yes">YES</span><span class="stamp no">NO</span>
+        <div class="pair"><div class="crop">${cropOf(q)}</div><div class="q">?</div>${av(q.m, 118)}</div>
+        <h2>Is this ${M[q.m].n}?</h2><p>Sunglasses make this one hard to tell. From Day ${q.p.day + 1} · ${DAYS[q.p.day].n}, with ${q.p.who.filter(h => !h.g && h.m > 0).map(h => M[h.m].n).join(' and ')}.</p>
+        <div class="acts"><button class="btn tonal" data-a="n">${ic('close', 20)} No</button><button class="btn" data-a="y">${ic('check', 20)} Yes, it's ${M[q.m].n}</button></div>
+      </div>`).join('');
+    return nav() + `<div class="ttl">Quick check</div><div class="sub">So nothing goes to the wrong person</div>
+      <div class="rv" id="rv">${cards}<div class="rdone" id="rdone" style="display:none;position:absolute;inset:0;text-align:center;padding-top:60px">
+        <div class="burstwrap" style="margin-top:0"><div class="orb2 pop">${ic('done_all', 56)}</div></div>
+        <div class="gh"><h2>All checked</h2><p id="rsum"></p></div></div></div>
+      <div class="counter" id="rc">1 of ${qs.length}</div>
+      <div style="height:16px;flex:none"></div><button class="btn" data-next id="rnext" disabled>${ic('send', 18, 'fill')} Start sending</button><div class="pad"></div>`;
+  },
+  send() {
+    const rows = M.slice(1).map((m, j) => {
+      const i = j + 1, n = S.counts[i] || 0;
+      return `<div class="row" id="sr${i}">${av(i, 36)}<div class="t"><b>${m.n}</b><small>${m.d} · ${n} photos</small></div>
+        <div class="ringp"><svg viewBox="0 0 32 32"><circle class="bg" cx="16" cy="16" r="13"/><circle class="fg" cx="16" cy="16" r="13" stroke-dasharray="81.7" stroke-dashoffset="81.7"/></svg></div></div>`;
+    }).join('');
+    return nav(`<div class="tcap"><button aria-label="Pause">${ic('pause', 22)}</button></div>`) +
+      `<div class="ttl">Sending</div><div class="sub">Each friend gets only the photos they're in</div>
+      <div class="card hero"><div class="big"><span id="sent">0</span><small>/ ${total()}</small></div><p id="shp">photos to 9 friends</p><div class="bar"><i id="sbar"></i></div></div>
+      <div class="sh2"><h3>Friends</h3><span class="badge" id="sdone">0 done</span></div>
+      <div class="card">${rows}</div>
+      <p class="foot">Their phones accept automatically because they're in the group. If someone is out of range, their photos wait and go as soon as they're back.</p>
+      <div style="height:16px;flex:none"></div><button class="btn" data-next id="snext" disabled>See what friends sent you ${ic('arrow_forward', 20)}</button><div class="pad"></div>`;
+  },
+  got() {
+    const mine = PHOTOS.filter(p => p.who.some(h => h.m === 0));
+    const tiles = [...mine, ...mine].slice(0, 7).map(p => photo(p)).join('') + '<div class="more">+31</div>';
+    const from = [[1, 9], [3, 7], [4, 6], [6, 5], [2, 4], [9, 4], [5, 3]];
+    return nav(`<div class="tcap"><button aria-label="Share">${ic('ios_share', 21)}</button></div>`) +
+      `<div class="burstwrap" id="bw"><div class="orb2">${ic('photo_library', 52, 'fill')}</div></div>
+      <div class="gh"><h2>38 photos of you</h2><p>From 7 friends · Goa trip</p></div>
+      <div class="card mosaic" style="margin-top:20px">${tiles}</div>
+      <div class="sh2"><h3>From</h3></div>
+      <div class="card">${from.map(([i, n]) => `<div class="row">${av(i, 36)}<div class="t"><b>${M[i].n}</b><small>${n} photos · ${M[i].d}</small></div>${ic('chevron_right', 22, 'chev')}</div>`).join('')}</div>
+      <div class="card" style="margin-top:12px"><div class="row"><div class="itile" style="--c:#30D158">${ic('photo_album', 20)}</div>
+        <div class="t"><b>Saved to “Goa trip”</b><small>Album on this phone, duplicates skipped</small></div></div></div>
+      <p class="foot">Photos you're not in were never sent to you.</p>
+      <div style="height:16px;flex:none"></div><button class="btn">${ic('photo_library', 20, 'fill')} Open album</button><div class="pad"></div>`;
+  },
+};
+
+// ---- Helpers ----
+function qrSvg() {
+  let seed = 11; const r = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  const N = 25, cell = 160 / N; let h = `<svg viewBox="0 0 160 160">`;
+  const finder = (x, y) => `<rect x="${x * cell + 1}" y="${y * cell + 1}" width="${7 * cell - 2}" height="${7 * cell - 2}" rx="11" fill="none" stroke="#1A1820" stroke-width="${cell * .95}"/>
+    <rect x="${(x + 2) * cell}" y="${(y + 2) * cell}" width="${3 * cell}" height="${3 * cell}" rx="5" fill="#1A1820"/>`;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const inF = (x < 8 && y < 8) || (x > N - 9 && y < 8) || (x < 8 && y > N - 9);
+    const mid = x > 8 && x < 16 && y > 8 && y < 16;
+    if (!inF && !mid && r() > .52) h += `<circle cx="${x * cell + cell / 2}" cy="${y * cell + cell / 2}" r="${cell * .42}" fill="#1A1820"/>`;
+  }
+  return h + finder(0, 0) + finder(N - 7, 0) + finder(0, N - 7) + '</svg>';
+}
+function orbitPts() {
+  return Array.from({ length: 9 }, (_, i) => {
+    const a = -Math.PI / 2 + i / 9 * Math.PI * 2;
+    return { x: 190 + Math.cos(a) * 148, y: 198 + Math.sin(a) * 148 };
+  });
+}
+function unsureList() {
+  return PHOTOS.filter(p => S.selected.has(p.k)).flatMap(p => p.who.map((h, i) => ({ ...h, p, i })).filter(h => h.g));
+}
+function cropOf(q) {
+  const b = faceBox(q.p, q.i), z = 100 / (b.size * 1.5);
+  return `<div style="position:absolute;width:${z * 100}%;height:${z * 100}%;left:${-(b.left - b.size * .25) * z}%;top:${-(b.top - b.size * .25) * z}%">${photo(q.p)}</div>`;
+}
+function total() { return Object.values(S.counts).reduce((a, b) => a + b, 0); }
+function computeCounts(withAnswers = true) {
+  const c = {};
+  for (const p of PHOTOS) {
+    if (!S.selected.has(p.k)) continue;
+    const to = new Set(p.to);
+    if (withAnswers) p.unsure.forEach(h => { if (S.answers[`${p.k}:${h.m}`] !== false) to.add(h.m); });
+    to.forEach(m => c[m] = (c[m] || 0) + 1);
+  }
+  return c;
+}
+S.counts = computeCounts();
+function countTo(el, to, ms = 500) {
+  const from = +el.textContent || 0, t0 = performance.now();
+  const step = t => { const k = Math.min(1, (t - t0) / ms); el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+function bump(el) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+
+// ---- Wiring ----
+function wire(name) {
+  $$('[data-back]').forEach(b => b.onclick = () => { const i = ORDER.indexOf(name); if (i > 0) go(ORDER[i - 1]); });
+  $$('[data-next]').forEach(b => b.onclick = () => { const i = ORDER.indexOf(name); if (i < ORDER.length - 1) go(ORDER[i + 1]); });
+  if (name === 'pick') {
+    const upd = () => {
+      const sel = PHOTOS.filter(p => S.selected.has(p.k)), c = computeCounts(false);
+      const friends = Object.keys(c).length;
+      $('#selN').innerHTML = `${sel.length} selected<small>Going to ${friends} ${friends === 1 ? 'friend' : 'friends'}</small>`;
+    };
+    $$('.gt').forEach(t => t.onclick = () => {
+      const k = +t.dataset.k;
+      S.selected.has(k) ? S.selected.delete(k) : S.selected.add(k);
+      t.classList.toggle('sel', S.selected.has(k));
+      upd();
+    });
+    $('#all').onclick = () => { PHOTOS.forEach(p => S.selected.add(p.k)); $$('.gt').forEach(t => t.classList.add('sel')); upd(); };
+    upd();
+  }
+  if (name === 'me') $('#mebtn').onclick = () => capture(gen).catch(() => {});
+  if (name === 'review') $$('[data-a]').forEach(b => b.onclick = () => answer(b.dataset.a === 'y'));
+}
+
+// ---- Animations per screen ----
+const ENTER = {
+  async group(g) {
+    if (!playing) return;
+    await sleep(700, g);
+    for (let i = 3; i < 10; i++) {
+      S.joined = i + 1;
+      const cell = $(`.mem[data-m="${i}"]`);
+      cell.innerHTML = `${av(i, 52)}<b>${M[i].n}</b><small>Setting up</small>`;
+      $('.av', cell).classList.add('pop');
+      $('#jc').textContent = `${S.joined} of 10`; bump($('#jc'));
+      await sleep(330, g);
+      const r = i - 2;
+      if (r >= 1) readyUp(r);
+    }
+    for (let r = 8; r < 10; r++) { await sleep(300, g); readyUp(r); }
+    await sleep(900, g);
+    go('me', { keepPlay: true });
+  },
+  async me(g) { if (playing) { await sleep(700, g); await capture(g); await sleep(1200, g); S.selected.clear(); go('pick', { keepPlay: true }); } },
+  async pick(g) {
+    if (!playing) return;
+    await sleep(600, g);
+    for (const t of $$('.gt')) {
+      const k = +t.dataset.k;
+      if (k === 7 || k === 16) continue;
+      t.click(); await sleep(80, g);
+    }
+    await sleep(1000, g);
+    go('match', { keepPlay: true });
+  },
+  async match(g) {
+    S.answers = {};
+    const center = $('#center'), orbit = $('#orbit'), pts = orbitPts();
+    const sel = PHOTOS.filter(p => S.selected.has(p.k));
+    let checked = 0, out = 0, kept = 0;
+    const cnt = {};
+    await sleep(500, g);
+    for (const [n, p] of sel.entries()) {
+      const fast = n > 3, beat = fast ? (playing ? 260 : 330) : 650;
+      center.getAnimations().forEach(a => a.cancel());
+      center.innerHTML = photo(p) + '<div class="scanline"></div>';
+      center.animate([{ transform: 'scale(.6)', opacity: 0 }, { transform: 'scale(1)', opacity: 1 }], { duration: 260, easing: 'cubic-bezier(.3,1.4,.5,1)' });
+      center.classList.remove('scanning'); void center.offsetWidth; center.classList.add('scanning');
+      await sleep(beat * .45, g);
+      p.who.forEach((h, i) => {
+        if (h.m < 0) return;
+        const b = faceBox(p, i), el = document.createElement('div');
+        el.className = 'fb' + (h.g ? ' q' : '');
+        Object.assign(el.style, { left: b.left + '%', top: b.top + '%', width: b.size + '%', height: b.size + '%' });
+        center.appendChild(el); requestAnimationFrame(() => el.classList.add('on'));
+      });
+      await sleep(beat * .45, g);
+      checked++; countTo($('#sC'), checked, 250);
+      if (p.to.length === 0) {
+        kept++;
+        center.animate([{ transform: 'none', opacity: 1 }, { transform: 'translateY(160px) scale(.4)', opacity: 0 }], { duration: 420, easing: 'cubic-bezier(.5,0,.7,.4)', fill: 'forwards' });
+        await sleep(300, g); countTo($('#sK'), kept, 250); bump($('#sK'));
+        $('#mst').textContent = p.who.some(h => h.m === 0) ? 'Only you in this one · it stays with you' : p.who.length ? 'Only strangers · it stays with you' : 'Nobody in it · it stays with you';
+      } else {
+        $('#mst').textContent = `Going to ${p.to.map(m => M[m].n).join(', ')}${p.unsure.length ? ' · one face to check' : ''}`;
+        p.to.forEach((m, j) => setTimeout(() => flyTo(orbit, pts[m - 1], p, m, () => {
+          cnt[m] = (cnt[m] || 0) + 1;
+          const om = $(`#om${m}`); if (!om) return;
+          const badge = $('.cnt', om); badge.textContent = cnt[m]; badge.classList.add('show');
+          bump($('.av', om));
+        }), j * 70));
+        out += p.to.length; countTo($('#sO'), out, 300);
+        center.animate([{ transform: 'none', opacity: 1 }, { transform: 'scale(.7)', opacity: 0 }], { duration: 380, delay: 260, easing: 'ease-in', fill: 'forwards' });
+        await sleep(beat * .9, g);
+      }
+    }
+    await sleep(500, g);
+    center.getAnimations().forEach(a => a.cancel());
+    center.innerHTML = `<div class="orb2" style="position:absolute;inset:6px;border-radius:50%;background:var(--g);color:var(--onG);display:grid;place-items:center">${ic('check', 54)}</div>`;
+    center.firstChild.classList.add('pop');
+    const q = unsureList().length;
+    $('#mst').innerHTML = `<b style="color:#F2EFF5">${sel.length} photos checked.</b> ${q ? `${q} ${q === 1 ? 'face needs' : 'faces need'} a quick look.` : 'Ready to send.'}`;
+    if (!q) { $('#mnext').innerHTML = `${ic('send', 18, 'fill')} Start sending`; $('#mnext').onclick = () => go('send'); }
+    $('#mnext').disabled = false;
+    if (playing) { await sleep(1500, g); go('review', { keepPlay: true }); }
+  },
+  async review(g) {
+    if (!playing) return;
+    await sleep(1300, g); answer(true);
+    await sleep(1500, g); answer(false);
+    await sleep(1600, g); go('send', { keepPlay: true });
+  },
+  async send(g) {
+    S.counts = computeCounts();
+    const ids = Object.keys(S.counts).map(Number), tot = total(), prog = {}, speed = {};
+    $('.big small').textContent = `/ ${tot}`;
+    ids.forEach(i => { prog[i] = 0; speed[i] = .7 + ((i * 37) % 10) / 10; });
+    M.slice(1).forEach((_, j) => { if (!S.counts[j + 1]) { const r = $(`#sr${j + 1} small`); if (r) r.textContent = 'Not in any of your photos'; $(`#sr${j + 1} .av`)?.classList.add('dim'); } });
+    const OMAR = 7; let omarBack = false;
+    const small = i => $(`#sr${i} small`);
+    if (S.counts[OMAR]) { small(OMAR).textContent = 'Waiting · not nearby'; $(`#sr${OMAR} .av`).classList.add('dim'); }
+    await sleep(400, g);
+    let doneN = 0;
+    while (true) {
+      await sleep(120, g);
+      let sent = 0, all = true;
+      for (const i of ids) {
+        const n = S.counts[i];
+        if (i === OMAR && !omarBack) {
+          all = false;
+          if (Object.values(prog).filter((v, k) => ids[k] !== OMAR).reduce((a, b) => a + b, 0) > tot * .8) {
+            omarBack = true; small(i).textContent = 'Back nearby · sending'; small(i).classList.add('hot'); $(`#sr${i} .av`).classList.remove('dim');
+          }
+          continue;
+        }
+        if (prog[i] < n) {
+          prog[i] = Math.min(n, prog[i] + .16 * speed[i]);
+          const got = Math.floor(prog[i]);
+          if (prog[i] >= n) {
+            doneN++; $('#sdone').textContent = `${doneN} done`; bump($('#sdone'));
+            $(`#sr${i} .ringp`).innerHTML = `<div class="ok pop">${ic('check', 18)}</div>`;
+            small(i).textContent = `Done · ${n} photos`; small(i).classList.remove('hot');
+          } else {
+            if (!(i === OMAR && omarBack)) small(i).textContent = `Sending ${Math.min(n, got + 1)} of ${n}`;
+            $(`#sr${i} .fg`).style.strokeDashoffset = 81.7 * (1 - prog[i] / n);
+          }
+        }
+        if (prog[i] < n) all = false;
+        sent += Math.floor(prog[i]);
+      }
+      $('#sent').textContent = sent;
+      $('#sbar').style.width = `${sent / tot * 100}%`;
+      if (all) break;
+    }
+    $('#shp').textContent = 'All sent · every friend has their photos';
+    $('#snext').disabled = false;
+    if (playing) { await sleep(1600, g); go('got', { keepPlay: true }); }
+  },
+  async got(g) {
+    await sleep(150, g);
+    const bw = $('#bw');
+    bw.firstChild.classList.add('pop');
+    const cols = [...M.map(m => m.c)];
+    for (let k = 0; k < 22; k++) {
+      const d = document.createElement('div'), a = k / 22 * Math.PI * 2, r = 80 + (k % 3) * 22;
+      d.className = 'dot'; d.style.background = cols[k % cols.length]; bw.appendChild(d);
+      d.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: `translate(${Math.cos(a) * r}px,${Math.sin(a) * r}px) scale(.3)`, opacity: 0 }],
+        { duration: 1000, delay: 120, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'both' }).finished.then(() => d.remove());
+    }
+    $$('.mosaic > *').forEach((t, i) => t.animate([{ transform: 'scale(.6)', opacity: 0 }, { transform: 'none', opacity: 1 }],
+      { duration: 380, delay: 300 + i * 60, easing: 'cubic-bezier(.3,1.4,.5,1)', fill: 'both' }));
+    playing = false;
+  },
+};
+
+function readyUp(i) {
+  const cell = $(`.mem[data-m="${i}"]`); if (!cell) return;
+  S.ready = Math.max(S.ready, i + 1);
+  const a = $('.av', cell);
+  if (!$('.tick', a)) a.insertAdjacentHTML('beforeend', `<span class="tick pop">${ic('check', 14)}</span>`);
+  const s = $('small', cell); s.textContent = 'Ready'; s.className = 'ok';
+}
+
+async function capture(g) {
+  const vf = $('#vf'), lines = $$('#vf line'), sil = $('#sil'), steps = $$('.steps i'), btn = $('#mebtn');
+  if (!vf || vf.classList.contains('cap') || vf.classList.contains('done')) return;
+  btn.disabled = true; vf.classList.add('cap');
+  const P = [['Look straight at the camera', 'Keep still for a moment', 'translateX(0)'],
+             ['Turn a little to the left', 'Slowly, just your head', 'translateX(-16px) rotate(-6deg)'],
+             ['Now a little to the right', 'Almost done', 'translateX(16px) rotate(6deg)']];
+  for (let s = 0; s < 3; s++) {
+    $('#pb').textContent = P[s][0]; $('#ps').textContent = P[s][1];
+    sil.style.transform = P[s][2];
+    steps[s].classList.add('on');
+    for (let k = s * 24; k < s * 24 + 24; k++) { lines[k].classList.add('on'); await sleep(38, g); }
+    await sleep(250, g);
+  }
+  sil.style.transform = 'none';
+  vf.classList.remove('cap'); vf.classList.add('done');
+  $('#pb').textContent = "That's you"; $('#ps').textContent = 'Your face fingerprint is ready for the group';
+  const fpc = $('#fpc'); fpc.style.display = 'block';
+  fpc.animate([{ opacity: 0, transform: 'translateY(14px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.2,.9,.3,1)' });
+  requestAnimationFrame(() => fpc.classList.add('fpon'));
+  let seed = 5; const r = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+  $$('.fp i').forEach((d, i) => setTimeout(() => d.style.opacity = (.25 + r() * .75).toFixed(2), i * 14));
+  btn.disabled = false; btn.innerHTML = `Continue ${ic('arrow_forward', 20)}`; btn.onclick = () => go('pick');
+}
+
+function flyTo(orbit, to, p, m, landed) {
+  const el = document.createElement('div');
+  el.className = 'fly'; el.innerHTML = photo(p);
+  el.style.left = '190px'; el.style.top = '198px';
+  orbit.appendChild(el);
+  const dx = to.x - 190, dy = to.y - 198, len = Math.hypot(dx, dy), nx = -dy / len * 34, ny = dx / len * 34;
+  el.animate([
+    { transform: 'translate(0,0) scale(1.4)', opacity: 1 },
+    { transform: `translate(${dx * .5 + nx}px,${dy * .5 + ny}px) scale(.95)`, opacity: 1, offset: .5 },
+    { transform: `translate(${dx}px,${dy}px) scale(.35)`, opacity: .2 },
+  ], { duration: reduce ? 1 : 560, easing: 'cubic-bezier(.4,.1,.3,1)', fill: 'forwards' }).finished.then(() => { el.remove(); landed(); });
+  const a = $(`#om${m} .av`); a?.classList.add('glow'); setTimeout(() => a?.classList.remove('glow'), 700);
+}
+
+function answer(yes) {
+  const card = $('.rcard:not(.y):not(.n)'); if (!card) return;
+  const qs = unsureList(), q = qs[+card.dataset.i];
+  S.answers[`${q.p.k}:${q.m}`] = yes;
+  card.classList.add(yes ? 'y' : 'n');
+  const next = card.nextElementSibling;
+  if (next?.classList.contains('rcard')) {
+    setTimeout(() => next.classList.remove('under'), 120);
+    $('#rc').textContent = `${+card.dataset.i + 2} of ${qs.length}`;
+  } else {
+    const yesN = Object.values(S.answers).filter(Boolean).length;
+    setTimeout(() => {
+      $('#rdone').style.display = 'block';
+      $('#rsum').textContent = `${yesN} added, ${qs.length - yesN} skipped. Ready to send.`;
+      $('#rc').textContent = ''; $('#rnext').disabled = false;
+    }, 380);
+  }
+}
+
+// ---- Shell ----
+$$('#screens button').forEach(b => b.onclick = () => go(b.dataset.s));
+$('#play').onclick = () => { playing = true; S.joined = 3; S.ready = 1; go('group', { keepPlay: true }); };
+function fit() {
+  const avail = Math.min(window.innerHeight - 48, 900) / 916, w = Math.min(window.innerWidth - 32, 460) / 436;
+  const scale = Math.max(.5, Math.min(1, avail, w));
+  const s = $('#stage'); s.style.width = 436 * scale + 'px'; s.style.height = 916 * scale + 'px';
+  Object.assign(phone.style, { transform: `scale(${scale})`, left: 12 * scale + 'px', top: 12 * scale + 'px' });
+}
+window.addEventListener('resize', fit);
+fit(); document.fonts.ready.then(() => go('group'));
+</script>
+</body>
+</html>

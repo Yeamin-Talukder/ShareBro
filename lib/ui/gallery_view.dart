@@ -597,11 +597,10 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
               if (more && r > rows.length - 8) _loadMore();
               return switch (rows[r]) {
                 _Header(:final day, :final start, :final count) => Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 18, 8, 8),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 8, 6),
                     child: Row(children: [
                       Text(_byMonth ? formatMonth(day) : formatSectionDay(day),
-                          style: text.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w700)),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
                       const Spacer(),
                       if (_selecting)
                         _DayCheck(
@@ -612,7 +611,8 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
                       else
                         Padding(
                           padding: const EdgeInsets.only(right: 8),
-                          child: Text('$count', style: text.labelMedium),
+                          child: Text('$count',
+                              style: text.labelMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                         ),
                     ]),
                   ),

@@ -1,5 +1,27 @@
 import 'package:flutter/material.dart';
 
+import '../data/db.dart';
+
+/// Light or dark: follow the phone (the default), or always one of them.
+/// Picked in Settings and remembered.
+class Appearance {
+  static final mode = ValueNotifier<ThemeMode>(ThemeMode.system);
+  static const _key = 'appearance';
+
+  static Future<void> load(AppDb db) async {
+    mode.value = switch (await db.setting(_key)) {
+      'light' => ThemeMode.light,
+      'dark' => ThemeMode.dark,
+      _ => ThemeMode.system,
+    };
+  }
+
+  static Future<void> set(AppDb db, ThemeMode m) async {
+    mode.value = m;
+    await db.setSetting(_key, m.name);
+  }
+}
+
 /// Brand palette: "golden hour" — a warm sunset accent for the one or two
 /// actions that matter, with violet and teal kept for the drifting aurora in
 /// the content layer. Contrast figures are against the matching surface.

@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShareBro · People animations</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block">
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { background:#050407; }
+  body { color:#F2F1F5; font-family:Roboto, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;
+         display:flex; flex-wrap:wrap; gap:36px; justify-content:center; align-items:flex-start; padding:24px 16px 48px; }
+  button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .i { display:inline-block; flex:none; font-family:'Material Symbols Rounded'; font-weight:400; font-style:normal; line-height:1; white-space:nowrap; direction:ltr;
+       font-feature-settings:'liga'; font-variation-settings:'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; width:1em; height:1em; overflow:hidden; }
+  .i.fill, .tab.on .i { font-variation-settings:'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+
+  /* Side panel */
+  .side { width:360px; max-width:100%; }
+  .side h1 { font-size:24px; font-weight:800; letter-spacing:-.5px; }
+  .side .lead { color:rgba(242,241,245,.65); font-size:13.5px; line-height:1.6; margin-top:6px; }
+  .opts { display:grid; gap:10px; margin-top:18px; }
+  .opt { border-radius:20px; padding:14px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:start; transition:all .25s; }
+  .opt.on { border-color:rgba(255,138,107,.6); background:rgba(255,138,107,.07); }
+  .opt .n { width:36px; height:36px; border-radius:11px; display:grid; place-items:center; background:#FF8A6B; color:#2A0D06; font-size:20px; }
+  .opt b { font-size:14.5px; display:block; } .opt p { font-size:12.5px; color:rgba(242,241,245,.62); line-height:1.5; margin-top:2px; }
+  .opt .ctl { display:flex; flex-direction:column; gap:6px; align-items:flex-end; }
+  .sw { width:44px; height:26px; border-radius:13px; background:rgba(118,118,128,.4); position:relative; transition:background .25s; }
+  .sw i { position:absolute; left:2px; top:2px; width:22px; height:22px; border-radius:50%; background:#fff; transition:transform .3s cubic-bezier(.3,1.3,.5,1); }
+  .opt.on .sw { background:#FF8A6B; } .opt.on .sw i { transform:translateX(18px); }
+  .play { font-size:12px; font-weight:700; color:#FF8A6B; display:flex; align-items:center; gap:2px; padding:2px 0; }
+  .side h4 { font-size:11.5px; letter-spacing:1.2px; text-transform:uppercase; color:rgba(242,241,245,.42); margin:22px 0 10px; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; }
+  .chips button { padding:8px 13px; border-radius:999px; border:1px solid rgba(255,255,255,.13); font-size:12.5px; background:rgba(255,255,255,.04); }
+
+  /* Phone */
+  .stage { position:relative; flex:none; }
+  .phone { position:absolute; width:412px; height:892px; transform-origin:0 0; border-radius:54px; overflow:hidden; isolation:isolate; user-select:none;
+           box-shadow:0 0 0 11px #0c0a0e, 0 0 0 12px rgba(255,255,255,.09), 0 50px 140px rgba(110,26,98,.32);
+           --bg:#050309; --card:rgba(28,28,31,.78); --fill:rgba(118,118,128,.24); --l1:#F2EFF5; --l2:rgba(235,235,245,.62); --l3:rgba(235,235,245,.32);
+           --g:#FF8A6B; --onG:#2A0D06; --glass:rgba(36,34,42,.55); --glassb:rgba(255,255,255,.14); background:var(--bg); color:var(--l1); }
+  .aur { position:absolute; inset:-10%; z-index:0; }
+  .aur b { position:absolute; width:80%; height:55%; border-radius:50%; filter:blur(55px); animation:drift 24s ease-in-out infinite alternate; }
+  .aur b:nth-child(1) { left:-18%; top:-6%; background:radial-gradient(#8E1F3E 0, transparent 68%); }
+  .aur b:nth-child(2) { left:42%; top:10%; background:radial-gradient(#6E1A62 0, transparent 68%); animation-delay:-7s; }
+  .aur b:nth-child(3) { left:-20%; top:48%; background:radial-gradient(#3A27A6 0, transparent 68%); animation-delay:-12s; }
+  .aur b:nth-child(4) { left:40%; top:68%; background:radial-gradient(#0C6A6E 0, transparent 68%); animation-delay:-3s; }
+  @keyframes drift { 50% { transform:translate(9%,6%) scale(1.12); } 100% { transform:translate(-7%,-5%) scale(.95); } }
+  .veil { position:absolute; inset:0; z-index:1; background:radial-gradient(120% 85% at 50% 35%, rgba(5,3,9,.18), rgba(5,3,9,.8)); }
+  .sbar { position:absolute; left:0; right:0; top:0; height:52px; z-index:20; display:flex; justify-content:space-between; padding:15px 30px 0; font-size:15px; font-weight:600;
+          background:linear-gradient(rgba(5,3,9,.94) 45%, transparent); pointer-events:none; }
+  .cam { position:absolute; top:12px; left:50%; width:20px; height:20px; margin-left:-10px; border-radius:50%; background:#000; z-index:21; }
+  .home { position:absolute; bottom:8px; left:50%; width:124px; height:4px; margin-left:-62px; border-radius:2px; background:#fff; opacity:.8; z-index:21; }
+  .scr { position:absolute; inset:0; z-index:2; overflow-y:auto; overflow-x:hidden; padding:46px 0 150px; scrollbar-width:none; }
+  .scr::-webkit-scrollbar { display:none; }
+  .navrow { display:flex; justify-content:flex-end; padding:4px 16px 0; min-height:48px; align-items:center; }
+  .tcap { display:flex; border-radius:24px; background:var(--glass); backdrop-filter:blur(24px); border:1px solid var(--glassb); }
+  .tcap button { width:44px; height:44px; display:grid; place-items:center; }
+  .ttl { font-size:34px; font-weight:800; letter-spacing:-.8px; padding:2px 20px 0; }
+  .sub { font-size:14px; color:var(--l2); padding:2px 20px 0; }
+  .crow { display:flex; gap:8px; padding:14px 16px 4px; overflow:hidden; }
+  .chip { flex:none; height:36px; padding:0 14px; border-radius:18px; display:flex; align-items:center; gap:6px; font-size:14px; font-weight:600; background:var(--fill); }
+  .chip.on { background:var(--g); color:var(--onG); }
+  .seg { position:relative; display:flex; height:36px; border-radius:18px; background:var(--fill); padding:2px; margin:12px 16px 0; }
+  .seg .thumb { position:absolute; top:2px; bottom:2px; left:2px; width:calc(50% - 2px); border-radius:16px; background:#636366; transition:transform .45s cubic-bezier(.32,1.3,.5,1); }
+  .seg.r .thumb { transform:translateX(100%); }
+  .seg button { flex:1; position:relative; z-index:1; font-size:14px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .hint { font-size:13px; color:var(--l2); padding:14px 20px 4px; }
+
+  .dock { position:absolute; left:20px; right:20px; bottom:36px; height:68px; border-radius:34px; padding:6px; z-index:15; display:flex;
+          background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0) 45%), rgba(28,26,34,.62); backdrop-filter:blur(18px); border:1px solid rgba(255,255,255,.157); transition:transform .4s, opacity .3s; }
+  .dock.hide { transform:translateY(140%); opacity:0; }
+  .dock .drop { position:absolute; top:6px; bottom:6px; left:6px; width:calc((100% - 12px) / 5); border-radius:28px; background:rgba(255,138,107,.18); border:1px solid rgba(255,138,107,.235); }
+  .dock .tab { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:12px; font-weight:500; opacity:.75; position:relative; }
+  .dock .tab.on { color:var(--g); font-weight:700; opacity:1; }
+
+  /* Faces */
+  .grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:18px 8px; padding:8px 14px 0; perspective:900px; }
+  .pt { display:flex; flex-direction:column; align-items:center; gap:7px; cursor:pointer; position:relative; touch-action:none; will-change:transform; }
+  .av { position:relative; width:98px; height:98px; }
+  .av svg.ring { position:absolute; inset:0; transform:rotate(-90deg); }
+  .av svg.ring circle { fill:none; stroke-width:3.5; stroke:var(--g); stroke-linecap:round; }
+  .pt.un .av svg.ring circle { stroke:var(--l3); stroke-dasharray:7 7; }
+  .face { position:absolute; inset:7px; border-radius:50%; overflow:hidden; background:var(--f); }
+  .face svg { position:absolute; left:0; right:0; bottom:-6%; width:100%; height:92%; color:rgba(255,255,255,.45); }
+  .pt b { font-size:14.5px; font-weight:700; white-space:nowrap; } .pt.un b { color:var(--g); font-weight:600; }
+  .pt small { font-size:12px; color:var(--l2); margin-top:-5px; font-variant-numeric:tabular-nums; }
+
+  /* 1. Wave in */
+  .pt.wave { animation:wave .7s cubic-bezier(.3,1.5,.5,1) both; animation-delay:var(--d); }
+  @keyframes wave { from { opacity:0; transform:scale(.3) translateY(20px); } 60% { opacity:1; } }
+  .pt.wave svg.ring circle { animation:draw .9s cubic-bezier(.4,0,.2,1) both; animation-delay:calc(var(--d) + .25s); }
+  .pt.un.wave svg.ring circle { animation:none; }
+  @keyframes draw { from { stroke-dashoffset:var(--c); } to { stroke-dashoffset:0; } }
+
+  /* 6. Attention pulse for new faces */
+  .pulse .pt.un svg.ring { animation:spin 9s linear infinite; }
+  .pulse .pt.un .av::after { content:''; position:absolute; inset:-2px; border-radius:50%; border:2px solid var(--g); animation:ping 2.4s ease-out infinite; }
+  .pulse .pt.un b { animation:nudge 2.4s ease-in-out infinite; }
+  @keyframes spin { to { transform:rotate(270deg); } }
+  @keyframes ping { 0% { transform:scale(.92); opacity:.8; } 70%,100% { transform:scale(1.18); opacity:0; } }
+  @keyframes nudge { 0%,60%,100% { transform:none; } 70% { transform:translateY(-2px); } 80% { transform:none; } }
+
+  /* 4. Gooey merge */
+  .goo { position:absolute; inset:0; z-index:5; pointer-events:none; filter:url(#goo); }
+  .goo i { position:absolute; width:90px; height:90px; margin:-45px; border-radius:50%; background:var(--g); }
+  .drag { position:absolute; z-index:7; pointer-events:none; width:98px; height:98px; margin:-49px; }
+  .drag .face { inset:4px; box-shadow:0 14px 30px rgba(0,0,0,.5); }
+  .pt.lift { opacity:.25; }
+  .pt.target .av { transform:scale(1.12); } .av { transition:transform .25s cubic-bezier(.3,1.5,.5,1); }
+  .pt.merged .av { animation:merged .7s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes merged { 35% { transform:scale(1.28); } }
+
+  /* 3. Honeycomb */
+  .hive { position:relative; height:620px; overflow:hidden; margin-top:6px; touch-action:none; cursor:grab; }
+  .hive .layer { position:absolute; left:0; top:0; }
+  .hive .hb { position:absolute; width:92px; height:92px; margin:-46px; will-change:transform; }
+  .hive .hb .face { inset:0; border:3px solid var(--g); }
+  .hive .hb.un .face { border-color:var(--l3); border-style:dashed; }
+  .hive .hb span { position:absolute; top:100%; left:50%; transform:translateX(-50%); margin-top:4px; font-size:13px; font-weight:700; white-space:nowrap; transition:opacity .2s; }
+
+  /* 5. Open person */
+  .scatter { transition:transform .5s cubic-bezier(.3,.9,.3,1), opacity .4s, filter .4s; }
+  .scattered { opacity:.15; filter:blur(5px); }
+  .flyface { position:absolute; z-index:12; border-radius:50%; overflow:hidden; pointer-events:none; }
+  .person { position:absolute; inset:0; z-index:11; pointer-events:none; opacity:0; transition:opacity .3s; }
+  .person.show { opacity:1; pointer-events:auto; }
+  .person .back { position:absolute; left:16px; top:52px; width:44px; height:44px; border-radius:50%; display:grid; place-items:center; background:var(--glass); border:1px solid var(--glassb); }
+  .person h2 { position:absolute; top:330px; left:0; right:0; text-align:center; font-size:30px; font-weight:800; letter-spacing:-.6px; }
+  .person p { position:absolute; top:372px; left:0; right:0; text-align:center; font-size:14px; color:var(--l2); }
+  .person .pg { position:absolute; top:420px; left:3px; right:3px; display:grid; grid-template-columns:repeat(3,1fr); gap:3px; }
+  .person .pg i { aspect-ratio:1; border-radius:4px; background:var(--f); }
+  .person.show h2, .person.show p { animation:rise .45s cubic-bezier(.2,.9,.3,1) both .15s; }
+  .person.show .pg i { animation:rise .5s cubic-bezier(.2,.9,.3,1) both; animation-delay:calc(.25s + var(--k) * 25ms); }
+  @keyframes rise { from { opacity:0; transform:translateY(24px); } }
+  .toast { position:absolute; top:46px; left:50%; transform:translate(-50%,-24px) scale(.85); opacity:0; z-index:30; background:#000; padding:10px 16px 10px 12px; border-radius:22px;
+           font-size:13.5px; display:flex; gap:8px; align-items:center; transition:all .5s cubic-bezier(.3,1.4,.5,1); pointer-events:none; white-space:nowrap; }
+  .toast.show { opacity:1; transform:translate(-50%,0) scale(1); } .toast .i { color:var(--g); }
+  @media (prefers-reduced-motion: reduce) { * { animation-duration:.01ms !important; transition-duration:.01ms !important; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs><filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="9" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10" result="g"/><feComposite in="SourceGraphic" in2="g" operator="atop"/></filter></defs></svg>
+
+<aside class="side">
+  <h1>People · animation options</h1>
+  <p class="lead">Six animations for the People page. Switch each one on or off, press Play to see it again, and tell me which to build. They all respect the phone's "remove animations" setting.</p>
+  <div class="opts" id="opts"></div>
+  <h4>Tips</h4>
+  <p class="lead" style="margin-top:0">Scroll the phone for <b>Scroll depth</b>. Drag on the honeycomb to move around. Press and hold a face, then drag it onto another one to merge. Tap a face to open the person.</p>
+</aside>
+
+<div class="stage" id="stage">
+  <div class="phone" id="phone">
+    <div class="aur"><b></b><b></b><b></b><b></b></div><div class="veil"></div>
+    <div class="scr" id="scr"></div>
+    <div class="goo" id="goo"></div>
+    <div class="person" id="person"></div>
+    <div class="dock" id="dock"></div>
+    <div class="sbar"><span>3:08</span><span>●●● ▮</span></div><div class="cam"></div>
+    <div class="toast" id="toast"></div><div class="home"></div>
+  </div>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const ic = (n, s = 22, c = '') => `<span class="i ${c}" style="font-size:${s}px">${n}</span>`;
+const SIL = '<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMax meet"><circle cx="50" cy="40" r="20" fill="currentColor"/><path d="M12 100c2-22 18-34 38-34s36 12 38 34z" fill="currentColor"/></svg>';
+const COLS = ['#C98F72','#7F98AE','#C9A46E','#8EA37E','#B98593','#9A8BC2','#C88866','#6FA39B','#BFA161','#A97B8A','#7D86C2','#B48C74','#8FA77F','#C27C7C','#9C8CC4'];
+let PEOPLE = [['Maya',248],['Ravi',196],['Sofia',171],['Ayaan',133],['Leo',97],['Nadia',88],[null,64],['Omar',51],['Priya',42],[null,27],['Kai',19],['Zara',17],[null,12],['Ethan',9],['Iris',6]]
+  .map(([n, c], k) => ({ n, c, k }));
+const OPTS = [
+  ['wave', 'waves', 'Wave in', 'When the page opens, faces ripple in from the top corner, each ring draws itself around the face, and the photo counts roll up.'],
+  ['depth', 'view_in_ar', 'Scroll depth', 'As you scroll, faces rise up out of the page with a slight tilt, and shrink away as they slide under the title.'],
+  ['hive', 'hive', 'Honeycomb view', 'A new view next to the grid: faces packed like an Apple Watch home screen. Drag around; faces near the middle grow, the edges shrink.'],
+  ['goo', 'join_full', 'Liquid merge', 'Drag one face onto another: as they get close they pull together like drops of liquid, then pop into one.'],
+  ['open', 'open_in_full', 'Open with focus', 'Tap a face: everyone else drifts away and blurs, the face flies up into the person page, and their photos rise in.'],
+  ['pulse', 'notifications_active', 'New face nudge', 'Faces without a name get a slowly turning dashed ring that gently pulses, inviting you to name them.'],
+];
+const ON = { wave: true, depth: true, hive: true, goo: true, open: true, pulse: true };
+let view = 'grid';
+const phone = $('#phone'), scr = $('#scr');
+let scale = 1;
+
+function faceHTML(p) { return `<div class="face" style="--f:${COLS[p.k % 15]}">${SIL}</div>`; }
+function tile(p, i, wave) {
+  const r = 45.5, c = 2 * Math.PI * r;
+  const row = Math.floor(i / 3), col = i % 3;
+  return `<div class="pt ${p.n ? '' : 'un'} ${wave ? 'wave' : ''}" data-i="${i}" style="--d:${(row + col) * 70}ms;--c:${c}">
+    <div class="av"><svg class="ring" viewBox="0 0 98 98"><circle cx="49" cy="49" r="${r}" stroke-dasharray="${p.n ? c : ''}" ${p.n ? '' : ''}/></svg>${faceHTML(p)}</div>
+    <b>${p.n || 'Add a name'}</b><small data-count="${p.c}">${wave ? 0 : p.c} photos</small></div>`;
+}
+function render(wave = ON.wave) {
+  scr.innerHTML = `<div class="navrow"><div class="tcap">${['search', 'add_photo_alternate', 'send', 'person_search', 'more_horiz'].map(n => `<button>${ic(n, 21)}</button>`).join('')}</div></div>
+    <h1 class="ttl">People</h1><p class="sub">${PEOPLE.length} people</p>
+    <div class="crow"><span class="chip">${ic('calendar_month', 17)}Any date</span><span class="chip on">All trips</span><span class="chip">${ic('luggage', 17)}Bali 2025</span><span class="chip">Tokyo</span></div>
+    ${ON.hive ? `<div class="seg ${view === 'hive' ? 'r' : ''}" id="seg"><div class="thumb"></div><button data-v="grid">${ic('grid_view', 18)}Grid</button><button data-v="hive">${ic('hive', 18)}Honeycomb</button></div>` : ''}
+    ${view === 'hive' && ON.hive ? '<div class="hive" id="hive"><div class="layer" id="layer"></div></div>'
+      : `<p class="hint">${ON.goo ? 'Press and hold a face, then drag it onto another to merge.' : 'Drag one person onto another to merge them.'}</p><div class="grid ${ON.pulse ? 'pulse' : ''}" id="grid">${PEOPLE.map((p, i) => tile(p, i, wave)).join('')}</div>`}`;
+  if (view === 'hive' && ON.hive) buildHive();
+  else { if (wave) rollCounts(); depth(); }
+}
+function rollCounts() {
+  $$('[data-count]').forEach((e, i) => {
+    const to = +e.dataset.count, start = performance.now() + (Math.floor(i / 3) + i % 3) * 70 + 250;
+    const step = t => { const p = Math.min(1, Math.max(0, (t - start) / 900)); e.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))) + ' photos'; if (p < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  });
+}
+/* 2. Scroll depth */
+function depth() {
+  const tiles = $$('#grid .pt');
+  if (!ON.depth) { tiles.forEach(t => { if (!t.classList.contains('wave')) t.style.transform = ''; }); return; }
+  const H = scr.clientHeight, top = 150;
+  tiles.forEach(t => {
+    const r = t.getBoundingClientRect(), pr = phone.getBoundingClientRect();
+    const y = (r.top - pr.top) / scale, h = r.height / scale;
+    const enter = Math.min(1, Math.max(0, (H - 110 - y) / 160));      // rising from the bottom
+    const leave = Math.min(1, Math.max(0, (y + h - top) / 120));      // sliding under the title
+    const s = (.78 + .22 * enter) * (.6 + .4 * leave);
+    t.style.transform = `translateY(${(1 - enter) * 40}px) rotateX(${(1 - enter) * 28}deg) scale(${s})`;
+    t.style.opacity = Math.min(enter * 1.4, leave * 1.3, 1);
+  });
+}
+scr.addEventListener('scroll', () => { if (view === 'grid') depth(); });
+
+/* 3. Honeycomb */
+let pan = { x: 0, y: 0 }, vel = { x: 0, y: 0 }, inertia;
+function buildHive() {
+  const layer = $('#layer'), W = 412, Hh = 620, gap = 108;
+  const pos = []; let ring = 0, placed = 0;
+  // Hex spiral from the middle.
+  pos.push([0, 0]);
+  for (ring = 1; pos.length < PEOPLE.length; ring++) {
+    let x = ring * gap, y = 0;
+    const dirs = [[-.5, .866], [-1, 0], [-.5, -.866], [.5, -.866], [1, 0], [.5, .866]];
+    for (const [dx, dy] of dirs) for (let s = 0; s < ring && pos.length < PEOPLE.length + 6; s++) { pos.push([x, y]); x += dx * gap; y += dy * gap; }
+  }
+  layer.innerHTML = PEOPLE.map((p, i) => `<div class="hb ${p.n ? '' : 'un'}" data-x="${pos[i][0]}" data-y="${pos[i][1]}">${faceHTML(p).replace('class="face"', 'class="face"')}<span>${p.n || 'Add a name'}</span></div>`).join('');
+  pan = { x: W / 2, y: Hh / 2 - 20 };
+  hiveLayout();
+  const hive = $('#hive'); let last = null;
+  hive.onpointerdown = e => { cancelAnimationFrame(inertia); last = { x: e.clientX, y: e.clientY, t: performance.now() }; hive.setPointerCapture(e.pointerId); };
+  hive.onpointermove = e => { if (!last) return; const dx = (e.clientX - last.x) / scale, dy = (e.clientY - last.y) / scale, dt = performance.now() - last.t || 16;
+    pan.x += dx; pan.y += dy; vel = { x: dx / dt * 16, y: dy / dt * 16 }; last = { x: e.clientX, y: e.clientY, t: performance.now() }; hiveLayout(); };
+  hive.onpointerup = () => { last = null; const go = () => { vel.x *= .93; vel.y *= .93; pan.x += vel.x; pan.y += vel.y; hiveLayout(); if (Math.hypot(vel.x, vel.y) > .2) inertia = requestAnimationFrame(go); }; go(); };
+}
+function hiveLayout() {
+  const cx = 206, cy = 290;
+  $$('#layer .hb').forEach(b => {
+    const x = +b.dataset.x + pan.x, y = +b.dataset.y + pan.y;
+    const d = Math.hypot(x - cx, (y - cy) * 1.1);
+    const s = Math.max(.32, Math.min(1.04, 1.12 - d / 250));
+    b.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+    $('span', b).style.opacity = s > .95 ? 1 : 0;
+  });
+}
+
+/* 4. Liquid merge (and plain drag when it's off) */
+let hold, drag = null;
+phone.addEventListener('pointerdown', e => {
+  const t = e.target.closest('#grid .pt'); if (!t) return;
+  const start = { x: e.clientX, y: e.clientY };
+  hold = setTimeout(() => startDrag(t, e), 320);
+  const cancel = ev => { if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > 8 && !drag) clearTimeout(hold); };
+  phone.addEventListener('pointermove', cancel);
+  phone.addEventListener('pointerup', () => { clearTimeout(hold); phone.removeEventListener('pointermove', cancel); }, { once: true });
+});
+const rel = (x, y) => { const p = phone.getBoundingClientRect(); return { x: (x - p.left) / scale, y: (y - p.top) / scale }; };
+function centreOf(el) { const r = el.getBoundingClientRect(); return rel(r.left + r.width / 2, r.top + r.height / 2); }
+function startDrag(t, e) {
+  const i = +t.dataset.i, p = PEOPLE[i];
+  scr.style.overflow = 'hidden';
+  t.classList.add('lift');
+  const d = document.createElement('div'); d.className = 'drag'; d.innerHTML = faceHTML(p); phone.appendChild(d);
+  const goo = $('#goo'); goo.innerHTML = ON.goo ? '<i id="gA"></i><i id="gB" style="opacity:0"></i>' : '';
+  drag = { i, el: d, t, target: null };
+  const move = ev => {
+    const m = rel(ev.clientX, ev.clientY); d.style.left = m.x + 'px'; d.style.top = m.y - 10 + 'px';
+    let best = null, bd = 85;
+    $$('#grid .pt').forEach(o => { if (o === t) return; const c = centreOf($('.av', o)); const dd = Math.hypot(c.x - m.x, c.y - m.y + 10); if (dd < bd) { bd = dd; best = o; } });
+    if (best !== drag.target) { drag.target?.classList.remove('target'); best?.classList.add('target'); drag.target = best; }
+    if (ON.goo) {
+      const a = $('#gA'), b = $('#gB'); a.style.left = m.x + 'px'; a.style.top = m.y - 10 + 'px';
+      if (best) { const c = centreOf($('.av', best)); b.style.left = c.x + 'px'; b.style.top = c.y + 'px'; b.style.opacity = 1; } else b.style.opacity = 0;
+    }
+  };
+  const up = () => {
+    phone.removeEventListener('pointermove', move); phone.removeEventListener('pointerup', up);
+    scr.style.overflow = ''; const target = drag.target; target?.classList.remove('target');
+    if (target) {
+      const j = +target.dataset.i, c = centreOf($('.av', target));
+      d.animate([{ left: d.style.left, top: d.style.top, transform: 'scale(1)' }, { left: c.x + 'px', top: c.y + 'px', transform: 'scale(.3)', opacity: .2 }], { duration: 320, easing: 'cubic-bezier(.5,0,.3,1)', fill: 'forwards' })
+        .finished.then(() => {
+          d.remove(); $('#goo').innerHTML = '';
+          const into = PEOPLE[j]; into.c += PEOPLE[i].c; PEOPLE.splice(i, 1);
+          render(false);
+          const nt = $$('#grid .pt')[PEOPLE.indexOf(into)]; nt?.classList.add('merged');
+          toast(`Merged into ${into.n || 'this person'}`, 'merge');
+        });
+      if (ON.goo) { const a = $('#gA'); a.animate([{ left: a.style.left, top: a.style.top }, { left: c.x + 'px', top: c.y + 'px' }], { duration: 320, fill: 'forwards' }); }
+    } else {
+      d.remove(); $('#goo').innerHTML = ''; t.classList.remove('lift');
+    }
+    drag = null;
+  };
+  phone.addEventListener('pointermove', move); phone.addEventListener('pointerup', up);
+  move(e);
+}
+
+/* 5. Open with focus */
+phone.addEventListener('click', e => {
+  if (drag) return;
+  const seg = e.target.closest('#seg button'); if (seg) { view = seg.dataset.v; $('#seg').classList.toggle('r', view === 'hive'); setTimeout(() => render(false), 200); return; }
+  const back = e.target.closest('.person .back'); if (back) return closePerson();
+  const t = e.target.closest('#grid .pt'); if (!t) return;
+  openPerson(t);
+});
+let opened = null;
+function openPerson(t) {
+  const p = PEOPLE[+t.dataset.i], av = $('.av', t);
+  const r = av.getBoundingClientRect(), pr = phone.getBoundingClientRect();
+  const from = { x: (r.left - pr.left) / scale + 7, y: (r.top - pr.top) / scale + 7, s: (r.width / scale) - 14 };
+  const person = $('#person');
+  person.innerHTML = `<button class="back">${ic('arrow_back', 22)}</button><h2>${p.n || 'Add a name'}</h2><p>${p.c} photos · 3 trips</p><div class="pg">${Array.from({ length: 15 }, (_, k) => `<i style="--f:${COLS[(p.k + k * 4) % 15]};--k:${k}"></i>`).join('')}</div>`;
+  if (!ON.open) { person.classList.add('show'); person.style.background = 'var(--bg)'; $('#dock').classList.add('hide'); opened = { t, from, plain: true }; return; }
+  const cx = from.x + from.s / 2, cy = from.y + from.s / 2;
+  $$('#scr > *').forEach(el => el.classList.add('scatter'));
+  $$('#grid .pt').forEach(o => {
+    if (o === t) { o.style.opacity = 0; return; }
+    const c = centreOf(o), dx = c.x - cx, dy = c.y - cy, d = Math.hypot(dx, dy) || 1;
+    o.classList.add('scatter', 'scattered'); o.style.transform = `translate(${dx / d * 60}px, ${dy / d * 60}px) scale(.85)`;
+  });
+  $$('.navrow, .ttl, .sub, .crow, .hint, .seg').forEach(el => el.classList.add('scattered'));
+  const f = document.createElement('div'); f.className = 'flyface'; f.innerHTML = faceHTML(p).replace('class="face"', 'class="face" style="inset:0;--f:' + COLS[p.k % 15] + '"');
+  Object.assign(f.style, { left: from.x + 'px', top: from.y + 'px', width: from.s + 'px', height: from.s + 'px', boxShadow: '0 0 0 4px var(--g)' });
+  phone.appendChild(f);
+  const to = { x: 206 - 70, y: 150, s: 140 };
+  f.animate([{ left: from.x + 'px', top: from.y + 'px', width: from.s + 'px', height: from.s + 'px' }, { left: to.x + 'px', top: to.y + 'px', width: to.s + 'px', height: to.s + 'px' }],
+    { duration: 520, easing: 'cubic-bezier(.3,1.2,.4,1)', fill: 'forwards' });
+  $('#dock').classList.add('hide');
+  setTimeout(() => person.classList.add('show'), 180);
+  opened = { t, from, f };
+}
+function closePerson() {
+  const person = $('#person'); person.classList.remove('show'); person.style.background = '';
+  $('#dock').classList.remove('hide');
+  if (!opened) return;
+  if (opened.plain) { opened = null; return; }
+  const { t, from, f } = opened;
+  f.animate([{ left: '136px', top: '150px', width: '140px', height: '140px' }, { left: from.x + 'px', top: from.y + 'px', width: from.s + 'px', height: from.s + 'px' }],
+    { duration: 420, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' }).finished.then(() => { f.remove(); t.style.opacity = ''; });
+  $$('#grid .pt').forEach(o => { if (o !== t) { o.classList.remove('scattered'); o.style.transform = ''; } });
+  $$('.scattered').forEach(el => el.classList.remove('scattered'));
+  setTimeout(() => { $$('.scatter').forEach(el => el.classList.remove('scatter')); depth(); }, 500);
+  opened = null;
+}
+
+function toast(msg, icon) { const t = $('#toast'); t.innerHTML = ic(icon, 16) + msg; t.classList.remove('show'); void t.offsetWidth; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2200); }
+
+/* Side panel */
+function panel() {
+  $('#opts').innerHTML = OPTS.map(([k, icn, title, text]) => `<div class="opt ${ON[k] ? 'on' : ''}" data-k="${k}"><span class="n">${ic(icn, 21, 'fill')}</span><div><b>${title}</b><p>${text}</p></div>
+    <div class="ctl"><button class="sw" data-sw="${k}" aria-label="On or off"><i></i></button><button class="play" data-play="${k}">${ic('play_arrow', 16, 'fill')}Play</button></div></div>`).join('');
+}
+document.addEventListener('click', e => {
+  const s = e.target.closest('[data-sw]'); if (s) { const k = s.dataset.sw; ON[k] = !ON[k]; if (k === 'hive' && !ON.hive) view = 'grid'; panel(); closePerson(); render(false); return; }
+  const p = e.target.closest('[data-play]'); if (!p) return;
+  const k = p.dataset.play; ON[k] = true; panel(); closePerson(); scr.scrollTop = 0;
+  if (k === 'wave') { view = 'grid'; render(true); }
+  if (k === 'depth') { view = 'grid'; render(false); setTimeout(() => scr.scrollTo({ top: 520, behavior: 'smooth' }), 200); setTimeout(() => scr.scrollTo({ top: 0, behavior: 'smooth' }), 1900); }
+  if (k === 'hive') { view = 'hive'; render(false); setTimeout(() => { vel = { x: -7, y: -4 }; const go = () => { vel.x *= .95; vel.y *= .95; pan.x += vel.x; pan.y += vel.y; hiveLayout(); if (Math.hypot(vel.x, vel.y) > .2) inertia = requestAnimationFrame(go); }; go(); }, 400); }
+  if (k === 'goo') { view = 'grid'; render(false); demoMerge(); }
+  if (k === 'open') { view = 'grid'; render(false); setTimeout(() => openPerson($$('#grid .pt')[1]), 300); setTimeout(closePerson, 2600); }
+  if (k === 'pulse') { view = 'grid'; render(false); setTimeout(() => scr.scrollTo({ top: 150, behavior: 'smooth' }), 100); }
+});
+async function demoMerge() {
+  await new Promise(r => setTimeout(r, 300));
+  const a = $$('#grid .pt')[6], b = $$('#grid .pt')[3]; if (!a || !b) return;
+  const ca = centreOf($('.av', a)), cb = centreOf($('.av', b)), pr = phone.getBoundingClientRect();
+  const ev = (x, y) => ({ clientX: pr.left + x * scale, clientY: pr.top + y * scale });
+  startDrag(a, ev(ca.x, ca.y + 10));
+  for (let k = 1; k <= 30; k++) { await new Promise(r => setTimeout(r, 30)); phone.dispatchEvent(new PointerEvent('pointermove', ev(ca.x + (cb.x - ca.x) * k / 30, ca.y + 10 + (cb.y - ca.y) * k / 30))); }
+  await new Promise(r => setTimeout(r, 300));
+  phone.dispatchEvent(new PointerEvent('pointerup', ev(cb.x, cb.y + 10)));
+}
+
+$('#dock').innerHTML = '<div class="drop"></div>' + [['group', 'People'], ['photo', 'Photos'], ['photo_album', 'Albums'], ['explore', 'Explore'], ['swap_horiz', 'Share']]
+  .map(([i, l], n) => `<div class="tab ${n === 0 ? 'on' : ''}">${ic(i, 24)}<span>${l}</span></div>`).join('');
+function fit() {
+  const avail = Math.min(window.innerHeight - 48, 900) / 916, w = Math.min(window.innerWidth - 32, 460) / 436;
+  scale = Math.max(.5, Math.min(1, avail, w));
+  const st = $('#stage'); st.style.width = 436 * scale + 'px'; st.style.height = 916 * scale + 'px';
+  Object.assign(phone.style, { transform: `scale(${scale})`, left: 12 * scale + 'px', top: 12 * scale + 'px' });
+  depth();
+}
+window.addEventListener('resize', fit);
+panel(); fit(); document.fonts.ready.then(() => render(true));
+</script>
+</body>
+</html>

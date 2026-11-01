@@ -9,10 +9,13 @@ import '../data/db.dart';
 import '../face/tags.dart';
 import '../scan/scan_controller.dart';
 import '../data/duplicates.dart';
+import '../data/group_shots.dart';
+import 'best_shots_screen.dart';
 import 'duplicates_screen.dart';
 import 'gallery_view.dart';
 import 'glass.dart';
 import 'motion.dart';
+import 'sections.dart';
 import 'widgets.dart';
 
 typedef _Meta = (String title, IconData icon);
@@ -83,6 +86,7 @@ class _ExploreTabState extends State<ExploreTab> {
   DaySpan? _dates;
   Map<String, ({int count, String cover})>? _counts;
   List<DuplicateSet> _dupes = const [];
+  List<ShotBurst> _bursts = const [];
   int _loadedRevision = -1;
 
   /// One scroll controller per row, for the parallax effect.
@@ -114,10 +118,12 @@ class _ExploreTabState extends State<ExploreTab> {
     final dupes = findDuplicates(await c.db.fingerprints())
         .where((d) => !d.allExtrasHidden)
         .toList();
+    final bursts = findBursts(await c.db.groupShots());
     if (mounted) {
       setState(() {
         _counts = counts;
         _dupes = dupes;
+        _bursts = bursts;
       });
     }
   }
@@ -180,27 +186,36 @@ class _ExploreTabState extends State<ExploreTab> {
             ),
           )
         else ...[
-          if (_dupes.isNotEmpty)
+          if (_dupes.isNotEmpty || _bursts.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: Card(
-                  clipBehavior: Clip.antiAlias,
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Theme.of(context).colorScheme.tertiaryContainer,
-                      child: const Icon(Icons.auto_delete_outlined),
+                child: SectionCard.rows(rows: [
+                  if (_bursts.isNotEmpty)
+                    SectionRow(
+                      leading: const IconTile(icon: Icons.auto_awesome_rounded, color: Color(0xFFFF9F0A)),
+                      title: 'Best group shots',
+                      subtitle: '${_bursts.length} ${_bursts.length == 1 ? 'moment' : 'moments'} · '
+                          'everyone\'s eyes open',
+                      chevron: true,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => BestShotsScreen(controller: c)),
+                      ).then((_) => _load()),
                     ),
-                    title: const Text('Clean up duplicates'),
-                    subtitle: Text('${_dupes.length} sets · '
-                        '${_dupes.fold<int>(0, (n, d) => n + d.photos.length - 1)} extra photos'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => DuplicatesScreen(controller: c)),
-                    ).then((_) => _load()),
-                  ),
-                ),
+                  if (_dupes.isNotEmpty)
+                    SectionRow(
+                      leading: const IconTile(icon: Icons.auto_delete_rounded, color: Color(0xFF5E5CE6)),
+                      title: 'Clean up duplicates',
+                      subtitle: '${_dupes.length} sets · '
+                          '${_dupes.fold<int>(0, (n, d) => n + d.photos.length - 1)} extra photos',
+                      chevron: true,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => DuplicatesScreen(controller: c)),
+                      ).then((_) => _load()),
+                    ),
+                ]),
               ).animate().fadeIn().moveY(begin: -8),
             ),
           ..._section(context, 'People', [
@@ -243,11 +258,11 @@ class _ExploreTabState extends State<ExploreTab> {
     return [
       SliverToBoxAdapter(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 10),
           child: Text(title,
               style: Theme.of(context)
                   .textTheme
-                  .titleMedium
+                  .titleLarge
                   ?.copyWith(fontWeight: FontWeight.w700)),
         ),
       ),
@@ -429,75 +444,72 @@ class _CategoryCardState extends State<_CategoryCard>
 
   Widget _front() {
     final screen = MediaQuery.sizeOf(context).width;
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    // The cover on top, the name and count underneath on a quiet card.
     return ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: Material(
-          child: InkWell(
-            onTap: () => widget.onTap(_covers[_i]),
-            onLongPress: _toggleFlip,
-            child: Stack(fit: StackFit.expand, children: [
-              // Parallax: the image drifts opposite to the row's scroll.
-              AnimatedBuilder(
-                animation: widget.scroll,
-                builder: (context, child) {
-                  final offset = widget.scroll.hasClients ? widget.scroll.offset : 0.0;
-                  final centre = _rowPad +
-                      widget.index * (_cardWidth + _cardGap) +
-                      _cardWidth / 2 -
-                      offset;
-                  final shift = ((centre - screen / 2) / screen).clamp(-1.0, 1.0) * -22;
-                  return Transform.translate(offset: Offset(shift, 0), child: child);
-                },
-                child: Hero(
-                  // Flies into the category page's header when opened.
-                  tag: 'cat-${widget.tag}',
-                  child: Transform.scale(
-                    scale: 1.35,
-                    child: AnimatedSwitcher(
-                      duration: 900.ms,
-                      child: KeyedSubtree(
-                        key: ValueKey(_covers[_i]),
-                        child: AssetThumb(id: _covers[_i], size: 300)
-                            .animate()
-                            .scaleXY(begin: 1, end: 1.12, duration: 5000.ms),
+      borderRadius: BorderRadius.circular(22),
+      child: Material(
+        color: dark ? const Color(0xC71C1C1F) : const Color(0xD9FFFFFF),
+        child: InkWell(
+          onTap: () => widget.onTap(_covers[_i]),
+          onLongPress: _toggleFlip,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Stack(fit: StackFit.expand, children: [
+                ClipRect(
+                  child: AnimatedBuilder(
+                    // Parallax: the image drifts opposite to the row's scroll.
+                    animation: widget.scroll,
+                    builder: (context, child) {
+                      final offset = widget.scroll.hasClients ? widget.scroll.offset : 0.0;
+                      final centre = _rowPad + widget.index * (_cardWidth + _cardGap) + _cardWidth / 2 - offset;
+                      final shift = ((centre - screen / 2) / screen).clamp(-1.0, 1.0) * -22;
+                      return Transform.translate(offset: Offset(shift, 0), child: child);
+                    },
+                    child: Hero(
+                      // Flies into the category page's header when opened.
+                      tag: 'cat-${widget.tag}',
+                      child: Transform.scale(
+                        scale: 1.35,
+                        child: AnimatedSwitcher(
+                          duration: 900.ms,
+                          child: KeyedSubtree(
+                            key: ValueKey(_covers[_i]),
+                            child: AssetThumb(id: _covers[_i], size: 300)
+                                .animate()
+                                .scaleXY(begin: 1, end: 1.12, duration: 5000.ms),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black87],
-                    stops: [0.4, 1],
+                Positioned(
+                  left: 10,
+                  top: 10,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(color: Colors.black.withAlpha(80), borderRadius: BorderRadius.circular(10)),
+                    child: Icon(widget.icon, color: Colors.white, size: 18),
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Icon(widget.icon, color: Colors.white, size: 22),
-                    const SizedBox(height: 4),
-                    Text(widget.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15)),
-                    Text('${widget.count} photos',
-                        style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                  ],
-                ),
-              ),
-            ]),
-          ),
+              ]),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 10, 10),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(widget.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                Text('${widget.count} photos', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
+              ]),
+            ),
+          ]),
         ),
+      ),
     );
   }
 }
@@ -588,6 +600,11 @@ String categoryTitle(String tag) =>
     _people[tag]?.$1 ??
     _types[tag]?.$1 ??
     (tag.startsWith(labelPrefix) ? tag.substring(labelPrefix.length) : tag);
+
+/// The built-in categories (not scene labels), tag -> title.
+Map<String, String> get builtInCategories => {
+      for (final e in {..._people, ..._types}.entries) e.key: e.value.$1,
+    };
 
 IconData categoryIcon(String tag) =>
     _people[tag]?.$2 ??

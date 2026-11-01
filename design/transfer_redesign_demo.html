@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShareBro · Sending and receiving</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block">
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { background:#050407; }
+  body { color:#F2F1F5; font-family:Roboto, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing:antialiased; min-height:100vh;
+         display:flex; flex-wrap:wrap; gap:36px; justify-content:center; align-items:flex-start; padding:24px 16px 48px; }
+  button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+  .i { display:inline-block; flex:none; font-family:'Material Symbols Rounded'; font-weight:400; font-style:normal; line-height:1; white-space:nowrap;
+       font-feature-settings:'liga'; font-variation-settings:'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; width:1em; height:1em; overflow:hidden; }
+  .i.fill { font-variation-settings:'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+
+  .side { width:340px; max-width:100%; }
+  .side h1 { font-size:24px; font-weight:800; letter-spacing:-.5px; }
+  .side .lead { color:rgba(242,241,245,.65); font-size:13.5px; line-height:1.6; margin-top:6px; }
+  .side h4 { font-size:11.5px; letter-spacing:1.2px; text-transform:uppercase; color:rgba(242,241,245,.42); margin:22px 0 10px; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chips button { padding:8px 13px; border-radius:999px; border:1px solid rgba(255,255,255,.13); font-size:12.5px; background:rgba(255,255,255,.04); }
+  .chips button.on { background:#F2F1F5; color:#111; border-color:#F2F1F5; font-weight:700; }
+  .chips button.go { background:#FF8A6B; color:#2A0D06; border-color:#FF8A6B; font-weight:700; }
+  .tips { list-style:none; display:grid; gap:8px; }
+  .tips li { font-size:12.8px; color:rgba(242,241,245,.65); line-height:1.5; padding-left:16px; position:relative; }
+  .tips li::before { content:''; position:absolute; left:2px; top:8px; width:5px; height:5px; border-radius:50%; background:#FF8A6B; }
+  .tips b { color:#F2F1F5; font-weight:600; }
+
+  .stage { position:relative; flex:none; }
+  .phone { position:absolute; width:412px; height:892px; transform-origin:0 0; border-radius:54px; overflow:hidden; isolation:isolate; user-select:none;
+           box-shadow:0 0 0 11px #0c0a0e, 0 0 0 12px rgba(255,255,255,.09), 0 50px 140px rgba(110,26,98,.32);
+           --card:rgba(28,28,31,.78); --fill:rgba(118,118,128,.24); --l2:rgba(235,235,245,.62); --l3:rgba(235,235,245,.32); --sep:rgba(84,84,88,.55);
+           --g:#FF8A6B; --onG:#2A0D06; --err:#FF453A; --glass:rgba(36,34,42,.55); --glassb:rgba(255,255,255,.14); background:#050309; color:#F2EFF5; }
+  .aur { position:absolute; inset:-10%; z-index:0; }
+  .aur b { position:absolute; width:80%; height:55%; border-radius:50%; filter:blur(55px); animation:drift 24s ease-in-out infinite alternate; }
+  .aur b:nth-child(1) { left:-18%; top:-6%; background:radial-gradient(#8E1F3E 0, transparent 68%); }
+  .aur b:nth-child(2) { left:42%; top:10%; background:radial-gradient(#6E1A62 0, transparent 68%); animation-delay:-7s; }
+  .aur b:nth-child(3) { left:-20%; top:48%; background:radial-gradient(#3A27A6 0, transparent 68%); animation-delay:-12s; }
+  .aur b:nth-child(4) { left:40%; top:68%; background:radial-gradient(#0C6A6E 0, transparent 68%); animation-delay:-3s; }
+  @keyframes drift { 50% { transform:translate(9%,6%) scale(1.12); } 100% { transform:translate(-7%,-5%) scale(.95); } }
+  .veil { position:absolute; inset:0; z-index:1; background:radial-gradient(120% 85% at 50% 35%, rgba(5,3,9,.25), rgba(5,3,9,.82)); }
+  .sbar { position:absolute; left:0; right:0; top:0; height:46px; z-index:20; display:flex; justify-content:space-between; padding:15px 30px 0; font-size:15px; font-weight:600; }
+  .cam { position:absolute; top:12px; left:50%; width:20px; height:20px; margin-left:-10px; border-radius:50%; background:#000; z-index:21; }
+  .home { position:absolute; bottom:8px; left:50%; width:124px; height:4px; margin-left:-62px; border-radius:2px; background:#fff; opacity:.8; z-index:21; }
+  .scr { position:absolute; inset:0; z-index:2; padding:46px 16px 0; display:flex; flex-direction:column; overflow-y:auto; scrollbar-width:none; }
+  .scr::-webkit-scrollbar { display:none; }
+  .scr.in > * { animation:rise .45s cubic-bezier(.2,.9,.3,1) both; }
+  .scr.in > *:nth-child(2) { animation-delay:.03s } .scr.in > *:nth-child(3) { animation-delay:.06s } .scr.in > *:nth-child(n+4) { animation-delay:.09s }
+  @keyframes rise { from { opacity:0; transform:translateY(12px); } }
+  .nav { display:flex; align-items:center; justify-content:space-between; min-height:48px; flex:none; }
+  .back, .tcap button { width:44px; height:44px; display:grid; place-items:center; }
+  .back { border-radius:50%; background:var(--glass); border:1px solid var(--glassb); }
+  .tcap { display:flex; border-radius:24px; background:var(--glass); border:1px solid var(--glassb); }
+  .ttl { font-size:30px; font-weight:800; letter-spacing:-.7px; margin:6px 4px 0; flex:none; }
+  .sub { font-size:14px; color:var(--l2); margin:2px 4px 0; flex:none; }
+  .card { background:var(--card); border-radius:26px; border:1px solid rgba(255,255,255,.055); position:relative; overflow:hidden; flex:none; }
+  .sh2 { display:flex; justify-content:space-between; align-items:center; margin:24px 4px 8px; flex:none; }
+  .sh2 h3 { font-size:20px; font-weight:700; letter-spacing:-.3px; }
+  .foot { font-size:13px; color:var(--l2); margin:8px 16px 0; line-height:1.4; flex:none; }
+
+  /* Stage */
+  .stagecard { margin-top:14px; height:226px; }
+  .stagecard svg.arc { position:absolute; inset:0; }
+  .arcpath { fill:none; stroke-width:2.5; stroke-linecap:round; stroke-dasharray:3 9; transition:stroke .4s; }
+  .flow .arcpath { animation:march .6s linear infinite; }
+  .ask .arcpath { animation:march 1.6s linear infinite; }
+  .done .arcpath { stroke-dasharray:none; }
+  @keyframes march { to { stroke-dashoffset:-12; } }
+  .dev { position:absolute; width:120px; margin-left:-60px; text-align:center; }
+  .dev .av { width:72px; height:72px; margin:0 auto; border-radius:50%; display:grid; place-items:center; color:#fff; background:var(--c); position:relative; transition:background .4s, transform .3s; }
+  .dev .av::after { content:''; position:absolute; inset:-7px; border-radius:50%; border:2px solid var(--c); opacity:0; }
+  .flow .dev.me .av::after { animation:breathe 1.6s ease-out infinite; }
+  @keyframes breathe { from { transform:scale(.95); opacity:.7; } to { transform:scale(1.35); opacity:0; } }
+  .dev b { display:block; font-size:13.5px; font-weight:700; margin-top:9px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .dev small { font-size:12px; color:var(--l2); }
+  .dev.off .av { background:#3A3A40; color:rgba(255,255,255,.5); }
+  .radar { position:absolute; left:50%; top:36px; width:72px; height:72px; margin:-36px; border-radius:50%; border:2px solid var(--g); opacity:0; pointer-events:none; }
+  .wait .radar { animation:rad 2.4s ease-out infinite; } .wait .radar.r2 { animation-delay:.8s; } .wait .radar.r3 { animation-delay:1.6s; }
+  @keyframes rad { from { transform:scale(1); opacity:.7; } to { transform:scale(2.2); opacity:0; } }
+  .bump { animation:bump .45s cubic-bezier(.3,1.8,.5,1); }
+  @keyframes bump { 40% { transform:scale(1.14); } }
+  .bubble { position:absolute; display:flex; align-items:center; gap:6px; padding:8px 12px; border-radius:16px; background:#000; font-size:12.5px; font-weight:700; white-space:nowrap;
+            transform:translateX(-50%); animation:bob 1.6s ease-in-out infinite; }
+  .bubble .i { color:var(--g); }
+  .bubble::after { content:''; position:absolute; left:50%; bottom:-5px; width:10px; height:10px; margin-left:-5px; background:#000; transform:rotate(45deg); border-radius:2px; }
+  @keyframes bob { 50% { transform:translate(-50%, -4px); } }
+  .tok { position:absolute; width:40px; height:40px; margin:-20px; border-radius:11px; background:var(--c); border:2.5px solid #fff; box-shadow:0 6px 14px rgba(0,0,0,.4); pointer-events:none; }
+  .tok.file { background:#2C2C30; display:grid; place-items:center; font-size:9px; font-weight:800; color:#fff; }
+  .dot { position:absolute; width:8px; height:8px; margin:-4px; border-radius:50%; pointer-events:none; }
+  .phasechip { position:absolute; left:50%; top:14px; transform:translateX(-50%); font-size:13px; font-weight:600; color:var(--l2); white-space:nowrap; display:flex; align-items:center; gap:6px; }
+  .phasechip .i { color:var(--g); }
+  .failed .phasechip, .failed .phasechip .i { color:var(--err); }
+
+  /* Numbers */
+  .big { display:flex; align-items:baseline; justify-content:center; gap:2px; margin-top:10px; flex:none; }
+  .big b { font-size:50px; font-weight:800; letter-spacing:-2.5px; color:var(--g); font-variant-numeric:tabular-nums; }
+  .big span { font-size:24px; font-weight:700; color:var(--l2); }
+  .bar { height:8px; border-radius:4px; background:var(--fill); margin:8px 24px 0; overflow:hidden; flex:none; }
+  .bar div { height:100%; width:0; border-radius:4px; background:var(--g); transition:width .35s; }
+  .failed .bar div { background:var(--err); }
+  .stats { display:grid; grid-template-columns:repeat(3, 1fr); margin-top:16px; }
+  .stat { padding:12px 6px 12px 14px; display:flex; flex-direction:column; gap:6px; position:relative; }
+  .stat + .stat::before { content:''; position:absolute; left:0; top:14px; bottom:14px; width:.5px; background:var(--sep); }
+  .stat .t { width:28px; height:28px; border-radius:8px; display:grid; place-items:center; color:#fff; background:var(--c); }
+  .stat b { font-size:19px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .stat small { font-size:12px; color:var(--l2); }
+
+  /* Files */
+  .files { margin-top:12px; padding:14px; }
+  .files .hd { display:flex; justify-content:space-between; } .files .hd b { font-size:16px; } .files .hd small { font-size:13px; color:var(--l2); }
+  .mosaic { display:grid; grid-template-columns:repeat(6, 1fr); gap:6px; margin-top:10px; }
+  .tile { aspect-ratio:1; border-radius:10px; background:var(--c); position:relative; opacity:.35; transition:opacity .3s, transform .3s; }
+  .tile.file { background:#2C2C30; display:grid; place-items:center; font-size:9px; font-weight:800; }
+  .tile.got { opacity:1; }
+  .tile.got::after { content:'check'; font-family:'Material Symbols Rounded'; font-size:13px; position:absolute; right:-4px; top:-4px; width:18px; height:18px; border-radius:50%;
+                     display:grid; place-items:center; background:var(--g); color:var(--onG); border:2px solid #1C1C1F; animation:pop .35s cubic-bezier(.3,1.8,.5,1); }
+  @keyframes pop { from { transform:scale(0); } }
+  .btns { display:flex; gap:10px; margin:auto 0 28px; padding-top:12px; flex:none; }
+  .btns button { flex:1; height:50px; border-radius:25px; font-size:16px; font-weight:700; background:var(--fill); display:flex; align-items:center; justify-content:center; gap:8px; }
+  .btns .main { background:var(--g); color:var(--onG); }
+
+  /* Sending list */
+  .row { display:flex; align-items:center; gap:14px; min-height:60px; padding:10px 16px; position:relative; }
+  .row + .row::before { content:''; position:absolute; top:0; right:0; left:66px; height:.5px; background:var(--sep); }
+  .row .mid { flex:1; min-width:0; } .row b { display:block; font-size:16px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row small { display:block; font-size:13px; color:var(--l2); margin-top:1px; }
+  .row small.on { color:var(--g); font-weight:600; } .row small.bad { color:var(--err); font-weight:600; }
+  .tilei { width:36px; height:36px; border-radius:11px; display:grid; place-items:center; color:#fff; background:var(--c); flex:none; }
+  .ring { width:40px; height:40px; position:relative; flex:none; }
+  .ring svg { transform:rotate(-90deg); } .ring circle { fill:none; stroke-width:3.5; } .ring .tr { stroke:var(--fill); } .ring .fg { stroke:var(--g); stroke-linecap:round; transition:stroke-dashoffset .4s; }
+  .ring .av { position:absolute; inset:5px; border-radius:50%; display:grid; place-items:center; color:#fff; background:var(--c); }
+  .ring.spin svg { animation:spin 1s linear infinite; } @keyframes spin { from { transform:rotate(-90deg); } to { transform:rotate(270deg); } }
+  .sw { width:51px; height:31px; border-radius:16px; background:var(--fill); position:relative; flex:none; transition:background .25s; cursor:pointer; }
+  .sw i { position:absolute; left:2px; top:2px; width:27px; height:27px; border-radius:50%; background:#fff; transition:transform .35s cubic-bezier(.3,1.3,.5,1); }
+  .sw.on { background:var(--g); } .sw.on i { transform:translateX(20px); }
+  .everyone { padding:16px; }
+  .everyone .top { display:flex; gap:12px; align-items:flex-start; }
+  .everyone b { font-size:16.5px; font-weight:700; display:block; } .everyone p { font-size:13px; color:var(--l2); line-height:1.4; margin-top:2px; }
+  .pill { height:46px; border-radius:23px; background:var(--g); color:var(--onG); font-weight:700; font-size:15px; display:flex; align-items:center; justify-content:center; gap:8px; margin-top:14px; width:100%; }
+  .empty { position:relative; height:250px; margin-top:24px; flex:none; }
+  .empty .a, .empty .b { position:absolute; top:120px; width:64px; height:64px; margin:-32px; border-radius:50%; display:grid; place-items:center; color:#fff; }
+  .empty .a { left:90px; background:var(--g); color:var(--onG); } .empty .b { left:290px; background:#6E5BFF; }
+  .empty svg { position:absolute; inset:0; } .empty path { fill:none; stroke:var(--l3); stroke-width:2; stroke-dasharray:3 9; stroke-linecap:round; animation:march 1.2s linear infinite; }
+  .empty .plane { position:absolute; color:var(--g); offset-path:path('M 90 120 Q 190 10 290 120'); animation:fly 3.2s cubic-bezier(.45,0,.55,1) infinite; }
+  @keyframes fly { 0% { offset-distance:0%; opacity:0; } 15% { opacity:1; } 85% { opacity:1; } 100% { offset-distance:100%; opacity:0; } }
+  .empty p { position:absolute; left:0; right:0; top:178px; text-align:center; } .empty p b { display:block; font-size:17px; } .empty p span { font-size:13.5px; color:var(--l2); line-height:1.45; display:block; margin:4px 24px 0; }
+</style>
+</head>
+<body>
+<aside class="side">
+  <h1>Sending & receiving · new style</h1>
+  <p class="lead">The live transfer screens and the Sending list redone in the flat look. The two-phones animation stays (it's good); everything around it now matches the rest of the app.</p>
+  <h4>Screen</h4>
+  <div class="chips" id="screens"><button data-s="send">Sending</button><button data-s="recv">Receiving</button><button data-s="list">Sending list</button><button data-s="empty">List · empty</button></div>
+  <h4>Stage</h4>
+  <div class="chips" id="phases"><button class="go" data-p="play">▶ Play a whole transfer</button><button data-p="wait">Waiting for device</button><button data-p="ask">Waiting to accept</button><button data-p="flow">Sending</button><button data-p="done">Done</button><button data-p="failed">Failed</button></div>
+  <h4>What's new</h4>
+  <ul class="tips">
+    <li><b>Same stage, new look:</b> both phones are flat circles (you in the accent, them in their device colour), joined by a marching dashed arc. Photos fly across it and their phone bumps as each one lands.</li>
+    <li><b>Clear stage line:</b> one line under the phones says what's happening: looking for the phone, waiting for them to accept, sending, done, or why it failed.</li>
+    <li><b>Finished:</b> their phone turns accent with a tick, the arc goes solid and flat dots burst out (accent, not green).</li>
+    <li><b>Numbers:</b> a big rolling percent, a flat progress bar, then a stats card (speed, time left, files) like the scan screen.</li>
+    <li><b>Files card:</b> every photo or file as a tile that lights up with an accent tick as it arrives.</li>
+    <li><b>Sending list:</b> big title, a "Send to everyone" card with one accent button, Receive as a Settings-style switch row, and live transfers as rows with progress rings. When nothing's sending, a small flat animation of a paper plane flying between two phones.</li>
+  </ul>
+</aside>
+
+<div class="stage" id="stage">
+  <div class="phone" id="phone">
+    <div class="aur"><b></b><b></b><b></b><b></b></div><div class="veil"></div>
+    <div class="scr" id="scr"></div>
+    <div class="sbar"><span>3:08</span><span>●●● ▮</span></div><div class="cam"></div><div class="home"></div>
+  </div>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const ic = (n, s = 20, c = '') => `<span class="i ${c}" style="font-size:${s}px">${n}</span>`;
+const PH = ['#C98B6B', '#7E9BB3', '#D2AE74', '#8FA77F', '#B88596', '#9C8CC4', '#CF9461', '#6FA8A0', '#C27C7C'];
+const FILES = Array.from({ length: 12 }, (_, k) => k === 9 ? { file: 'PDF' } : { c: PH[k % 9] });
+const phone = $('#phone'), scr = $('#scr');
+let scale = 1, screen = 'send', phase = 'flow', pct = .42, got = 5, raf = 0, run = 0, toks = [];
+
+const A = { x: 82, y: 132 }, B = { x: 298, y: 132 }, C = { x: 190, y: 26 };
+const at = t => { const u = 1 - t; return { x: A.x * u * u + C.x * 2 * u * t + B.x * t * t, y: A.y * u * u + C.y * 2 * u * t + B.y * t * t }; };
+
+function stageHTML(recv) {
+  const me = `<div class="dev me" style="left:${recv ? B.x : A.x}px;top:${A.y - 36}px;--c:var(--g)"><div class="av" style="color:var(--onG)">${ic('smartphone', 30)}</div><b>You</b><small>Pixel 7 Pro</small></div>`;
+  const themName = recv ? 'Energetic Avocado' : "Maya's Pixel";
+  const them = `<div class="dev them ${phase === 'wait' ? 'off' : ''}" id="them" style="left:${recv ? A.x : B.x}px;top:${A.y - 36}px;--c:${phase === 'done' ? 'var(--g)' : phase === 'failed' ? 'var(--err)' : recv ? '#6E5BFF' : '#E0684E'}">
+      <div class="radar"></div><div class="radar r2"></div><div class="radar r3"></div>
+      <div class="av" id="themav" style="${phase === 'done' ? 'color:var(--onG)' : ''}">${ic(phase === 'done' ? 'check' : phase === 'failed' ? 'close' : recv ? 'computer' : 'smartphone', phase === 'done' || phase === 'failed' ? 36 : 30)}</div><b>${themName}</b><small>${recv ? 'Windows' : 'Pixel 8'}</small></div>`;
+  const stroke = phase === 'done' ? 'var(--g)' : phase === 'failed' ? 'var(--err)' : phase === 'wait' ? 'var(--l3)' : 'var(--g)';
+  const line = { wait: ['wifi_tethering', `Looking for ${themName}…`], ask: ['touch_app', recv ? 'Tap Accept to start' : `Waiting for ${themName.split("'")[0]} to accept`], flow: ['send', recv ? 'Receiving' : 'Sending'], done: ['check_circle', recv ? 'All saved to the ShareBro album' : 'Sent'], failed: ['error', `${themName.split("'")[0]} declined`] }[phase];
+  return `<div class="card stagecard ${phase}" id="stagecard"><svg class="arc" viewBox="0 0 380 226"><path class="arcpath" style="stroke:${stroke}" d="M ${A.x} ${A.y} Q ${C.x} ${C.y} ${B.x} ${B.y}"/></svg>${me}${them}
+    ${phase === 'ask' ? `<div class="bubble" style="left:${recv ? A.x : B.x}px;top:48px">${ic('touch_app', 16, 'fill')}${recv ? 'Accept?' : 'Accept?'}</div>` : ''}
+    <div class="phasechip">${ic(line[0], 17, 'fill')}${line[1]}</div></div>`;
+}
+function transferHTML(recv) {
+  const shown = phase === 'done' ? 1 : phase === 'flow' ? pct : 0;
+  return `<div class="nav"><button class="back">${ic('arrow_back', 22)}</button>${recv ? '' : `<div class="tcap"><button>${ic('more_horiz', 21)}</button></div>`}</div>
+    <h1 class="ttl">${recv ? 'Receiving' : 'Sending'}</h1><p class="sub">${recv ? '12 photos from Energetic Avocado' : "12 photos to Maya's Pixel"}</p>
+    <div class="${phase}" style="display:contents">${stageHTML(recv)}
+    <div class="big"><b id="pct">${Math.round(shown * 100)}</b><span>%</span></div>
+    <div class="bar"><div id="bar" style="width:${shown * 100}%"></div></div></div>
+    <div class="card stats">
+      <div class="stat"><span class="t" style="--c:#30B0C7">${ic('speed', 17, 'fill')}</span><b id="speed">${phase === 'flow' ? '12.4 MB/s' : '–'}</b><small>speed</small></div>
+      <div class="stat"><span class="t" style="--c:#5E5CE6">${ic('schedule', 17, 'fill')}</span><b id="left">${phase === 'flow' ? Math.max(1, Math.round((1 - pct) * 14)) + ' s' : phase === 'done' ? 'Done' : '–'}</b><small>left</small></div>
+      <div class="stat"><span class="t" style="--c:#FF9F0A">${ic('photo_library', 17, 'fill')}</span><b id="nfiles">${phase === 'done' ? 12 : phase === 'flow' ? got : 0} of 12</b><small>${recv ? 'received' : 'sent'}</small></div>
+    </div>
+    <div class="card files"><div class="hd"><b>${recv ? 'Arriving' : 'Files'}</b><small>48.2 MB</small></div>
+      <div class="mosaic" id="mosaic">${FILES.map((f, k) => `<div class="tile ${f.file ? 'file' : ''} ${phase === 'done' || (phase === 'flow' && k < got) ? 'got' : ''}" style="--c:${f.c || ''}">${f.file || ''}</div>`).join('')}</div></div>
+    ${phase === 'failed' ? `<p class="foot">Maya tapped Decline. You can try again, or send a link instead.</p>` : recv ? `<p class="foot">Photos go to the ShareBro album and are scanned for faces.</p>` : ''}
+    <div class="btns">${phase === 'done' ? `<button>${recv ? 'Close' : 'Send more'}</button><button class="main">${recv ? ic('photo_album', 20) + 'Open album' : 'Done'}</button>`
+      : phase === 'failed' ? `<button>Close</button><button class="main">${ic('refresh', 20)}Try again</button>`
+      : `<button>${ic('close', 20)}${recv ? 'Stop' : 'Cancel'}</button>`}</div>`;
+}
+function listHTML(empty) {
+  const rows = empty ? '' : `
+    <div class="sh2"><h3>Now</h3></div>
+    <div class="card">
+      <div class="row"><div class="ring"><svg viewBox="0 0 40 40" width="40" height="40"><circle class="tr" cx="20" cy="20" r="17"/><circle class="fg" id="lring" cx="20" cy="20" r="17" stroke-dasharray="106.8" stroke-dashoffset="${106.8 * (1 - pct)}"/></svg><span class="av" style="--c:#E0684E">${ic('smartphone', 16)}</span></div>
+        <div class="mid"><b>12 photos → Maya's Pixel</b><small class="on" id="lsub">Sending ${Math.round(pct * 100)}% · 12.4 MB/s</small></div>${ic('chevron_right', 20)}</div>
+      <div class="row"><div class="ring spin"><svg viewBox="0 0 40 40" width="40" height="40"><circle class="tr" cx="20" cy="20" r="17"/><circle class="fg" cx="20" cy="20" r="17" stroke-dasharray="106.8" stroke-dashoffset="80"/></svg><span class="av" style="--c:#1F9E92">${ic('bluetooth', 16)}</span></div>
+        <div class="mid"><b>Itinerary.pdf → Ravi's Galaxy</b><small>Waiting for the phone to be nearby</small></div>${ic('chevron_right', 20)}</div>
+    </div>
+    <div class="sh2"><h3>Earlier</h3><button style="color:var(--g);font-weight:600;font-size:15px">Clear</button></div>
+    <div class="card">
+      <div class="row"><span class="tilei" style="--c:var(--g);color:var(--onG)">${ic('check', 20)}</span><div class="mid"><b>8 photos → Energetic Avocado</b><small>Sent · 2:41 PM</small></div></div>
+      <div class="row"><span class="tilei" style="--c:var(--err)">${ic('close', 20)}</span><div class="mid"><b>3 files → Studio Mac</b><small class="bad">Declined · tap to try again</small></div>${ic('refresh', 20)}</div>
+    </div>`;
+  return `<div class="nav"><button class="back">${ic('arrow_back', 22)}</button><div class="tcap"><button>${ic('history', 21)}</button></div></div>
+    <h1 class="ttl">Sending</h1>
+    <div class="card everyone" style="margin-top:16px"><div class="top"><span class="tilei" style="--c:#5E5CE6">${ic('groups', 20, 'fill')}</span><div><b>Send to everyone</b><p>Every named friend whose phone you've paired gets the photos they don't have yet. Friends who aren't nearby wait in the queue.</p></div></div>
+      <button class="pill">${ic('send', 18)}Send new photos to everyone</button></div>
+    <div class="card" style="margin-top:12px"><div class="row"><span class="tilei" style="--c:#30B0C7">${ic('download', 20)}</span><div class="mid"><b>Receive</b><small>Let friends send you photos and files</small></div><span class="sw on" onclick="this.classList.toggle('on')"><i></i></span></div></div>
+    ${empty ? `<div class="empty"><svg viewBox="0 0 380 250"><path d="M 90 120 Q 190 10 290 120"/></svg><span class="a">${ic('smartphone', 28)}</span><span class="b">${ic('computer', 28)}</span><span class="plane">${ic('send', 26, 'fill')}</span>
+      <p><b>Nothing sending right now</b><span>Pick something in the Share tab, or open a person and tap Send.</span></p></div>` : rows}`;
+}
+
+function render(animate = true) {
+  cancelAnimationFrame(raf); toks.forEach(t => t.remove()); toks = [];
+  const recv = screen === 'recv';
+  scr.innerHTML = screen === 'list' ? listHTML(false) : screen === 'empty' ? listHTML(true) : transferHTML(recv);
+  scr.classList.remove('in'); if (animate) { void scr.offsetWidth; scr.classList.add('in'); }
+  $$('#screens button').forEach(b => b.classList.toggle('on', b.dataset.s === screen));
+  $$('#phases button').forEach(b => b.classList.toggle('on', b.dataset.p === phase));
+  if (phase === 'flow' && (screen === 'send' || screen === 'recv')) startTokens(recv);
+  if (phase === 'done' && (screen === 'send' || screen === 'recv')) burst(recv);
+}
+/* Files flying along the arc. */
+function startTokens(recv) {
+  const card = $('#stagecard');
+  for (let k = 0; k < 3; k++) {
+    const t = document.createElement('div'); const f = FILES[(got + k) % 12];
+    t.className = 'tok' + (f.file ? ' file' : ''); t.style.setProperty('--c', f.c || ''); t.textContent = f.file || '';
+    card.appendChild(t); toks.push(t);
+  }
+  const t0 = performance.now();
+  const loop = now => {
+    const v = ((now - t0) / 1800) % 1;
+    toks.forEach((el, k) => {
+      const tt = (v + k / 3) % 1, p = at(recv ? 1 - tt : tt), s = Math.sin(tt * Math.PI);
+      el.style.transform = `translate(${p.x}px, ${p.y}px) rotate(${(tt - .5) * (recv ? -34 : 34)}deg) scale(${.55 + .55 * s})`;
+      el.style.left = '0'; el.style.top = '0'; el.style.opacity = Math.min(1, s * 1.4);
+    });
+    raf = requestAnimationFrame(loop);
+  };
+  raf = requestAnimationFrame(loop);
+}
+function burst(recv) {
+  const card = $('#stagecard'), c = recv ? A : B;
+  for (let k = 0; k < 22; k++) {
+    const d = document.createElement('i'); d.className = 'dot'; d.style.background = ['#FF8A6B', '#FFD60A', '#5E5CE6', '#30B0C7', '#34C759'][k % 5];
+    d.style.left = c.x + 'px'; d.style.top = c.y + 'px'; card.appendChild(d);
+    const a = k / 22 * Math.PI * 2, r = 60 + Math.random() * 40;
+    d.animate([{ transform: 'translate(0,0) scale(1)', opacity: 1 }, { transform: `translate(${Math.cos(a) * r}px,${Math.sin(a) * r}px) scale(.4)`, opacity: 0 }], { duration: 900, delay: 150, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'both' }).finished.then(() => d.remove());
+  }
+  $('#themav')?.animate([{ transform: 'scale(.6)' }, { transform: 'scale(1.15)' }, { transform: 'scale(1)' }], { duration: 600, easing: 'cubic-bezier(.3,1.6,.5,1)' });
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function play() {
+  const id = ++run; if (screen === 'list' || screen === 'empty') screen = 'send';
+  phase = 'wait'; pct = 0; got = 0; render(); await wait(2200); if (id !== run) return;
+  phase = 'ask'; render(false); await wait(2000); if (id !== run) return;
+  phase = 'flow'; render(false);
+  while (pct < 1 && id === run) {
+    await wait(120); pct = Math.min(1, pct + .012 + Math.random() * .01);
+    const n = Math.floor(pct * 12);
+    if (n > got) { got = n; $$('#mosaic .tile').forEach((t, k) => t.classList.toggle('got', k < got)); const av = $('#themav'); av?.classList.remove('bump'); void av?.offsetWidth; av?.classList.add('bump'); }
+    $('#pct').textContent = Math.round(pct * 100); $('#bar').style.width = pct * 100 + '%';
+    $('#left').textContent = Math.max(1, Math.round((1 - pct) * 14)) + ' s'; $('#nfiles').textContent = got + ' of 12';
+  }
+  if (id !== run) return;
+  phase = 'done'; render(false);
+}
+document.addEventListener('click', e => {
+  const s = e.target.closest('[data-s]'); if (s) { run++; screen = s.dataset.s; if (phase === 'wait' || phase === 'ask') phase = 'flow'; pct = .42; got = 5; render(); return; }
+  const p = e.target.closest('[data-p]'); if (!p) return;
+  if (p.dataset.p === 'play') return play();
+  run++; phase = p.dataset.p; pct = .42; got = 5; if (screen === 'list' || screen === 'empty') screen = 'send'; render();
+});
+function fit() {
+  const avail = Math.min(window.innerHeight - 48, 900) / 916, w = Math.min(window.innerWidth - 32, 460) / 436;
+  scale = Math.max(.5, Math.min(1, avail, w));
+  const s = $('#stage'); s.style.width = 436 * scale + 'px'; s.style.height = 916 * scale + 'px';
+  Object.assign(phone.style, { transform: `scale(${scale})`, left: 12 * scale + 'px', top: 12 * scale + 'px' });
+}
+window.addEventListener('resize', fit);
+fit(); document.fonts.ready.then(() => render());
+</script>
+</body>
+</html>
