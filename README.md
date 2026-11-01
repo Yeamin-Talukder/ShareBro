@@ -190,7 +190,11 @@ lib/
 ├── share/      LocalSend protocol, sender, receiver, Nearby, web server, notifications
 └── ui/         screens and widgets (gallery, people, share, island, viewer…)
 android/app/src/main/kotlin/…   native helpers: files, trash, notifications
-assets/models/  MobileFaceNet face-recognition model (TensorFlow Lite)
+assets/models/  MobileFaceNet face-recognition model and a small male/female
+                classifier (gender_lite.tflite, MIT, from
+                github.com/shubham0204/Age-Gender_Estimation_TF-Android)
+                The Places "Real" map shows OpenStreetMap tiles
+                (© OpenStreetMap contributors) via flutter_map.
 design/         HTML design demos (backgrounds, notifications, premium look)
 docs/           logo and screenshots for this README
 test/           unit and widget tests

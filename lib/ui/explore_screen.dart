@@ -15,6 +15,7 @@ import 'duplicates_screen.dart';
 import 'gallery_view.dart';
 import 'glass.dart';
 import 'motion.dart';
+import 'places_screen.dart';
 import 'sections.dart';
 import 'widgets.dart';
 
@@ -87,6 +88,9 @@ class _ExploreTabState extends State<ExploreTab> {
   Map<String, ({int count, String cover})>? _counts;
   List<DuplicateSet> _dupes = const [];
   List<ShotBurst> _bursts = const [];
+
+  /// Photos with a location, for the Places map.
+  int _located = 0;
   int _loadedRevision = -1;
 
   /// One scroll controller per row, for the parallax effect.
@@ -119,8 +123,10 @@ class _ExploreTabState extends State<ExploreTab> {
         .where((d) => !d.allExtrasHidden)
         .toList();
     final bursts = findBursts(await c.db.groupShots());
+    final located = await c.db.locatedCount();
     if (mounted) {
       setState(() {
+        _located = located;
         _counts = counts;
         _dupes = dupes;
         _bursts = bursts;
@@ -186,11 +192,24 @@ class _ExploreTabState extends State<ExploreTab> {
             ),
           )
         else ...[
-          if (_dupes.isNotEmpty || _bursts.isNotEmpty)
+            // Places is always here, so the map is easy to find.
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                 child: SectionCard.rows(rows: [
+                    SectionRow(
+                      leading: const IconTile(icon: Icons.map_rounded, color: Color(0xFF34C759)),
+                      title: 'Places',
+                      subtitle: _located > 0
+                          ? '$_located photos on the map'
+                          : 'Your photos by where they were taken',
+
+                      chevron: true,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => PlacesScreen(controller: c)),
+                      ).then((_) => _load()),
+                    ),
                   if (_bursts.isNotEmpty)
                     SectionRow(
                       leading: const IconTile(icon: Icons.auto_awesome_rounded, color: Color(0xFFFF9F0A)),

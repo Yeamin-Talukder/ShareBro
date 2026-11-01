@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
+import '../data/db.dart';
 import '../scan/scan_controller.dart';
 import 'motion.dart';
 import 'aurora.dart';
@@ -26,6 +27,10 @@ class _ReviewScreenState extends State<ReviewScreen> {
   int _index = 0;
   final _cardKey = GlobalKey<_SwipeCardState>();
   final _nameField = TextEditingController();
+
+  /// While the name field has the keyboard, the card stays put: dragging
+  /// in the field moves the cursor instead of swiping the card away.
+  final _nameFocus = FocusNode();
   int _shakeName = 0;
 
   /// Yes/Save answers in a row; shown as a streak badge from 3.
@@ -34,12 +39,21 @@ class _ReviewScreenState extends State<ReviewScreen> {
   @override
   void initState() {
     super.initState();
+    _nameFocus.addListener(() => setState(() {}));
     _load();
   }
+
+  /// Answers saved since the screen opened. The rest of the app hears
+  /// about them once, on the way out: refreshing it after every card made
+  /// the People page reload (and re-count reviews) under the next card.
+  bool _dirty = false;
 
   @override
   void dispose() {
     _nameField.dispose();
+    _nameFocus.dispose();
+    // After this frame: the tree is locked while screens are disposed.
+    if (_dirty) Future.microtask(c.changed);
     super.dispose();
   }
 
@@ -60,59 +74,73 @@ class _ReviewScreenState extends State<ReviewScreen> {
   ReviewItem? get _current =>
       _items != null && _index < _items!.length ? _items![_index] : null;
 
-  /// Returns false to make the card spring back instead of leaving.
-  Future<bool> _decide(bool yes) async {
+  /// Starts saving the answer and returns the save, or null to make the
+  /// card spring back instead of leaving. The card flies off while the
+  /// save runs, so a slow database write never holds it in place.
+  Future<void>? _decide(bool yes) {
     final item = _current;
-    if (item == null) return false;
+    if (item == null) return null;
+    final Future<void> save;
     switch (item) {
       case GroupReview():
         if (yes) {
-          final name = _nameField.text.trim();
+          final name = AppDb.cleanName(_nameField.text);
           if (name.isEmpty) {
             Haptics.warn();
             setState(() => _shakeName++);
-            return false;
+            return null;
           }
-          await c.db.renamePerson(item.person.id, name);
+          save = c.db.renamePerson(item.person.id, name);
           if (!_names.contains(name)) _names = [..._names, name];
         } else {
-          await c.db.skipGroup(item.person.id);
+          save = c.db.skipGroup(item.person.id);
         }
       case FaceReview():
-        if (yes) {
-          await c.db.assignFace(item.faceId, item.person.id);
-        } else {
-          await c.db.markReviewed([item.faceId]);
-        }
+        save = yes
+            ? c.db.assignFace(item.faceId, item.person.id)
+            : c.db.markReviewed([item.faceId]);
       case MergeReview(:final a, :final b):
         if (yes) {
           // Keep whichever has a name.
           final (into, from) = a.name == null && b.name != null
               ? (b, a)
               : (a, b);
-          await c.db.mergePeople(into.id, [from.id]);
-          // Later cards may mention the merged-away person; reload the deck.
-          _reloadAfterCard = true;
+          save = c.db.mergePeople(into.id, [from.id]);
+          _mergedAway = from.id;
         } else {
-          await c.db.dismissPair(a.id, b.id);
+          save = c.db.dismissPair(a.id, b.id);
         }
     }
+    _dirty = true;
     yes ? Haptics.success() : Haptics.tick();
     setState(() => _streak = yes ? _streak + 1 : 0);
-    return true;
+    return save;
   }
 
-  bool _reloadAfterCard = false;
+  /// A person merged into someone else by the last card.
+  int? _mergedAway;
 
   void _next() {
     _nameField.clear();
-    c.changed();
-    if (_reloadAfterCard) {
-      _reloadAfterCard = false;
-      _load();
-      return;
-    }
-    setState(() => _index++);
+    setState(() {
+      final gone = _mergedAway;
+      if (gone != null) {
+        // Drop later cards about the merged-away person instead of
+        // rebuilding the whole deck (that compares every face again).
+        _mergedAway = null;
+        final rest = _items!
+            .sublist(_index + 1)
+            .where(
+              (i) => switch (i) {
+                MergeReview(:final a, :final b) => a.id != gone && b.id != gone,
+                GroupReview(:final person) ||
+                FaceReview(:final person) => person.id != gone,
+              },
+            );
+        _items = [..._items!.take(_index + 1), ...rest];
+      }
+      _index++;
+    });
   }
 
   @override
@@ -173,17 +201,21 @@ class _ReviewScreenState extends State<ReviewScreen> {
             // the next card lifts into place each time one is swiped away.
             child: Stack(
               children: [
+                // The cards behind sit still: keep their paint (and its
+                // opacity layers) cached while the top card moves.
                 if (after != null)
                   Positioned.fill(
-                    child: Transform.translate(
-                      offset: const Offset(0, 22),
-                      child: Transform.rotate(
-                        angle: 0.03,
-                        child: Transform.scale(
-                          scale: 0.88,
-                          child: Opacity(
-                            opacity: 0.35,
-                            child: _CardBody(item: after, preview: true),
+                    child: RepaintBoundary(
+                      child: Transform.translate(
+                        offset: const Offset(0, 22),
+                        child: Transform.rotate(
+                          angle: 0.03,
+                          child: Transform.scale(
+                            scale: 0.88,
+                            child: Opacity(
+                              opacity: 0.35,
+                              child: _CardBody(item: after, preview: true),
+                            ),
                           ),
                         ),
                       ),
@@ -191,15 +223,17 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   ),
                 if (next != null)
                   Positioned.fill(
-                    child: Transform.translate(
-                      offset: const Offset(0, 11),
-                      child: Transform.rotate(
-                        angle: -0.02,
-                        child: Transform.scale(
-                          scale: 0.94,
-                          child: Opacity(
-                            opacity: 0.6,
-                            child: _CardBody(item: next, preview: true),
+                    child: RepaintBoundary(
+                      child: Transform.translate(
+                        offset: const Offset(0, 11),
+                        child: Transform.rotate(
+                          angle: -0.02,
+                          child: Transform.scale(
+                            scale: 0.94,
+                            child: Opacity(
+                              opacity: 0.6,
+                              child: _CardBody(item: next, preview: true),
+                            ),
                           ),
                         ),
                       ),
@@ -213,11 +247,14 @@ class _ReviewScreenState extends State<ReviewScreen> {
                             id: _index,
                             onDecide: _decide,
                             onGone: _next,
+                            draggable: !_nameFocus.hasFocus,
                             child: _CardBody(
                               item: item,
                               nameField: _nameField,
+                              nameFocus: _nameFocus,
                               names: _names,
                               shake: _shakeName,
+                              onSubmit: () => _cardKey.currentState?.fling(true),
                             ),
                           )
                           .animate(key: ValueKey('card$_index'))
@@ -237,6 +274,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
             ),
           ),
         ),
+        if (MediaQuery.viewInsetsOf(context).bottom == 0)
         SafeArea(
           child: Padding(
             padding: const EdgeInsets.only(bottom: 16),
@@ -321,13 +359,20 @@ class _CardBody extends StatelessWidget {
   const _CardBody({
     required this.item,
     this.nameField,
+    this.nameFocus,
     this.names = const [],
     this.shake = 0,
     this.preview = false,
+    this.onSubmit,
   });
+
+  /// Keeps the name field (and the keyboard) alive when the shake replays.
+  static final _fieldKey = GlobalKey();
 
   final ReviewItem item;
   final TextEditingController? nameField;
+  final FocusNode? nameFocus;
+  final VoidCallback? onSubmit;
   final List<String> names;
   final int shake;
   final bool preview;
@@ -463,8 +508,13 @@ class _CardBody extends StatelessWidget {
                   if (!preview && nameField != null) ...[
                     const SizedBox(height: 12),
                     TextField(
+                          key: _fieldKey,
                           controller: nameField,
+                          focusNode: nameFocus,
                           textCapitalization: TextCapitalization.words,
+                          textInputAction: TextInputAction.done,
+                          autocorrect: false,
+                          onSubmitted: (_) => onSubmit?.call(),
                           decoration: InputDecoration(
                             hintText: 'Type a name',
                             filled: true,
@@ -481,25 +531,41 @@ class _CardBody extends StatelessWidget {
                           amount: shake > 0 ? 6 : 0,
                           duration: 400.ms,
                         ),
-                    if (names.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: 36,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: [
+                    if (names.isNotEmpty)
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: nameField!,
+                        builder: (context, value, _) {
+                          final typed = value.text.trim().toLowerCase();
+                          final shown = [
                             for (final n in names)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 6),
-                                child: ActionChip(
-                                  label: Text(n),
-                                  onPressed: () => nameField!.text = n,
-                                ),
+                              if (n.toLowerCase().contains(typed) && n.toLowerCase() != typed) n,
+                          ];
+                          if (shown.isEmpty) return const SizedBox.shrink();
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: SizedBox(
+                              height: 36,
+                              child: ListView(
+                                scrollDirection: Axis.horizontal,
+                                children: [
+                                  for (final n in shown)
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 6),
+                                      child: ActionChip(
+                                        label: Text(n),
+                                        // Cursor at the end, so typing carries on after the name.
+                                        onPressed: () => nameField!.value = TextEditingValue(
+                                          text: n,
+                                          selection: TextSelection.collapsed(offset: n.length),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
-                          ],
-                        ),
+                            ),
+                          );
+                        },
                       ),
-                    ],
                   ],
                 ],
               ),
@@ -519,10 +585,12 @@ class _SwipeCard extends StatefulWidget {
     required this.onDecide,
     required this.onGone,
     required this.child,
+    this.draggable = true,
   });
 
+  final bool draggable;
   final int id;
-  final Future<bool> Function(bool yes) onDecide;
+  final Future<void>? Function(bool yes) onDecide;
   final VoidCallback onGone;
   final Widget child;
 
@@ -580,9 +648,13 @@ class _SwipeCardState extends State<_SwipeCard>
     if (_busy) return;
     _busy = true;
     final width = MediaQuery.sizeOf(context).width;
-    if (await widget.onDecide(yes)) {
-      await _animateTo(Offset((yes ? 1.5 : -1.5) * width, _drag.dy + 40));
-      widget.onGone();
+    final save = widget.onDecide(yes);
+    if (save != null) {
+      await Future.wait([
+        save,
+        _animateTo(Offset((yes ? 1.5 : -1.5) * width, _drag.dy + 40)),
+      ]);
+      if (mounted) widget.onGone();
     } else {
       await _animateTo(Offset.zero);
       _busy = false;
@@ -594,8 +666,8 @@ class _SwipeCardState extends State<_SwipeCard>
     final width = MediaQuery.sizeOf(context).width;
     final t = (_drag.dx / (width * 0.4)).clamp(-1.0, 1.0);
     return GestureDetector(
-      onPanUpdate: _busy ? null : (d) => setState(() => _drag += d.delta),
-      onPanEnd: _busy
+      onPanUpdate: _busy || !widget.draggable ? null : (d) => setState(() => _drag += d.delta),
+      onPanEnd: _busy || !widget.draggable
           ? null
           : (d) {
               final fast = d.velocity.pixelsPerSecond.dx.abs() > 900;
@@ -613,6 +685,7 @@ class _SwipeCardState extends State<_SwipeCard>
             children: [
               Positioned.fill(
                 child: DecoratedBox(
+                  // The glow is the only thing that changes while dragging.
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
@@ -625,7 +698,7 @@ class _SwipeCardState extends State<_SwipeCard>
                         ),
                     ],
                   ),
-                  child: widget.child,
+                  child: RepaintBoundary(child: widget.child),
                 ),
               ),
               Positioned(

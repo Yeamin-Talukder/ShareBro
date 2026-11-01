@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Places Map Demo</title>
+<style>
+:root{
+  --bg:#F3F1F5;--page:#ECE9EF;--card:#fff;--ink:#141217;--sub:#6b6670;--line:rgba(26,24,32,.12);
+  --coral:#FF6B4A;--coral2:#FFC3B2;--sea:#DCE7EE;--land:#F7F4EF;--contour:rgba(26,24,32,.10);--glass:rgba(255,255,255,.92);
+}
+:root[data-theme=dark]{
+  --bg:#0B0A0F;--page:#050407;--card:#1b1a1f;--ink:#F2EFF4;--sub:#a29ca8;--line:rgba(255,255,255,.12);
+  --sea:#101826;--land:#17161c;--contour:rgba(255,255,255,.09);--glass:rgba(37,35,41,.92);--coral2:#8A4A3C;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#0B0A0F;--page:#050407;--card:#1b1a1f;--ink:#F2EFF4;--sub:#a29ca8;--line:rgba(255,255,255,.12);
+  --sea:#101826;--land:#17161c;--contour:rgba(255,255,255,.09);--glass:rgba(37,35,41,.92);--coral2:#8A4A3C;}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--page);color:var(--ink);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:20px 16px 40px}
+.top{max-width:900px;margin:0 auto 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:20px;margin:0}
+.note{max-width:900px;margin:0 auto 16px;color:var(--sub);font-size:14px}
+button{font:inherit;color:inherit;cursor:pointer}
+.pill{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px}
+.wrap{display:flex;justify-content:center}
+.phone{width:375px;max-width:100%;height:760px;background:var(--bg);border-radius:44px;border:10px solid #000;position:relative;overflow:hidden}
+.screen{position:absolute;inset:0;overflow:hidden}
+/* ---------- the map ---------- */
+#map{position:absolute;inset:0;background:var(--sea);transition:transform .8s cubic-bezier(.2,.8,.2,1);transform-origin:50% 50%}
+#map svg{position:absolute;inset:0;width:100%;height:100%}
+.landmass{fill:var(--land);stroke:var(--line);stroke-width:1}
+.ct{fill:none;stroke:var(--contour);stroke-width:1}
+.road{fill:none;stroke:var(--line);stroke-width:2;stroke-dasharray:1 5;stroke-linecap:round}
+.label{font:600 10px system-ui;fill:var(--sub);letter-spacing:.08em;text-transform:uppercase}
+/* photo pins */
+.pin{position:absolute;transform:translate(-50%,-100%);transition:left .7s cubic-bezier(.2,.8,.2,1),top .7s cubic-bezier(.2,.8,.2,1),opacity .4s,transform .4s;cursor:pointer}
+.pin .ph{width:54px;height:54px;border-radius:14px;border:3px solid #fff;box-shadow:0 6px 16px rgba(0,0,0,.25);overflow:hidden;position:relative;background:var(--coral2)}
+:root[data-theme=dark] .pin .ph{border-color:#2a282e}
+.pin .tail{width:10px;height:10px;background:#fff;transform:rotate(45deg);margin:-6px auto 0;border-radius:2px}
+:root[data-theme=dark] .pin .tail{background:#2a282e}
+.pin .n{position:absolute;top:-8px;right:-10px;background:var(--coral);color:#fff;font:700 12px system-ui;min-width:24px;height:24px;border-radius:12px;display:grid;place-items:center;padding:0 6px;border:2px solid var(--bg)}
+.pin.pop{animation:pop .5s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes pop{from{transform:translate(-50%,-100%) scale(.2);opacity:0}}
+.pin.hide{opacity:0;transform:translate(-50%,-100%) scale(.3);pointer-events:none}
+/* placeholder "photos": flat little scenes */
+.scene{position:absolute;inset:0}
+/* ---------- glass bars ---------- */
+.bar{position:absolute;left:12px;right:12px;top:14px;height:52px;border-radius:26px;background:var(--glass);border:1px solid var(--line);display:flex;align-items:center;padding:0 8px 0 18px;gap:8px;backdrop-filter:blur(18px)}
+.bar b{flex:1;font-size:17px}
+.seg{display:flex;background:var(--line);border-radius:18px;padding:3px}
+.seg button{border:0;background:none;border-radius:15px;padding:5px 11px;font-size:13px;font-weight:600;color:var(--sub)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.fab{position:absolute;right:14px;width:44px;height:44px;border-radius:22px;background:var(--glass);border:1px solid var(--line);display:grid;place-items:center;font-size:20px;backdrop-filter:blur(18px)}
+/* ---------- bottom sheet ---------- */
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--glass);border-top-left-radius:28px;border-top-right-radius:28px;border:1px solid var(--line);backdrop-filter:blur(18px);transform:translateY(100%);transition:transform .45s cubic-bezier(.2,.8,.2,1);padding:10px 16px 24px}
+.sheet.open{transform:none}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 12px}
+.sheet h3{margin:0;font-size:20px}
+.sheet .meta{color:var(--sub);font-size:13px;margin:2px 0 12px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.grid div{aspect-ratio:1;border-radius:8px;position:relative;overflow:hidden;animation:fadeUp .4s both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}}
+.chips{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.chip{font-size:12px;font-weight:600;padding:4px 10px;border-radius:12px;background:var(--line)}
+/* ---------- journey ---------- */
+#route{fill:none;stroke:var(--coral);stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
+#routeGhost{fill:none;stroke:var(--coral);stroke-opacity:.25;stroke-width:4;stroke-dasharray:2 8;stroke-linecap:round}
+#walker{fill:var(--coral);stroke:#fff;stroke-width:3}
+.stopdot{fill:var(--card);stroke:var(--coral);stroke-width:3;transform-box:fill-box;transform-origin:center;transition:transform .3s}
+.stopdot.hit{fill:var(--coral);transform:scale(1.3)}
+.card{position:absolute;left:16px;right:16px;bottom:96px;background:var(--card);border-radius:24px;border:1px solid var(--line);padding:12px;display:flex;gap:12px;align-items:center;box-shadow:0 12px 30px rgba(0,0,0,.18);transition:transform .5s cubic-bezier(.2,1.2,.4,1),opacity .3s}
+.card.out{transform:translateY(30px) scale(.95);opacity:0}
+.card .thumbs{display:flex}
+.card .thumbs div{width:58px;height:58px;border-radius:12px;border:3px solid var(--card);position:relative;overflow:hidden;margin-left:-18px}
+.card .thumbs div:first-child{margin-left:0}
+.card .day{color:var(--coral);font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.card .place{font-weight:700;font-size:17px}
+.card .sub{color:var(--sub);font-size:13px}
+.player{position:absolute;left:16px;right:16px;bottom:24px;height:56px;border-radius:28px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(18px);display:flex;align-items:center;gap:12px;padding:0 8px}
+.play{width:42px;height:42px;border-radius:21px;border:0;background:var(--coral);color:#fff;font-size:16px}
+.track{flex:1;height:4px;background:var(--line);border-radius:2px;position:relative}
+.track i{position:absolute;left:0;top:0;bottom:0;background:var(--coral);border-radius:2px;width:0}
+.track s{position:absolute;top:-3px;width:10px;height:10px;border-radius:5px;background:var(--card);border:2px solid var(--coral);transform:translateX(-50%)}
+.time{font:600 12px system-ui;color:var(--sub);width:44px}
+/* ---------- places list ---------- */
+#places{position:absolute;inset:0;padding:80px 16px 24px;overflow:auto;background:var(--bg);display:none}
+.pl{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:10px;margin-bottom:10px;animation:fadeUp .45s both}
+.mini{width:84px;height:84px;border-radius:16px;background:var(--sea);position:relative;overflow:hidden;flex:none}
+.mini svg{position:absolute;inset:0}
+.pl .t{font-weight:700;font-size:16px}
+.pl .s{color:var(--sub);font-size:13px}
+.strip{display:flex;gap:3px;margin-top:6px}
+.strip div{width:30px;height:30px;border-radius:7px;position:relative;overflow:hidden}
+.hint{position:absolute;left:50%;top:78px;transform:translateX(-50%);background:var(--ink);color:var(--bg);font-size:12px;font-weight:600;padding:6px 12px;border-radius:14px;opacity:0;transition:opacity .3s;white-space:nowrap;pointer-events:none}
+.hint.show{opacity:.9}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Places: map photo viewer (demo)</h1>
+  <button class="pill" id="theme">Switch light / dark</button>
+</div>
+<p class="note">Made-up places and flat placeholder pictures. <b>Map</b>: photos sit where they were taken. Tap “zoom” to see clusters split, tap a pin for its photos. <b>Journey</b>: press play and the trip draws itself day by day. <b>Places</b>: every place as a card.</p>
+<div class="wrap"><div class="phone"><div class="screen" id="screen">
+
+  <div id="map">
+    <svg viewBox="0 0 375 760" preserveAspectRatio="xMidYMid slice">
+      <path class="landmass" d="M-20 120 C 60 80, 140 140, 220 110 S 360 60, 400 120 L 400 520 C 330 560, 300 640, 220 650 S 80 600, 40 680 L -20 700 Z"/>
+      <path class="landmass" d="M250 690 q40 -30 90 -10 q30 20 10 50 q-40 30 -100 -40z"/>
+      <g id="contours"></g>
+      <path class="road" d="M70 200 C 120 260, 90 330, 150 380 S 260 420, 280 300 S 300 200, 320 170"/>
+      <path class="road" d="M150 380 C 170 450, 120 520, 200 590"/>
+      <text class="label" x="40" y="160">Old Town</text>
+      <text class="label" x="250" y="150">Hill Camp</text>
+      <text class="label" x="200" y="460">Lake Side</text>
+      <text class="label" x="60" y="560">Sunset Beach</text>
+      <text class="label" x="270" y="745">Turtle Isle</text>
+      <path id="routeGhost" d=""/>
+      <path id="route" d=""/>
+      <g id="stops"></g>
+      <circle id="walker" r="8" cx="-50" cy="-50"/>
+    </svg>
+    <div id="pins"></div>
+  </div>
+
+  <div id="places"></div>
+
+  <div class="bar">
+    <b id="title">Places</b>
+    <div class="seg" id="seg">
+      <button class="on" data-m="map">Map</button>
+      <button data-m="journey">Journey</button>
+      <button data-m="places">Places</button>
+    </div>
+  </div>
+  <div class="hint" id="hint">Pinch out to split the groups</div>
+  <button class="fab" id="zoom" style="top:80px" title="Zoom">＋</button>
+
+  <div class="card out" id="card">
+    <div class="thumbs" id="cthumbs"></div>
+    <div><div class="day" id="cday"></div><div class="place" id="cplace"></div><div class="sub" id="csub"></div></div>
+  </div>
+  <div class="player" id="player" style="display:none">
+    <button class="play" id="play">▶</button>
+    <div class="track"><i id="fill"></i><s id="knob" style="left:0"></s></div>
+    <span class="time" id="tday">Day 1</span>
+  </div>
+
+  <div class="sheet" id="sheet">
+    <div class="grab"></div>
+    <h3 id="stitle"></h3>
+    <div class="meta" id="smeta"></div>
+    <div class="chips" id="schips"></div>
+    <div class="grid" id="sgrid"></div>
+  </div>
+</div></div></div>
+
+<script>
+// ---------- placeholder pictures: flat scenes in a few palettes ----------
+const PAL=[['#FDE3DA','#FF8A6B','#E5533A'],['#DCEBF5','#7FB3D5','#2E6F99'],['#E4F1E0','#8CC084','#3C7A3B'],['#F7EBD3','#E9B44C','#9B6A16'],['#EDE3F5','#B08BD9','#5E3A8C'],['#FFE9E2','#FFC3B2','#FF6B4A']];
+function scene(i,kind){
+  const [sky,mid,front]=PAL[i%PAL.length];
+  const s=(i*37)%100;
+  if(kind==='face')return `<svg class="scene" viewBox="0 0 60 60"><rect width="60" height="60" fill="${sky}"/><circle cx="30" cy="27" r="11" fill="${mid}"/><path d="M12 60 q18 -26 36 0z" fill="${front}"/></svg>`;
+  if(kind==='food')return `<svg class="scene" viewBox="0 0 60 60"><rect width="60" height="60" fill="${sky}"/><circle cx="30" cy="32" r="19" fill="#fff" opacity=".85"/><circle cx="30" cy="32" r="12" fill="${mid}"/><circle cx="26" cy="29" r="3" fill="${front}"/></svg>`;
+  return `<svg class="scene" viewBox="0 0 60 60"><rect width="60" height="60" fill="${sky}"/><circle cx="${18+s%26}" cy="18" r="7" fill="${front}"/><path d="M0 60 L0 40 L${16+s%10} 26 L${30+s%8} 38 L44 30 L60 42 L60 60Z" fill="${mid}"/><path d="M0 60 q30 -14 60 0z" fill="${front}" opacity=".7"/></svg>`;
+}
+const KINDS=['scene','face','scene','food','face','scene'];
+
+// ---------- the places (made up) ----------
+const PLACES=[
+  {id:'old',name:'Old Town',x:78,y:205,day:1,date:'June 12',n:48,tags:['Street','Food','Maya, Leo'],c:0},
+  {id:'cafe',name:'Corner Café',x:118,y:250,day:1,date:'June 12',n:12,tags:['Food','Maya'],c:3},
+  {id:'hill',name:'Hill Camp',x:300,y:180,day:2,date:'June 13',n:64,tags:['Hiking','Sunrise','Everyone'],c:2},
+  {id:'falls',name:'Hidden Falls',x:262,y:300,day:2,date:'June 13',n:21,tags:['Waterfall','Leo, Sam'],c:1},
+  {id:'lake',name:'Lake Side',x:205,y:420,day:3,date:'June 14',n:37,tags:['Boat','Selfies'],c:1},
+  {id:'beach',name:'Sunset Beach',x:110,y:540,day:4,date:'June 15',n:92,tags:['Beach','Sunset','Everyone'],c:5},
+  {id:'isle',name:'Turtle Isle',x:292,y:700,day:5,date:'June 16',n:30,tags:['Boat','Snorkel'],c:4},
+];
+// zoomed out, nearby places merge into one pin
+const CLUSTERS=[
+  {ids:['old','cafe'],name:'Old Town',x:96,y:228},
+  {ids:['hill','falls'],name:'Hill Camp',x:282,y:240},
+  {ids:['lake'],name:'Lake Side',x:205,y:420},
+  {ids:['beach'],name:'Sunset Beach',x:110,y:540},
+  {ids:['isle'],name:'Turtle Isle',x:292,y:700},
+];
+const byId=Object.fromEntries(PLACES.map(p=>[p.id,p]));
+const $=id=>document.getElementById(id);
+
+// contour rings around the hills, like the app background
+(function(){let g='';[[300,180,6],[262,300,3],[80,200,3],[130,600,4]].forEach(([x,y,n])=>{for(let k=1;k<=n;k++)g+=`<ellipse class="ct" cx="${x}" cy="${y}" rx="${k*16+6}" ry="${k*11+4}" transform="rotate(${(x+y)%40-20} ${x} ${y})"/>`});$('contours').innerHTML=g})();
+
+// ---------- MAP: photo pins ----------
+let zoomed=false;
+function drawPins(){
+  const pins=$('pins');pins.innerHTML='';
+  const list=zoomed?PLACES.map(p=>({ids:[p.id],name:p.name,x:p.x,y:p.y})):CLUSTERS;
+  list.forEach((c,i)=>{
+    const ps=c.ids.map(id=>byId[id]);const n=ps.reduce((a,p)=>a+p.n,0);
+    const el=document.createElement('div');el.className='pin pop';
+    // zoomed in: each pin starts where its cluster was, then slides out
+    const from=zoomed?CLUSTERS.find(k=>k.ids.includes(c.ids[0])):c;
+    el.style.left=from.x+'px';el.style.top=from.y+'px';el.style.animationDelay=(i*60)+'ms';
+    el.innerHTML=`<div class="ph">${scene(ps[0].c,KINDS[ps[0].c])}</div><span class="n">${n}</span><div class="tail"></div>`;
+    el.onclick=()=>openSheet(c,ps,n);
+    pins.appendChild(el);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{el.style.left=c.x+'px';el.style.top=c.y+'px'}));
+  });
+}
+function zoom(){
+  zoomed=!zoomed;$('zoom').textContent=zoomed?'－':'＋';
+  $('map').style.transform=zoomed?'scale(1.08)':'none';
+  closeSheet();drawPins();
+}
+function openSheet(c,ps,n){
+  $('stitle').textContent=c.name;
+  $('smeta').textContent=`${n} photos · ${ps.map(p=>p.date).filter((v,i,a)=>a.indexOf(v)===i).join(', ')}`;
+  $('schips').innerHTML=[...new Set(ps.flatMap(p=>p.tags))].map(t=>`<span class="chip">${t}</span>`).join('');
+  let g='';for(let i=0;i<12;i++)g+=`<div style="animation-delay:${i*30}ms">${scene(ps[0].c+i,KINDS[(i+ps[0].c)%6])}</div>`;
+  $('sgrid').innerHTML=g;$('sheet').classList.add('open');
+  // map glides so the pin sits above the sheet
+  $('map').style.transform=`${zoomed?'scale(1.08) ':''}translateY(${Math.min(0,220-c.y)}px)`;
+}
+function closeSheet(){$('sheet').classList.remove('open');$('map').style.transform=zoomed?'scale(1.08)':'none'}
+$('sheet').onclick=closeSheet;
+
+// ---------- JOURNEY: the trip draws itself ----------
+const STOPS=PLACES; // in time order
+function routeD(){let d=`M${STOPS[0].x} ${STOPS[0].y}`;for(let i=1;i<STOPS.length;i++){const a=STOPS[i-1],b=STOPS[i];const mx=(a.x+b.x)/2+((i%2)?30:-30),my=(a.y+b.y)/2;d+=` Q${mx} ${my} ${b.x} ${b.y}`}return d}
+$('route').setAttribute('d',routeD());$('routeGhost').setAttribute('d',routeD());
+$('stops').innerHTML=STOPS.map((s,i)=>`<circle class="stopdot" id="sd${i}" cx="${s.x}" cy="${s.y}" r="7"/>`).join('');
+const route=$('route');const L=route.getTotalLength();
+route.style.strokeDasharray=L;route.style.strokeDashoffset=L;
+// how far along the path each stop sits
+const stopAt=STOPS.map(s=>{let best=0,bd=1e9;for(let t=0;t<=L;t+=2){const p=route.getPointAtLength(t);const d=(p.x-s.x)**2+(p.y-s.y)**2;if(d<bd){bd=d;best=t}}return best/L});
+let prog=0,playing=false,last=0,shown=-1,pause=0;
+const DUR=16000;
+function setProg(p){
+  prog=Math.max(0,Math.min(1,p));
+  route.style.strokeDashoffset=L*(1-prog);
+  const pt=route.getPointAtLength(L*prog);$('walker').setAttribute('cx',pt.x);$('walker').setAttribute('cy',pt.y);
+  $('fill').style.width=(prog*100)+'%';$('knob').style.left=(prog*100)+'%';
+  let k=-1;stopAt.forEach((a,i)=>{if(prog>=a-0.002)k=i});
+  STOPS.forEach((s,i)=>$('sd'+i).classList.toggle('hit',i<=k));
+  if(k!==shown){shown=k;showCard(k);if(playing&&k>=0)pause=900}
+  // the map follows the walker
+  $('map').style.transform=`translateY(${Math.max(-300,Math.min(0,300-pt.y))}px)`;
+}
+function showCard(k){
+  const card=$('card');card.classList.add('out');if(k<0)return;
+  const s=STOPS[k];
+  setTimeout(()=>{
+    $('cday').textContent=`Day ${s.day} · ${s.date}`;$('cplace').textContent=s.name;$('csub').textContent=`${s.n} photos · ${s.tags.join(' · ')}`;
+    $('cthumbs').innerHTML=[0,1,2].map(i=>`<div>${scene(s.c+i,KINDS[(s.c+i)%6])}</div>`).join('');
+    $('tday').textContent='Day '+s.day;card.classList.remove('out');
+  },180);
+}
+function tick(t){
+  if(!playing)return;const dt=last?t-last:0;last=t;
+  if(pause>0)pause-=dt;else setProg(prog+dt/DUR);
+  if(prog>=1){playing=false;$('play').textContent='↺';return}
+  requestAnimationFrame(tick);
+}
+$('play').onclick=()=>{
+  if(prog>=1){setProg(0)}
+  playing=!playing;$('play').textContent=playing?'❚❚':'▶';last=0;if(playing)requestAnimationFrame(tick);
+};
+document.querySelector('.track').onclick=e=>{const r=e.currentTarget.getBoundingClientRect();setProg((e.clientX-r.left)/r.width)};
+
+// ---------- PLACES list ----------
+function drawPlaces(){
+  $('places').innerHTML=[...PLACES].sort((a,b)=>b.n-a.n).map((p,i)=>`
+    <div class="pl" style="animation-delay:${i*60}ms">
+      <div class="mini"><svg viewBox="0 0 84 84"><path class="landmass" d="M-5 20 C20 5,50 30,90 12 L90 90 L-5 90Z"/><ellipse class="ct" cx="42" cy="46" rx="22" ry="14"/><ellipse class="ct" cx="42" cy="46" rx="34" ry="22"/><circle cx="42" cy="46" r="7" fill="var(--coral)" stroke="#fff" stroke-width="3"/></svg></div>
+      <div style="flex:1;min-width:0"><div class="t">${p.name}</div><div class="s">${p.n} photos · Day ${p.day}, ${p.date}</div>
+      <div class="strip">${[0,1,2,3,4].map(k=>`<div>${scene(p.c+k,KINDS[(p.c+k)%6])}</div>`).join('')}</div></div>
+    </div>`).join('');
+}
+
+// ---------- modes ----------
+function mode(m){
+  document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  closeSheet();playing=false;$('play').textContent='▶';
+  const journey=m==='journey';
+  $('pins').style.display=m==='map'?'block':'none';
+  $('zoom').style.display=m==='map'?'grid':'none';
+  $('player').style.display=journey?'flex':'none';
+  ['route','routeGhost','stops','walker'].forEach(id=>$(id).style.display=journey?'':'none');
+  $('card').classList.add('out');
+  $('places').style.display=m==='places'?'block':'none';
+  $('title').textContent={map:'Places',journey:'Summer trip',places:'All places'}[m];
+  if(journey){shown=-2;setProg(0)}else $('map').style.transform=zoomed?'scale(1.08)':'none';
+  if(m==='places')drawPlaces();
+  if(m==='map'){drawPins();$('hint').classList.add('show');setTimeout(()=>$('hint').classList.remove('show'),2200)}
+}
+document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>mode(b.dataset.m));
+$('zoom').onclick=zoom;
+$('theme').onclick=()=>{const r=document.documentElement;const dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=dark?'light':'dark'};
+mode('map');
+</script>
+</body>
+</html>

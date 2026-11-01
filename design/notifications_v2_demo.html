@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Notifications Redesign</title>
+<style>
+:root{--page:#ECE9EF;--card:#fff;--ink:#141217;--sub:#6b6670;--line:rgba(26,24,32,.12);--coral:#E5533A;--coral2:#FF8A6B;--shade:#DCD8E0;--notif:#F7F5F9;--chip:#EFE9F2;--ok:#1E8E5A}
+:root[data-theme=dark]{--page:#050407;--card:#1b1a1f;--ink:#F2EFF4;--sub:#a29ca8;--line:rgba(255,255,255,.12);--shade:#0d0c10;--notif:#232128;--chip:#2f2c35;--ok:#4cc38a}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--page:#050407;--card:#1b1a1f;--ink:#F2EFF4;--sub:#a29ca8;--line:rgba(255,255,255,.12);--shade:#0d0c10;--notif:#232128;--chip:#2f2c35;--ok:#4cc38a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Google Sans",Roboto,sans-serif;padding:20px 16px 48px}
+header{max-width:1180px;margin:0 auto 8px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+h1{margin:0;font-size:20px}
+.note{max-width:1180px;margin:0 auto 18px;color:var(--sub)}
+button.t{font:inherit;color:inherit;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px;cursor:pointer}
+.row{max-width:1180px;margin:0 auto 26px;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px}
+.case{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:16px}
+.case h2{margin:0 0 4px;font-size:16px}
+.case .why{color:var(--sub);font-size:13px;margin:0 0 12px}
+.pair{display:grid;grid-template-columns:1fr;gap:10px}
+.lbl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--sub);margin:2px 0 4px}
+.lbl.new{color:var(--coral)}
+.shade{background:var(--shade);border-radius:22px;padding:8px}
+/* an Android notification */
+.n{background:var(--notif);border-radius:18px;padding:12px 14px;position:relative}
+.n + .n{margin-top:3px;border-top-left-radius:6px;border-top-right-radius:6px}
+.head{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub)}
+.app{width:18px;height:18px;border-radius:9px;background:var(--coral);display:grid;place-items:center}
+.app svg{width:11px;height:11px}
+.head b{color:var(--coral);font-weight:600}
+.body{display:flex;gap:12px;margin-top:6px;align-items:flex-start}
+.txt{flex:1;min-width:0}
+.title{font-weight:600;font-size:15px}
+.text{color:var(--sub);font-size:13.5px}
+.big{width:44px;height:44px;border-radius:12px;flex:none;overflow:hidden;position:relative}
+.big.round{border-radius:22px}
+.bar{height:6px;border-radius:3px;background:var(--line);margin-top:10px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--coral);border-radius:3px}
+.bar.seg{display:flex;gap:3px;background:none}
+.bar.seg i{flex:1;background:var(--line)}
+.bar.seg i.f{background:var(--coral)}
+.acts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.acts span{font-size:13px;font-weight:600;padding:7px 14px;border-radius:999px;background:var(--chip);color:var(--ink)}
+.acts span.p{background:var(--coral);color:#fff}
+.acts.plain span{background:none;padding:6px 4px;color:var(--coral)}
+.faces{display:flex;margin-top:8px}
+.faces div{width:26px;height:26px;border-radius:13px;border:2px solid var(--notif);margin-left:-7px;overflow:hidden;position:relative}
+.faces div:first-child{margin-left:0}
+.faces em{font-style:normal;font-size:12px;color:var(--sub);align-self:center;margin-left:8px}
+.pic{height:150px;border-radius:14px;margin-top:10px;overflow:hidden;display:grid;grid-template-columns:2fr 1fr;gap:3px}
+.pic div{position:relative;overflow:hidden}
+.pic .col{display:grid;grid-template-rows:1fr 1fr;gap:3px}
+.chipbar{display:flex;align-items:center;gap:8px;background:#000;color:#fff;border-radius:999px;padding:4px 10px 4px 4px;width:max-content;font-size:12px;font-weight:600;margin-bottom:8px}
+.chipbar .app{width:20px;height:20px}
+.dim{opacity:.55}
+.scene{position:absolute;inset:0;width:100%;height:100%}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--chip);color:var(--sub);margin-left:6px;vertical-align:1px}
+.list{max-width:1180px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:24px;padding:16px 20px}
+.list h2{margin:0 0 6px;font-size:16px}
+.list li{margin:4px 0;color:var(--sub)}
+.list b{color:var(--ink)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Notifications: before and after</h1>
+  <button class="t" id="theme">Switch light / dark</button>
+</header>
+<p class="note">Each card shows today's notification and the proposed one, as they'd look in Android's shade. Names and pictures are made up.</p>
+
+<div id="cases"></div>
+
+<div class="list">
+  <h2>Also changes behind the scenes</h2>
+  <ul>
+    <li><b>Tapping opens the right screen</b>: a scan opens Scan, a request opens Receive, a finished send opens its transfer, received photos open the album. Today every tap lands on the People page.</li>
+    <li><b>Finished transfers stack</b> into one ShareBro group with a summary (“3 transfers done”) instead of a pile of separate notices.</li>
+    <li><b>The extra “ShareBro is working” notice stays out of sight</b>: still needed by Android to keep working in the background, but silent and folded at the bottom of the shade.</li>
+    <li><b>One tone of voice</b>: titles say what happened, the line under says what to do; no ✓ marks or emoji in titles.</li>
+    <li><b>Quiet when you're in the app</b>: the in-app island shows it; the shade only gets what you'd miss.</li>
+  </ul>
+</div>
+
+<script>
+const PAL=[['#FDE3DA','#FF8A6B','#E5533A'],['#DCEBF5','#7FB3D5','#2E6F99'],['#E4F1E0','#8CC084','#3C7A3B'],['#F7EBD3','#E9B44C','#9B6A16'],['#EDE3F5','#B08BD9','#5E3A8C']];
+const photo=i=>{const [a,b,c]=PAL[i%5];return `<svg class="scene" viewBox="0 0 60 60" preserveAspectRatio="xMidYMid slice"><rect width="60" height="60" fill="${a}"/><circle cx="${20+i*7%24}" cy="18" r="7" fill="${c}"/><path d="M0 60 L0 40 L18 26 L32 38 L44 30 L60 42 L60 60Z" fill="${b}"/></svg>`};
+const face=i=>{const [a,b,c]=PAL[i%5];return `<svg class="scene" viewBox="0 0 60 60"><rect width="60" height="60" fill="${a}"/><circle cx="30" cy="26" r="12" fill="${b}"/><path d="M10 60 q20 -28 40 0z" fill="${c}"/></svg>`};
+const icon=`<svg viewBox="0 0 24 24" fill="#fff"><rect x="4" y="5" width="7" height="13" rx="2" transform="rotate(-18 7.5 11.5)"/><rect x="13" y="5" width="7" height="13" rx="2" transform="rotate(18 16.5 11.5)"/></svg>`;
+const head=(sub,time='')=>`<div class="head"><span class="app">${icon}</span><b>ShareBro</b>${sub?` · ${sub}`:''}${time?` · ${time}`:''}</div>`;
+const N=({sub='',time='',title,text='',big='',extra='',acts='',plain=false,dim=false})=>
+  `<div class="n ${dim?'dim':''}">${head(sub,time)}<div class="body"><div class="txt"><div class="title">${title}</div>${text?`<div class="text">${text}</div>`:''}</div>${big}</div>${extra}${acts?`<div class="acts ${plain?'plain':''}">${acts}</div>`:''}</div>`;
+const A=(...xs)=>xs.map(x=>x.startsWith('*')?`<span class="p">${x.slice(1)}</span>`:`<span>${x}</span>`).join('');
+const big=(html,round)=>`<div class="big ${round?'round':''}">${html}</div>`;
+const bar=p=>`<div class="bar"><i style="width:${p}%"></i></div>`;
+const faces=(n,more)=>`<div class="faces">${[0,1,2,3,4].slice(0,n).map(i=>`<div>${face(i)}</div>`).join('')}<em>${more}</em></div>`;
+
+const CASES=[
+ {t:'Scanning for faces',why:'Today: a bare bar and a count. Proposed: the faces it is finding, time left, and a chip in the status bar.',
+  old:N({title:'Finding faces · 1,240 of 3,600',text:'14 people so far',extra:bar(34),acts:A('Stop'),plain:true}),
+  neu:`<div class="chipbar"><span class="app">${icon}</span>34% · 4 min</div>`+
+      N({sub:'Trip to the coast',title:'Finding faces',text:'1,240 of 3,600 photos · about 4 min left',big:big(photo(2)),
+         extra:bar(34)+faces(5,'14 people so far'),acts:A('Pause','Stop')})},
+ {t:'Scan finished',why:'Today: nothing (the notice just disappears). Proposed: what it found, and the next step.',
+  old:`<div class="n dim"><div class="text" style="text-align:center;padding:14px 0">(no notification)</div></div>`,
+  neu:N({sub:'Trip to the coast',time:'now',title:'Found 14 people in 3,600 photos',text:'6 faces need a quick look before they’re sorted',
+         big:big(face(1),true),extra:faces(5,'Maya, Leo and 12 more'),acts:A('*Review faces','Open People')})},
+ {t:'Someone wants to send you photos',why:'Today: plain text. Proposed: who, what, a preview of the first photo, and a clear main button; Accept stands out.',
+  old:N({title:'Maya’s Pixel wants to send you 24 photos',text:'86 MB over Wi-Fi',acts:A('Decline','Accept'),plain:true}),
+  neu:N({sub:'Nearby',time:'now',title:'Maya’s Pixel wants to send you 24 photos',text:'86 MB · Wi-Fi · will save to the ShareBro album',
+         big:big(photo(0)),acts:A('Decline','*Accept')})},
+ {t:'Sending',why:'Today: fine, but no feel for what is going. Proposed: the photo going now, speed and time left, and a segmented bar on Android 16.',
+  old:N({title:'Sending to Leo’s phone',text:'9 of 24 photos · 40 s left',big:big(photo(1)),extra:bar(38),acts:A('Cancel'),plain:true}),
+  neu:`<div class="chipbar"><span class="app">${icon}</span>38% · Leo</div>`+
+      N({sub:'4.2 MB/s',title:'Sending 24 photos to Leo’s phone',text:'9 of 24 · about 40 s left',big:big(photo(1)),
+         extra:`<div class="bar seg">${Array.from({length:12},(_,i)=>`<i class="${i<5?'f':''}"></i>`).join('')}</div>`,acts:A('Cancel')})},
+ {t:'Received',why:'Today: a ✓ in the title and one big picture. Proposed: a contact-sheet of what arrived and buttons to see or share them.',
+  old:N({title:'Got 24 photos from Maya’s Pixel ✓',text:'Saved to the ShareBro album · faces will be found',extra:`<div class="pic" style="grid-template-columns:1fr"><div>${photo(0)}</div></div>`}),
+  neu:N({sub:'Maya’s Pixel',time:'2 min ago',title:'24 photos from Maya',text:'In the ShareBro album · faces are being found',
+         extra:`<div class="pic"><div>${photo(0)}</div><div class="col"><div>${photo(3)}</div><div>${photo(4)}</div></div></div>`,acts:A('*View photos','Share')})},
+ {t:'Send didn’t finish',why:'Today: a dead end. Proposed: why, and a one-tap retry that picks up where it stopped.',
+  old:N({title:'Couldn’t finish sending to Leo’s phone',text:'Open ShareBro to try again'}),
+  neu:N({sub:'Leo’s phone',time:'now',title:'Sending to Leo stopped at 15 of 24',text:'Leo’s phone left the Wi-Fi. The rest will go when you retry.',
+         big:big(photo(1)),acts:A('*Retry','Dismiss')})},
+ {t:'Several transfers done',why:'Today: one notice each. Proposed: stacked under one summary, expandable.',
+  old:N({title:'Sent 24 photos to Leo’s phone ✓',text:'Maya arrived on Leo’s phone'})+N({title:'Sent 8 photos to Sam’s tablet ✓',text:'Leo arrived on Sam’s tablet'})+N({title:'Got 12 photos from Maya’s Pixel ✓',text:'Saved to the ShareBro album'}),
+  neu:N({sub:'3 transfers',time:'now',title:'Sent 32 photos, got 12',text:'Leo’s phone · Sam’s tablet · Maya’s Pixel',big:big(photo(4)),acts:A('Show all')})},
+];
+document.getElementById('cases').innerHTML=`<div class="row">${CASES.map(c=>`
+  <div class="case"><h2>${c.t}</h2><p class="why">${c.why}</p>
+    <div class="pair">
+      <div><div class="lbl">Today</div><div class="shade">${c.old}</div></div>
+      <div><div class="lbl new">Proposed</div><div class="shade">${c.neu}</div></div>
+    </div></div>`).join('')}</div>`;
+document.getElementById('theme').onclick=()=>{const r=document.documentElement;const d=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=d?'light':'dark'};
+</script>
+</body>
+</html>

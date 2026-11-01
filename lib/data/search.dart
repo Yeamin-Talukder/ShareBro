@@ -1,11 +1,11 @@
 import 'db.dart';
 
-enum TermKind { person, trip, tag, dates }
+enum TermKind { person, trip, tag, dates, gender }
 
 /// One thing the search understood: a person, a trip, a category or scene,
 /// or a span of dates.
 class SearchTerm {
-  const SearchTerm(this.kind, this.label, {this.personId, this.tag, this.tripId, this.dates});
+  const SearchTerm(this.kind, this.label, {this.personId, this.tag, this.tripId, this.dates, this.gender});
 
   final TermKind kind;
 
@@ -16,7 +16,11 @@ class SearchTerm {
   final int? tripId;
   final DaySpan? dates;
 
-  String get key => '${kind.name}:${personId ?? tag ?? tripId ?? dates?.start.millisecondsSinceEpoch}';
+  /// Photos with any man / any woman in them.
+  final Gender? gender;
+
+  String get key =>
+      '${kind.name}:${personId ?? tag ?? tripId ?? dates?.start.millisecondsSinceEpoch ?? gender?.code}';
 
   @override
   bool operator ==(Object other) => other is SearchTerm && other.key == key;
@@ -35,6 +39,12 @@ const _monthNames = [
   'january', 'february', 'march', 'april', 'may', 'june',
   'july', 'august', 'september', 'october', 'november', 'december',
 ];
+
+/// Words that mean photos with a man / a woman in them.
+const _genderWords = {
+  Gender.male: ['male', 'males', 'man', 'men', 'boy', 'boys', 'guy', 'guys'],
+  Gender.female: ['female', 'females', 'woman', 'women', 'girl', 'girls', 'lady', 'ladies'],
+};
 
 /// Longest phrase (in words) that's looked up as one thing.
 const _maxPhrase = 4;
@@ -63,6 +73,12 @@ class SearchVocabulary {
     }
     for (final trip in trips) {
       _add(trip.name, SearchTerm(TermKind.trip, trip.name, tripId: trip.id));
+    }
+    for (final MapEntry(key: g, value: words) in _genderWords.entries) {
+      final t = SearchTerm(TermKind.gender, g.label, gender: g);
+      for (final w in words) {
+        _add(w, t);
+      }
     }
     tags.forEach((tag, title) {
       final t = SearchTerm(TermKind.tag, title, tag: tag);
@@ -176,6 +192,8 @@ Future<List<String>> runSearch(AppDb db, List<SearchTerm> terms) async {
   final dates = terms.where((t) => t.dates != null).firstOrNull?.dates;
   final lists = <List<String>>[
     if (people.isNotEmpty) await db.photosWithAll(people, tripId: trip),
+    for (final t in terms)
+      if (t.gender != null) await db.photosWithGender(t.gender!, tripId: trip),
     for (final t in terms)
       if (t.tag != null) await db.photosWithTag(t.tag!, dates: dates),
     if (trip != null || dates != null) await db.photosIn(tripId: trip, dates: dates),

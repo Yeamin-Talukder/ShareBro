@@ -208,6 +208,7 @@ class _PersonScreenState extends State<PersonScreen> {
         ],
       ),
     );
+    text.dispose();
     if (name == null) return;
     final id = await c.db.renamePerson(widget.personId, name);
     c.changed();
@@ -215,7 +216,7 @@ class _PersonScreenState extends State<PersonScreen> {
     if (id != widget.personId) {
       // The name already existed, so the two were merged.
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Merged with the existing ${name.trim()}')));
+          SnackBar(content: Text('Merged with the existing ${AppDb.cleanName(name)}')));
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -263,6 +264,41 @@ class _PersonScreenState extends State<PersonScreen> {
         );
         if (nick == null) return;
         await c.db.setNickname(person.id, nick);
+        Haptics.success();
+      case 'gender':
+        final picked = await showDialog<(Gender?,)>(
+          context: context,
+          builder: (context) => SimpleDialog(
+            title: Text('${person.displayName} is'),
+            children: [
+              for (final g in Gender.values)
+                SimpleDialogOption(
+                  onPressed: () => Navigator.pop(context, (g,)),
+                  child: Row(children: [
+                    Icon(g == Gender.male ? Icons.male_rounded : Icons.female_rounded),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(g.label)),
+                    if (person.gender == g && !person.genderGuessed) const Icon(Icons.check_rounded),
+                  ]),
+                ),
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, (null,)),
+                child: Row(children: [
+                  const Icon(Icons.auto_awesome_rounded),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(person.genderGuessed && person.gender != null
+                        ? 'Let ShareBro guess (now ${person.gender!.label.toLowerCase()})'
+                        : 'Let ShareBro guess'),
+                  ),
+                  if (person.genderGuessed || person.gender == null) const Icon(Icons.check_rounded),
+                ]),
+              ),
+            ],
+          ),
+        );
+        if (picked == null) return;
+        await c.db.setGender(person.id, picked.$1);
         Haptics.success();
       case 'together':
         await Navigator.push(
@@ -542,6 +578,7 @@ class _PersonScreenState extends State<PersonScreen> {
                     itemBuilder: (_) => [
                       const PopupMenuItem(value: 'nickname', child: Text('Set nickname')),
                       const PopupMenuItem(value: 'together', child: Text('Photos with someone…')),
+                      const PopupMenuItem(value: 'gender', child: Text('Male or female…')),
                       PopupMenuItem(
                         value: 'ignore',
                         child: Text(_ignored ? 'Bring back to People' : 'Not in our group'),

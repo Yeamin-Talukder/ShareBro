@@ -34,6 +34,9 @@ class NotifyChannel(private val context: Context, messenger: BinaryMessenger) {
         const val SCAN = "scan_progress"
         const val EXTRA_ID = "notify_id"
         const val EXTRA_ACTION = "notify_action"
+
+        /** Which screen a tap on the notification should open. */
+        const val EXTRA_OPEN = "notify_open"
         const val ACTION_TAP = "photo_organizer.NOTIFY_ACTION"
 
         /** The live channel, while the app is running. */
@@ -63,8 +66,17 @@ class NotifyChannel(private val context: Context, messenger: BinaryMessenger) {
                             thumb = call.argument<ByteArray>("thumb"),
                             picture = call.argument<ByteArray>("picture"),
                             actions = call.argument<List<Map<String, String>>>("actions") ?: emptyList(),
+                            open = call.argument<String>("open"),
+                            group = call.argument<String>("group"),
+                            lines = call.argument<List<String>>("lines"),
+                            segments = call.argument<Int>("segments"),
                         )
                         result.success(true)
+                    }
+                    // A tap that launched the app before Dart was listening.
+                    "takeOpen" -> {
+                        result.success(pendingOpen)
+                        pendingOpen = null
                     }
                     "cancel" -> {
                         manager.cancel(call.argument<Int>("id")!!)
@@ -81,6 +93,19 @@ class NotifyChannel(private val context: Context, messenger: BinaryMessenger) {
 
     fun dispose() {
         if (instance === this) instance = null
+    }
+
+    /** Screen a notification tap asked for, until Dart picks it up. */
+    private var pendingOpen: String? = null
+
+    /** A notification was tapped: open [target] in the app. */
+    fun onOpen(target: String) {
+        pendingOpen = target
+        main.post { channel.invokeMethod("open", target, object : MethodChannel.Result {
+            override fun success(result: Any?) { pendingOpen = null }
+            override fun error(code: String, message: String?, details: Any?) {}
+            override fun notImplemented() {}
+        }) }
     }
 
     /** A button was pressed (from the receiver). */
@@ -107,9 +132,10 @@ class NotifyChannel(private val context: Context, messenger: BinaryMessenger) {
         ))
     }
 
-    private fun openApp(id: Int): PendingIntent {
+    private fun openApp(id: Int, open: String?): PendingIntent {
         val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)!!
             .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        open?.let { intent.putExtra(EXTRA_OPEN, it) }
         return PendingIntent.getActivity(context, id, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
     }
 
@@ -139,6 +165,10 @@ class NotifyChannel(private val context: Context, messenger: BinaryMessenger) {
         thumb: ByteArray?,
         picture: ByteArray?,
         actions: List<Map<String, String>>,
+        open: String? = null,
+        group: String? = null,
+        lines: List<String>? = null,
+        segments: Int? = null,
     ) {
         if (!canPost()) return
         val channelId = when (kind) {
@@ -147,13 +177,14 @@ class NotifyChannel(private val context: Context, messenger: BinaryMessenger) {
             "scan" -> SCAN
             else -> DONE
         }
+        val summary = kind == "summary"
         val ongoing = kind == "progress" || kind == "scan"
         val b = Notification.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_notify)
             .setColor(accent)
             .setContentTitle(title)
             .setContentText(text)
-            .setContentIntent(openApp(id))
+            .setContentIntent(openApp(id, open))
             .setOnlyAlertOnce(ongoing)
             .setOngoing(ongoing)
             .setAutoCancel(!ongoing)
@@ -166,9 +197,19 @@ class NotifyChannel(private val context: Context, messenger: BinaryMessenger) {
                 },
             )
         sub?.let { b.setSubText(it) }
+        // Finished transfers stack under one summary.
+        group?.let { b.setGroup(it).setGroupSummary(summary) }
+        if (summary && lines != null) {
+            b.setStyle(Notification.InboxStyle().also { s -> lines.forEach { s.addLine(it) } }.setSummaryText(text))
+        }
         bitmap(thumb)?.let { b.setLargeIcon(it) }
         for (a in actions) {
-            b.addAction(Notification.Action.Builder(null as android.graphics.drawable.Icon?, a["label"], actionIntent(id, a["id"]!!)).build())
+            val action = a["id"]!!
+            // "open:review" etc. open the app at that screen; the rest are
+            // handled in the background (Accept, Cancel, Retry…).
+            val intent = if (action.startsWith("open:")) openApp(id * 31 + action.hashCode(), action.removePrefix("open:"))
+            else actionIntent(id, action)
+            b.addAction(Notification.Action.Builder(null as android.graphics.drawable.Icon?, a["label"], intent).build())
         }
 
         val p = progress
@@ -177,14 +218,20 @@ class NotifyChannel(private val context: Context, messenger: BinaryMessenger) {
             // also shows as a chip in the status bar.
             val style = Notification.ProgressStyle()
                 .setStyledByProgress(true)
-                .setProgressSegments(listOf(Notification.ProgressStyle.Segment(1000).setColor(accent)))
-            if (p == null || p < 0) style.setProgressIndeterminate(true) else style.setProgress((p * 1000).toInt())
+                // One segment per file (a dozen at most), like the demo.
+                .setProgressSegments(
+                    List((segments ?: 1).coerceIn(1, 12)) { Notification.ProgressStyle.Segment(1000).setColor(accent) },
+                )
+            val total = 1000 * (segments ?: 1).coerceIn(1, 12)
+            if (p == null || p < 0) style.setProgressIndeterminate(true) else style.setProgress((p * total).toInt())
             b.setStyle(style)
             // Ask for promotion to a Live Update (Notification.EXTRA_REQUEST_PROMOTED_ONGOING).
             b.addExtras(Bundle().apply { putBoolean("android.requestPromotedOngoing", true) })
             chip?.let { b.setShortCriticalText(it) }
         } else if (ongoing) {
             if (p == null || p < 0) b.setProgress(0, 0, true) else b.setProgress(1000, (p * 1000).toInt(), false)
+        } else if (summary) {
+            // Style set above.
         } else if (picture != null) {
             bitmap(picture)?.let { pic ->
                 b.setStyle(Notification.BigPictureStyle().bigPicture(pic).setSummaryText(text))

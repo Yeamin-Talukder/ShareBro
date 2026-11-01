@@ -113,7 +113,8 @@ class AssetThumb extends StatelessWidget {
   }
 }
 
-/// Floating face bubbles for empty screens.
+/// A stack of three prints that fans open and closes, the front one
+/// lifting, for empty screens.
 class EmptyIllustration extends StatelessWidget {
   const EmptyIllustration({super.key, required this.message, this.action});
 
@@ -122,72 +123,14 @@ class EmptyIllustration extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final bubbles = [
-      (const Offset(-62, -18), 30.0, scheme.primaryContainer, 0),
-      (const Offset(58, -30), 24.0, scheme.tertiaryContainer, 400),
-      (const Offset(0, 22), 40.0, scheme.secondaryContainer, 200),
-      (const Offset(-30, 58), 18.0, scheme.tertiaryContainer, 700),
-      (const Offset(44, 52), 22.0, scheme.primaryContainer, 900),
-    ];
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          SizedBox(
+          const SizedBox(
             width: 200,
             height: 170,
-            child: Stack(alignment: Alignment.center, children: [
-              for (final (offset, r, color, delay) in bubbles)
-                Transform.translate(
-                  offset: offset,
-                  child: CircleAvatar(
-                    radius: r,
-                    backgroundColor: color,
-                    child: Icon(Icons.face_rounded,
-                        size: r * 1.1, color: scheme.onPrimaryContainer),
-                  )
-                      .animate(onPlay: (c) => c.repeat(reverse: true))
-                      .moveY(
-                          begin: -5,
-                          end: 5,
-                          delay: delay.ms,
-                          duration: 1800.ms,
-                          curve: Curves.easeInOut),
-                ),
-              // A little scene: the big face waves...
-              Transform.translate(
-                offset: const Offset(34, 0),
-                child: const Text('👋', style: TextStyle(fontSize: 26))
-                    .animate(onPlay: (c) => c.repeat(reverse: true))
-                    .rotate(
-                        begin: -0.06,
-                        end: 0.08,
-                        alignment: Alignment.bottomCenter,
-                        duration: 420.ms,
-                        curve: Curves.easeInOut),
-              ),
-              // ...while a camera in the corner takes a photo now and then.
-              Transform.translate(
-                offset: const Offset(78, -66),
-                child: Stack(alignment: Alignment.center, children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: const BoxDecoration(
-                        color: Colors.white, shape: BoxShape.circle),
-                  )
-                      .animate(onPlay: (c) => c.repeat())
-                      .scaleXY(begin: 0, end: 1.6, delay: 2000.ms, duration: 260.ms)
-                      .fadeOut(delay: 2000.ms, duration: 380.ms),
-                  Icon(Icons.photo_camera_rounded, size: 26, color: scheme.primary)
-                      .animate(onPlay: (c) => c.repeat())
-                      .scaleXY(begin: 1, end: 0.85, delay: 1900.ms, duration: 100.ms)
-                      .then()
-                      .scaleXY(begin: 1, end: 1 / 0.85, duration: 160.ms),
-                ]),
-              ),
-            ]),
+            child: _PhotoStack(),
           ).animate().fadeIn(duration: 500.ms).scale(
               begin: const Offset(0.8, 0.8), curve: Curves.easeOutBack),
           const SizedBox(height: 24),
@@ -204,6 +147,126 @@ class EmptyIllustration extends StatelessWidget {
       ),
     );
   }
+}
+
+/// One loop of the fan: open, then closed again.
+const _fanCycle = Duration(milliseconds: 3600);
+
+class _PhotoStack extends StatefulWidget {
+  const _PhotoStack();
+
+  @override
+  State<_PhotoStack> createState() => _PhotoStackState();
+}
+
+class _PhotoStackState extends State<_PhotoStack> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: _fanCycle);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Still when animations are turned off.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _c.stop();
+      _c.value = 0;
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = scheme.brightness == Brightness.dark;
+    final coral = scheme.primary;
+    final peach = dark ? const Color(0xFF8A4A3C) : const Color(0xFFFFC3B2);
+    final sky = dark ? const Color(0xFF3A2A28) : const Color(0xFFFDE3DA);
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, _) {
+        // 0 closed, 1 fully fanned, eased in and out.
+        final v = (1 - math.cos(2 * math.pi * _c.value)) / 2;
+        const deg = math.pi / 180;
+        return Stack(alignment: Alignment.center, children: [
+          Transform.translate(
+            offset: Offset(-6 * v, 0),
+            child: Transform.rotate(angle: (-6 - 10 * v) * deg, child: _Print(photo: peach, dark: dark)),
+          ),
+          Transform.translate(
+            offset: Offset(6 * v, 0),
+            child: Transform.rotate(angle: (6 + 10 * v) * deg, child: _Print(photo: sky, dark: dark)),
+          ),
+          Transform.translate(
+            offset: Offset(0, -10 * v),
+            child: _Print(
+              photo: sky,
+              dark: dark,
+              scene: CustomPaint(painter: _ScenePainter(sun: coral, hill: coral, sunDrop: 4 - 7 * v)),
+            ),
+          ),
+        ]);
+      },
+    );
+  }
+}
+
+/// A white-bordered print with a photo, plain or with a little scene.
+class _Print extends StatelessWidget {
+  const _Print({required this.photo, required this.dark, this.scene});
+
+  final Color photo;
+  final bool dark;
+  final Widget? scene;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 76,
+        height: 92,
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 26),
+        decoration: BoxDecoration(
+          color: dark ? const Color(0xFF252329) : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: (dark ? Colors.white : const Color(0xFF1A1820)).withAlpha(30)),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(5),
+          child: ColoredBox(color: photo, child: scene ?? const SizedBox.expand()),
+        ),
+      );
+}
+
+/// A sun over a hill, the sun bobbing by [sunDrop].
+class _ScenePainter extends CustomPainter {
+  _ScenePainter({required this.sun, required this.hill, required this.sunDrop});
+
+  final Color sun, hill;
+  final double sunDrop;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Drawn on the 60 x 58 grid of the design, scaled to fit.
+    canvas.scale(size.width / 60, size.height / 58);
+    canvas.drawCircle(Offset(42, 18 + sunDrop), 8, Paint()..color = sun);
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, 58)
+        ..lineTo(22, 32)
+        ..lineTo(36, 46)
+        ..lineTo(46, 38)
+        ..lineTo(60, 58)
+        ..close(),
+      Paint()..color = hill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ScenePainter old) => old.sunDrop != sunDrop || old.sun != sun || old.hill != hill;
 }
 
 /// Little bursting dots for celebrations.
@@ -319,14 +382,32 @@ class _LivingAvatarState extends State<LivingAvatar> {
   @override
   void initState() {
     super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(LivingAvatar old) {
+    super.didUpdateWidget(old);
+    // A new cover means the faces changed (a merge, a new scan, a chosen
+    // picture): pick the set again.
+    if (old.cover != widget.cover) _load();
+  }
+
+  void _load() {
     widget.loadFaces().then((faces) {
-      if (!mounted || faces.length < 2) return;
-      _faces = faces;
+      if (!mounted) return;
+      _timer?.cancel();
+      _timer = null;
+      setState(() {
+        _faces = faces.length < 2 ? const [] : faces;
+        _i = 0;
+      });
+      if (_faces.isEmpty) return;
       // Stagger so the whole grid doesn't change at the same moment.
-      final period = Duration(milliseconds: 3500 + math.Random(widget.personId).nextInt(3000));
+      final period = Duration(milliseconds: 4000 + math.Random(widget.personId).nextInt(3000));
       _timer = Timer.periodic(period, (_) {
-        // Skip while this tab is hidden.
-        if (mounted && (_active?.value.enabled ?? true)) {
+        // Skip while this tab is hidden, and stay put with motion turned off.
+        if (mounted && (_active?.value.enabled ?? true) && !MediaQuery.disableAnimationsOf(context)) {
           setState(() => _i = (_i + 1) % _faces.length);
         }
       });
@@ -354,6 +435,17 @@ class _LivingAvatarState extends State<LivingAvatar> {
       tag: 'person-${widget.personId}',
       child: AnimatedSwitcher(
         duration: 900.ms,
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        // The next face settles in from slightly closer while the last one
+        // fades out under it, like a slow photo slideshow.
+        transitionBuilder: (child, a) => FadeTransition(
+          opacity: a,
+          child: ScaleTransition(scale: Tween(begin: 1.12, end: 1.0).animate(a), child: child),
+        ),
+        layoutBuilder: (current, previous) => ClipOval(
+          child: Stack(alignment: Alignment.center, children: [...previous, ?current]),
+        ),
         child: FaceAvatar(
           key: ValueKey(_i),
           personId: widget.personId,

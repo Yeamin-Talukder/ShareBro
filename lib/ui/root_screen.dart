@@ -3,14 +3,20 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../scan/scan_controller.dart';
 import '../share/receive.dart';
+import '../share/notify.dart';
 import '../share/send_center.dart';
 import 'app_lock.dart';
 import 'aurora.dart';
 import 'explore_screen.dart';
 import 'gallery_screen.dart';
+import 'launch_clink.dart';
 import 'glass_dock.dart';
 import 'home_screen.dart';
+import 'island.dart' show islandNavigator;
 import 'receive_screen.dart';
+import 'review_screen.dart';
+import 'scan_screen.dart';
+import 'send_center_screen.dart';
 import 'share_screen.dart';
 import 'motion.dart';
 
@@ -44,10 +50,37 @@ class _RootScreenState extends State<RootScreen> {
     _celebratedSession = s.receiver.session;
     s.addListener(_checkSent);
     s.receiver.addListener(_checkReceived);
+    Notify.onOpen = _openFromNotification;
+    // A tap on a notification may have started the app.
+    WidgetsBinding.instance.addPostFrameCallback((_) => Notify.takeOpen());
+  }
+
+  /// A notification was tapped: show the screen it's about.
+  void _openFromNotification(String target) {
+    final nav = islandNavigator.currentState;
+    if (!mounted || nav == null) return;
+    final c = widget.controller;
+    nav.popUntil((r) => r.isFirst);
+    Widget? screen;
+    switch (target) {
+      case 'people':
+        setState(() => _tab = 0);
+      case 'scan':
+        screen = ScanScreen(controller: c);
+      case 'review':
+        setState(() => _tab = 0);
+        screen = ReviewScreen(controller: c);
+      case 'receive':
+        screen = ReceiveScreen(controller: c);
+      case 'transfers':
+        screen = SendCenterScreen(controller: c);
+    }
+    if (screen != null) nav.push(MaterialPageRoute(builder: (_) => screen!));
   }
 
   @override
   void dispose() {
+    if (Notify.onOpen == _openFromNotification) Notify.onOpen = null;
     final s = widget.controller.sharing;
     s.removeListener(_checkSent);
     s.receiver.removeListener(_checkReceived);
@@ -159,76 +192,7 @@ class _RootScreenState extends State<RootScreen> {
     return Stack(children: [
       AppLockGate(controller: c, child: IncomingWatcher(controller: c, child: app)),
       if (_launching)
-        _LaunchOverlay(onDone: () => setState(() => _launching = false)),
+        LaunchClink(onDone: () => setState(() => _launching = false)),
     ]);
-  }
-}
-
-/// Opening animation: the logo pops in, bursts into floating faces that
-/// drift toward where the People grid sits, then the whole thing fades away.
-class _LaunchOverlay extends StatelessWidget {
-  const _LaunchOverlay({required this.onDone});
-
-  final VoidCallback onDone;
-
-  static const _targets = [
-    Offset(-110, -200), Offset(0, -200), Offset(110, -200),
-    Offset(-110, -80), Offset(0, -80), Offset(110, -80),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final faces = [
-      scheme.primaryContainer,
-      scheme.tertiaryContainer,
-      scheme.secondaryContainer,
-    ];
-    return Positioned.fill(
-      child: ColoredBox(
-        color: scheme.surface,
-        child: Stack(alignment: Alignment.center, children: [
-          for (final (i, target) in _targets.indexed)
-            CircleAvatar(
-              radius: 30,
-              backgroundColor: faces[i % faces.length],
-              child: Icon(Icons.face_rounded, size: 34, color: scheme.onPrimaryContainer),
-            )
-                .animate()
-                .scaleXY(begin: 0, end: 1, delay: (550 + 40 * i).ms, duration: 350.ms,
-                    curve: Curves.easeOutBack)
-                .move(
-                    begin: Offset.zero,
-                    end: target,
-                    delay: (550 + 40 * i).ms,
-                    duration: 600.ms,
-                    curve: Curves.easeOutCubic),
-          // The app icon pops in with a light sweep across it, then lifts away.
-          ClipRRect(
-            borderRadius: BorderRadius.circular(30),
-            child: Image.asset('assets/icon/app_icon_1024.png', width: 120, height: 120),
-          )
-              .animate()
-              .scaleXY(begin: 0, end: 1, duration: 600.ms, curve: Curves.elasticOut)
-              .shimmer(delay: 350.ms, duration: 700.ms, color: Colors.white70)
-              .then(delay: 120.ms)
-              .scaleXY(end: 0.4, duration: 300.ms, curve: Curves.easeIn)
-              .fadeOut(duration: 300.ms),
-          Positioned(
-            bottom: 120,
-            child: Text('ShareBro',
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.w800))
-                .animate()
-                .fadeIn(delay: 200.ms, duration: 400.ms)
-                .moveY(begin: 12, curve: Curves.easeOutCubic),
-          ),
-        ]),
-      )
-          .animate(onComplete: (_) => onDone())
-          .fadeOut(delay: 1300.ms, duration: 350.ms),
-    );
   }
 }

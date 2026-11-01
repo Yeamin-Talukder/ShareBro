@@ -129,6 +129,7 @@ class _SearchScreenState extends State<SearchScreen> {
         TermKind.person => Icons.person_rounded,
         TermKind.trip => Icons.luggage_rounded,
         TermKind.dates => Icons.calendar_month_rounded,
+        TermKind.gender => t.gender == Gender.male ? Icons.male_rounded : Icons.female_rounded,
         TermKind.tag => categoryIcon(t.tag!),
       };
 

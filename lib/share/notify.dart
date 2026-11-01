@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -11,26 +12,47 @@ import 'receive.dart';
 import 'send_center.dart';
 
 /// Android's notification shade (see NotifyChannel.kt): progress with a
-/// thumbnail, buttons, a photo preview when done, and the Android 16 status
-/// bar chip.
+/// thumbnail, buttons, a photo preview when done, grouped summaries, and
+/// the Android 16 status bar chip. A tap opens the screen it's about.
 class Notify {
   static const _channel = MethodChannel('photo_organizer/notify');
   static void Function(int id, String action)? onAction;
+
+  /// A notification was tapped: open this screen ('scan', 'review',
+  /// 'people', 'receive', 'transfers').
+  static void Function(String target)? onOpen;
   static bool _listening = false;
 
   static void _listen() {
     if (_listening) return;
     _listening = true;
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'action') {
-        final args = (call.arguments as Map).cast<String, Object?>();
-        onAction?.call(args['id']! as int, args['action']! as String);
+      switch (call.method) {
+        case 'action':
+          final args = (call.arguments as Map).cast<String, Object?>();
+          onAction?.call(args['id']! as int, args['action']! as String);
+        case 'open':
+          onOpen?.call(call.arguments as String);
       }
     });
   }
 
-  /// [kind]: 'request', 'progress', 'scan' or 'done'. [progress] 0..1, or
-  /// null for "working on it". [chip] is the short status-bar text.
+  /// Picks up a tap that started the app before Dart was listening.
+  static Future<void> takeOpen() async {
+    _listen();
+    try {
+      final target = await _channel.invokeMethod<String>('takeOpen');
+      if (target != null) onOpen?.call(target);
+    } on MissingPluginException {
+      // Not on Android.
+    }
+  }
+
+  /// [kind]: 'request', 'progress', 'scan', 'done' or 'summary' (the head
+  /// of a [group]). [progress] 0..1, or null for "working on it". [chip] is
+  /// the short status-bar text, [segments] how many pieces the Android 16
+  /// bar is split into, [open] the screen a tap opens, [lines] a summary's
+  /// rows.
   static Future<void> show({
     required int id,
     required String kind,
@@ -39,8 +61,12 @@ class Notify {
     String? sub,
     double? progress,
     String? chip,
+    int? segments,
     Uint8List? thumb,
     Uint8List? picture,
+    String? open,
+    String? group,
+    List<String>? lines,
     List<(String id, String label)> actions = const [],
   }) async {
     _listen();
@@ -53,8 +79,12 @@ class Notify {
         'sub': sub,
         'progress': progress,
         'chip': chip,
+        'segments': segments,
         'thumb': thumb,
         'picture': picture,
+        'open': open,
+        'group': group,
+        'lines': lines,
         'actions': [
           for (final (a, l) in actions) {'id': a, 'label': l},
         ],
@@ -78,9 +108,10 @@ class Notify {
 }
 
 /// Keeps the notification shade in step with what's happening: live
-/// progress for every send, receive and scan; incoming requests and
-/// "done" notices while the app is in the background (the island shows
-/// them in the app).
+/// progress for every send, receive and scan; incoming requests, "done"
+/// and "didn't finish" notices while the app is in the background (the
+/// island shows them in the app). Titles say what happened, the line under
+/// says what's next.
 class NotifyBridge with WidgetsBindingObserver {
   NotifyBridge(this.c) {
     WidgetsBinding.instance.addObserver(this);
@@ -97,9 +128,18 @@ class NotifyBridge with WidgetsBindingObserver {
 
   final ScanController c;
 
-  static const _request = 2000, _missed = 2001, _receive = 3000, _received = 3001, _scan = 4000;
+  static const _request = 2000,
+      _missed = 2001,
+      _receive = 3000,
+      _received = 3001,
+      _scan = 4000,
+      _scanDone = 4001,
+      _summary = 1999;
   static int _progressId(SendJob j) => 10000 + j.id;
   static int _doneId(SendJob j) => 20000 + j.id;
+
+  /// Finished transfers stack in this group under one summary.
+  static const _doneGroup = 'transfers';
 
   bool _foreground = true;
   final Map<int, DateTime> _last = {};
@@ -108,6 +148,15 @@ class NotifyBridge with WidgetsBindingObserver {
   IncomingRequest? _askShown;
   ReceiveSession? _sessionShown, _sessionDone;
   bool _scanShown = false;
+
+  /// When this scan's progress was first seen, and how far it was then:
+  /// for "about 4 min left".
+  DateTime? _scanFrom;
+  int _scanFromDone = 0;
+
+  /// Rows of the "transfers done" summary, newest first, while the shade
+  /// still has them.
+  final List<String> _doneLines = [];
 
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -125,15 +174,22 @@ class NotifyBridge with WidgetsBindingObserver {
       id: _missed,
       kind: 'request',
       title: '${req.from} tried to send you ${req.summary}',
-      text: 'Receive is off. Open ShareBro (or turn on Receive) and ask them to send again.',
+      text: 'Receive was off. Turn it on and ask them to send again.',
+      open: 'receive',
     );
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
-    // Leaving the app with a question open: ask in the shade instead.
-    if (!_foreground) _onReceiver();
+    if (_foreground) {
+      // Back in the app: the island shows it all; clear the "done" pile.
+      _doneLines.clear();
+      unawaited(Notify.cancel(_summary));
+    } else {
+      // Leaving the app with a question open: ask in the shade instead.
+      _onReceiver();
+    }
   }
 
   /// Progress updates are throttled; Android drops rapid-fire ones anyway.
@@ -153,6 +209,34 @@ class NotifyBridge with WidgetsBindingObserver {
     return _thumbs[key] = await a?.thumbnailDataWithSize(ThumbnailSize.square(size), quality: 80);
   }
 
+  /// A finished transfer: posted into the group, with the summary on top
+  /// once there's more than one.
+  Future<void> _done(int id, String title, String text, {Uint8List? thumb, Uint8List? picture,
+      String open = 'transfers', List<(String, String)> actions = const []}) async {
+    await Notify.show(
+      id: id,
+      kind: 'done',
+      title: title,
+      text: text,
+      thumb: thumb,
+      picture: picture,
+      open: open,
+      group: _doneGroup,
+      actions: actions,
+    );
+    _doneLines.insert(0, title);
+    if (_doneLines.length < 2) return;
+    await Notify.show(
+      id: _summary,
+      kind: 'summary',
+      title: '${_doneLines.length} transfers done',
+      text: 'ShareBro',
+      lines: _doneLines.take(6).toList(),
+      open: 'transfers',
+      group: _doneGroup,
+    );
+  }
+
   // ---- Sending ----
 
   Future<void> _onSharing() async {
@@ -163,23 +247,24 @@ class NotifyBridge with WidgetsBindingObserver {
         if (!_due(_progressId(j))) continue;
         final (text, progress) = switch (j.status) {
           JobStatus.waiting => ('Waiting for ${j.deviceAlias} to be nearby', null),
-          JobStatus.preparing => ('Getting ${j.count} ${j.noun} ready', null),
+          JobStatus.preparing => ('Getting them ready', null),
           JobStatus.asking => ('Waiting for ${j.deviceAlias} to accept', null),
           _ => (
-            '${j.filesDone} of ${j.count} ${j.noun}'
-                '${j.remaining == null ? '' : ' · ${_short(j.remaining!)} left'}',
-            j.progress,
-          ),
+              '${j.filesDone} of ${j.count}${j.remaining == null ? '' : ' · about ${_short(j.remaining!)} left'}',
+              j.progress,
+            ),
         };
         await Notify.show(
           id: _progressId(j),
           kind: 'progress',
-          title: 'Sending to ${j.deviceAlias}',
+          title: 'Sending ${j.count} ${j.noun} to ${j.deviceAlias}',
           text: text,
           sub: j.speed == null ? null : '${formatBytes(j.speed!.round())}/s',
           progress: progress,
-          chip: progress == null ? j.deviceAlias : '${(progress * 100).round()}%',
+          segments: j.count,
+          chip: progress == null ? j.deviceAlias : '${(progress * 100).round()}% · ${j.deviceAlias}',
           thumb: await _thumbFor(firstPhoto),
+          open: 'transfers',
           actions: const [('cancel', 'Cancel')],
         );
         continue;
@@ -189,19 +274,25 @@ class NotifyBridge with WidgetsBindingObserver {
       await Notify.cancel(_progressId(j));
       if (_foreground) continue;
       if (j.status == JobStatus.done) {
-        await Notify.show(
-          id: _doneId(j),
-          kind: 'done',
-          title: 'Sent ${j.count} ${j.noun} to ${j.deviceAlias} ✓',
-          text: '${j.personName} arrived on ${j.deviceAlias}',
+        await _done(
+          _doneId(j),
+          'Sent ${j.count} ${j.noun} to ${j.deviceAlias}',
+          '${j.personName}\'s ${j.noun} are on ${j.deviceAlias}',
           thumb: await _thumbFor(firstPhoto),
         );
       } else if (j.status != JobStatus.cancelled) {
         await Notify.show(
           id: _doneId(j),
           kind: 'done',
-          title: 'Couldn\'t finish sending to ${j.deviceAlias}',
-          text: j.message ?? 'Open ShareBro to try again',
+          title: j.filesDone > 0
+              ? 'Sending to ${j.deviceAlias} stopped at ${j.filesDone} of ${j.count}'
+              : 'Couldn\'t send to ${j.deviceAlias}',
+          text: '${j.message ?? 'Something went wrong on the way.'} '
+              '${j.canRetry ? 'Retry picks up where it stopped.' : ''}'
+              .trim(),
+          thumb: await _thumbFor(firstPhoto),
+          open: 'transfers',
+          actions: [if (j.canRetry) ('retry', 'Retry'), ('dismiss', 'Dismiss')],
         );
       }
     }
@@ -218,7 +309,9 @@ class NotifyBridge with WidgetsBindingObserver {
         id: _request,
         kind: 'request',
         title: '${req.from} wants to send you ${req.summary}',
-        text: '${formatBytes(req.totalBytes)} over ${req.via}',
+        text: '${formatBytes(req.totalBytes)} · ${req.via} · '
+            '${req.allMedia ? 'saves to the $receivedAlbum album' : 'saves to Download/$receivedAlbum'}',
+        open: 'receive',
         actions: const [('decline', 'Decline'), ('accept', 'Accept')],
       );
     } else if ((req == null || req.answered) && _askShown != null) {
@@ -236,26 +329,77 @@ class NotifyBridge with WidgetsBindingObserver {
       await Notify.show(
         id: _receive,
         kind: 'progress',
-        title: 'Receiving from ${s.from}',
+        title: 'Getting ${s.tokens.length} from ${s.from}',
         text: '${s.done.length} of ${s.tokens.length} · ${formatBytes(s.bytes)} of ${formatBytes(total)}',
         progress: p,
-        chip: p == null ? s.from : '${(p * 100).round()}%',
+        segments: s.tokens.length,
+        chip: p == null ? s.from : '${(p * 100).round()}% · ${s.from}',
         thumb: await _thumbFor(s.savedIds.isEmpty ? null : s.savedIds.last),
+        open: 'receive',
       );
     } else if (_sessionDone != s) {
       _sessionDone = s;
       if (_sessionShown == s) await Notify.cancel(_receive);
       if (_foreground || s.cancelled || s.done.isEmpty) return;
       final photos = s.savedIds.length, files = s.savedFiles;
-      await Notify.show(
-        id: _received,
-        kind: 'done',
-        title: 'Got ${s.done.length} ${files == 0 ? (photos == 1 ? 'photo' : 'photos') : 'files'} from ${s.from} ✓',
-        text: photos > 0
-            ? 'Saved to the $receivedAlbum album · faces will be found'
-            : 'Saved to Download/$receivedAlbum',
-        picture: await _thumbFor(s.savedIds.isEmpty ? null : s.savedIds.first, size: 720),
+      final what = files == 0 ? (photos == 1 ? 'photo' : 'photos') : 'files';
+      await _done(
+        _received,
+        '${s.done.length} $what from ${s.from}',
+        photos > 0 ? 'In the $receivedAlbum album · faces are being found' : 'In Download/$receivedAlbum',
+        picture: await _sheet(s.savedIds),
+        open: 'receive',
+        actions: const [('open:receive', 'View photos')],
       );
+    }
+  }
+
+  /// A contact sheet of what arrived: one big photo and two small ones
+  /// beside it (Android shows one picture per notification).
+  Future<Uint8List?> _sheet(List<String> ids) async {
+    if (ids.isEmpty) return null;
+    try {
+      final shots = [
+        for (final id in ids.take(3))
+          ?await _thumbFor(id, size: 480),
+      ];
+      if (shots.isEmpty) return null;
+      final images = [
+        for (final b in shots) (await (await ui.instantiateImageCodec(b)).getNextFrame()).image,
+      ];
+      const w = 720.0, h = 360.0, gap = 6.0;
+      final rec = ui.PictureRecorder();
+      final canvas = ui.Canvas(rec);
+      void cover(ui.Image img, ui.Rect to) {
+        // Crop to fill, like a photo tile.
+        final s = img.width / img.height, t = to.width / to.height;
+        final src = s > t
+            ? ui.Rect.fromCenter(
+                center: ui.Offset(img.width / 2, img.height / 2), width: img.height * t, height: img.height.toDouble())
+            : ui.Rect.fromCenter(
+                center: ui.Offset(img.width / 2, img.height / 2), width: img.width.toDouble(), height: img.width / t);
+        canvas.drawImageRect(img, src, to, ui.Paint()..filterQuality = ui.FilterQuality.medium);
+      }
+
+      if (images.length == 1) {
+        cover(images[0], const ui.Rect.fromLTWH(0, 0, w, h));
+      } else {
+        const big = w * 2 / 3 - gap / 2;
+        cover(images[0], const ui.Rect.fromLTWH(0, 0, big, h));
+        final small = images.length == 2 ? h : (h - gap) / 2;
+        cover(images[1], ui.Rect.fromLTWH(big + gap, 0, w - big - gap, small));
+        if (images.length > 2) cover(images[2], ui.Rect.fromLTWH(big + gap, small + gap, w - big - gap, small));
+      }
+      final out = await rec.endRecording().toImage(w.toInt(), h.toInt());
+      final png = await out.toByteData(format: ui.ImageByteFormat.png);
+      for (final i in images) {
+        i.dispose();
+      }
+      out.dispose();
+      return png?.buffer.asUint8List();
+    } catch (e) {
+      debugPrint('Contact sheet failed: $e');
+      return null;
     }
   }
 
@@ -263,21 +407,56 @@ class NotifyBridge with WidgetsBindingObserver {
 
   Future<void> _onScan() async {
     if (c.running && c.total > 0) {
+      if (!_scanShown) {
+        _scanFrom = DateTime.now();
+        _scanFromDone = c.done;
+        await Notify.cancel(_scanDone);
+      }
       if (!_due(_scan, ms: 1500)) return;
       _scanShown = true;
+      final left = _scanLeft();
+      final p = c.done / c.total;
       await Notify.show(
         id: _scan,
         kind: 'scan',
-        title: 'Finding faces · ${_n(c.done)} of ${_n(c.total)}',
-        text: '${c.peopleSoFar} ${c.peopleSoFar == 1 ? 'person' : 'people'} so far',
-        progress: c.done / c.total,
-        chip: '${(c.done / c.total * 100).round()}%',
+        title: 'Finding faces',
+        text: '${_n(c.done)} of ${_n(c.total)} photos${left == null ? '' : ' · about ${_short(left)} left'}',
+        sub: c.albumName,
+        progress: p,
+        chip: left == null ? '${(p * 100).round()}%' : '${(p * 100).round()}% · ${_short(left)}',
+        // The newest face it found, or the photo it's on.
+        thumb: c.recentFaces.isNotEmpty ? c.recentFaces.first : c.preview,
+        open: 'scan',
         actions: const [('stop', 'Stop')],
       );
     } else if (!c.running && _scanShown) {
       _scanShown = false;
       await Notify.cancel(_scan);
+      // Finished while you were away: say what it found and what's next.
+      if (_foreground || c.error != null || c.stopped) return;
+      final people = c.peopleFound ?? 0;
+      await Notify.show(
+        id: _scanDone,
+        kind: 'done',
+        title: c.facesFound == 0
+            ? 'No faces in ${_n(c.done)} photos'
+            : 'Found $people ${people == 1 ? 'person' : 'people'} in ${_n(c.done)} photos',
+        text: c.facesFound == 0 ? 'Try another album or folder' : 'Name them, or check the faces it wasn\'t sure about',
+        sub: c.albumName,
+        thumb: c.recentFaces.isNotEmpty ? c.recentFaces.first : null,
+        open: c.facesFound == 0 ? 'people' : 'review',
+        actions: c.facesFound == 0 ? const [] : const [('open:review', 'Review faces'), ('open:people', 'Open People')],
+      );
     }
+  }
+
+  /// Time left at the pace so far, once there's enough to go on.
+  Duration? _scanLeft() {
+    final from = _scanFrom;
+    final done = c.done - _scanFromDone;
+    if (from == null || done < 10) return null;
+    final per = DateTime.now().difference(from).inMilliseconds / done;
+    return Duration(milliseconds: (per * (c.total - c.done)).round());
   }
 
   // ---- Buttons ----
@@ -291,11 +470,25 @@ class NotifyBridge with WidgetsBindingObserver {
         for (final j in c.sharing.jobs) {
           if (_progressId(j) == id) c.sharing.cancelJob(j);
         }
+      case 'retry':
+        for (final j in c.sharing.jobs) {
+          if (_doneId(j) == id && j.canRetry) {
+            _settled.remove(j.id);
+            c.sharing.retry(j);
+          }
+        }
+        unawaited(Notify.cancel(id));
+      case 'dismiss':
+        unawaited(Notify.cancel(id));
       case 'stop':
         c.cancel();
     }
   }
 
   static String _n(int n) => n.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
-  static String _short(Duration d) => d.inMinutes >= 1 ? '${d.inMinutes} min' : '${d.inSeconds} s';
+  static String _short(Duration d) => d.inHours >= 1
+      ? '${d.inHours} h ${d.inMinutes % 60} min'
+      : d.inMinutes >= 1
+          ? '${d.inMinutes} min'
+          : '${d.inSeconds} s';
 }

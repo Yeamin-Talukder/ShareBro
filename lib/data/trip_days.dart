@@ -2,7 +2,7 @@ import '../face/tags.dart' show labelPrefix;
 import 'db.dart';
 
 /// Scene labels too vague to name a day after.
-const _vague = {
+const vagueLabels = {
   'Smile', 'Fun', 'Selfie', 'Event', 'Leisure', 'Sky', 'Cool', 'Crowd', 'Team', 'Pattern',
   'Darkness', 'Hand', 'Eyelash', 'Jacket', 'Shirt', 'Sunglasses', 'Hair', 'Beard', 'Flesh', 'Room',
 };
@@ -47,7 +47,7 @@ Future<List<TripDay>> tripDays(AppDb db, int tripId) async {
       for (final t in tags[id] ?? const <String>{}) {
         if (!t.startsWith(labelPrefix)) continue;
         final name = t.substring(labelPrefix.length);
-        if (!_vague.contains(name)) n[name] = (n[name] ?? 0) + 1;
+        if (!vagueLabels.contains(name)) n[name] = (n[name] ?? 0) + 1;
       }
     }
     return n;

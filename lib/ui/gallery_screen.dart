@@ -67,6 +67,15 @@ class PhotosTab extends StatefulWidget {
 class _PhotosTabState extends State<PhotosTab> {
   DaySpan? _dates;
 
+  /// Photos are selected: the selection bar takes the top bar's place.
+  bool _selecting = false;
+
+  /// Fades the top bar's contents out (and off-limits) while selecting.
+  Widget _stepAside(Widget child) => IgnorePointer(
+        ignoring: _selecting,
+        child: AnimatedOpacity(opacity: _selecting ? 0 : 1, duration: 180.ms, child: child),
+      );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -78,16 +87,19 @@ class _PhotosTabState extends State<PhotosTab> {
           shadow: false,
           child: SizedBox.expand(),
         ),
-        title: const Text('Photos', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.6)),
+        title: _stepAside(
+            const Text('Photos', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.6))),
         actions: [
-          IconButton(
-            tooltip: 'Search',
-            icon: const Icon(Icons.search_rounded),
-            onPressed: () => Navigator.push(
-                context, MaterialPageRoute(builder: (_) => SearchScreen(controller: widget.controller))),
-          ),
-          DateChip(value: _dates, onChanged: (d) => setState(() => _dates = d)),
-          const SizedBox(width: 12),
+          _stepAside(Row(children: [
+            IconButton(
+              tooltip: 'Search',
+              icon: const Icon(Icons.search_rounded),
+              onPressed: () => Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => SearchScreen(controller: widget.controller))),
+            ),
+            DateChip(value: _dates, onChanged: (d) => setState(() => _dates = d)),
+            const SizedBox(width: 12),
+          ])),
         ],
       ),
       body: _AccessGate(
@@ -100,6 +112,9 @@ class _PhotosTabState extends State<PhotosTab> {
           emptyMessage: _dates == null
               ? 'No photos on this phone yet.'
               : 'No photos taken in these dates.',
+          onSelectingChanged: (v) {
+            if (mounted) setState(() => _selecting = v);
+          },
         ),
       ),
     );
@@ -120,9 +135,13 @@ class _AlbumsTabState extends State<AlbumsTab> {
   DaySpan? _dates;
   late Future<List<AssetPathEntity>> _albums = Gallery.albums(media: true);
 
+  /// Album cards that have already played their entrance.
+  final _shown = <int>{};
+
   void _setDates(DaySpan? d) => setState(() {
     _dates = d;
     _albums = Gallery.albums(dates: d, media: true);
+    _shown.clear();
   });
 
   void _openSmart(
@@ -246,7 +265,8 @@ class _AlbumsTabState extends State<AlbumsTab> {
                       childAspectRatio: 0.8,
                     ),
                     itemCount: albums.length,
-                    itemBuilder: (context, i) => _AlbumCard(
+                    itemBuilder: (context, i) {
+                      final card = _AlbumCard(
                       album: albums[i],
                       onTap: () => Navigator.push(
                         context,
@@ -258,7 +278,15 @@ class _AlbumsTabState extends State<AlbumsTab> {
                           ),
                         ),
                       ),
-                    ).animate().fadeIn(delay: (40 * i.clamp(0, 12)).ms).scaleXY(begin: 0.92, curve: Curves.easeOutBack),
+                    );
+                      // Once each: cards scrolling back into view don't pop in again.
+                      return _shown.add(i)
+                          ? card
+                              .animate()
+                              .fadeIn(delay: (40 * i.clamp(0, 12)).ms)
+                              .scaleXY(begin: 0.92, curve: Curves.easeOutBack)
+                          : card;
+                    },
                   ),
                 ),
               ]),

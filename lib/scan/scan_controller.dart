@@ -18,10 +18,12 @@ import '../data/group_match.dart';
 import '../data/profile.dart';
 import '../face/clustering.dart';
 import '../face/face_engine.dart';
+import '../face/gender.dart';
 import '../face/tags.dart';
 import '../share/receive.dart' show receivedAlbum;
 import '../share/send_center.dart';
 import '../share/server.dart' show FindLink, WebShare;
+import '../ui/fast_thumb.dart' show FastThumb;
 import 'background.dart';
 
 /// Longest side of the image the face finder looks at. Bigger finds smaller
@@ -31,6 +33,15 @@ const _scanSize = 1600;
 /// How far below a sure match a face still gets a "Is this them?".
 const _unsureRange = 0.1;
 const _pageSize = 200;
+
+/// Photos scanned at the same time.
+const _inFlight = 3;
+
+/// Photos whose location is read at the same time.
+const _locateBatch = 24;
+
+/// Clearest faces per person the gender guess looks at.
+const _genderFaces = 6;
 
 /// How many of the latest faces the scan screen shows.
 const _recentLimit = 60;
@@ -158,6 +169,7 @@ class ScanController extends ChangeNotifier {
     autoScanEnabled = (await db.setting(_autoScanKey)) != '0';
     appLock = (await db.setting(_appLockKey)) == '1';
     backfillDates();
+    unawaited(backfillLocations());
     _watchForNewPhotos();
   }
 
@@ -263,6 +275,51 @@ class ScanController extends ChangeNotifier {
     } catch (e) {
       debugPrint('Date backfill failed: $e');
     }
+  }
+
+  bool _locating = false;
+
+  /// Reads where already-scanned photos were taken, for the Places map:
+  /// earlier versions couldn't (Android hid it without the photo-location
+  /// permission). Cheap: no rescan, just each photo's GPS tag.
+  ///
+  /// Each photo is checked once: ones with no location are marked so the
+  /// next run skips them. Returns how many locations it found.
+  Future<int> backfillLocations() async {
+    if (_locating) return 0;
+    _locating = true;
+    var saved = 0;
+    try {
+      final ids = await db.photosWithoutLocation();
+      if (ids.isEmpty) return 0;
+      final none = <String>[];
+      // Several at a time: each look-up is a round trip to Android.
+      for (var start = 0; start < ids.length; start += _locateBatch) {
+        final batch = ids.skip(start).take(_locateBatch).toList();
+        final found = await Future.wait([
+          for (final id in batch)
+            () async {
+              final ll = await (await AssetEntity.fromId(id))?.latlngAsync();
+              return ll != null && (ll.latitude != 0 || ll.longitude != 0) ? (lat: ll.latitude, lng: ll.longitude) : null;
+            }(),
+        ]);
+        final located = <String, ({double lat, double lng})>{};
+        for (final (i, ll) in found.indexed) {
+          ll == null ? none.add(batch[i]) : located[batch[i]] = ll;
+        }
+        await db.setLocations(located);
+        saved += located.length;
+      }
+      // Only trust "no location" once some photo had one: without the
+      // photo-location permission Android reports none for every photo.
+      if (saved > 0 || await db.locatedCount() > 0) await db.markNoLocation(none);
+      if (saved > 0) changed();
+    } catch (e) {
+      debugPrint('Location backfill failed: $e');
+    } finally {
+      _locating = false;
+    }
+    return saved;
   }
 
   GroupingThresholds get thresholds =>
@@ -443,6 +500,9 @@ class ScanController extends ChangeNotifier {
 
   void cancel() => _cancel = true;
 
+  /// The last scan was stopped before the end.
+  bool get stopped => _cancel;
+
   /// Scans [album], or only its photos taken within [dates].
   Future<void> scan(AssetPathEntity album, {DaySpan? dates}) async {
     if (running) return;
@@ -511,7 +571,9 @@ class ScanController extends ChangeNotifier {
     notifyListeners();
     await ScanNotification.start('Starting…');
 
-    final tmp = File(p.join((await getTemporaryDirectory()).path, 'scan.jpg'));
+    final dir = (await getTemporaryDirectory()).path;
+    // One scan copy per photo in flight.
+    final tmps = [for (var i = 0; i < _inFlight; i++) File(p.join(dir, 'scan_$i.jpg'))];
     try {
       _engine ??= await FaceEngine.load();
       final scanned = await db.scannedAssetIds();
@@ -521,23 +583,30 @@ class ScanController extends ChangeNotifier {
       for (var start = 0; start < total && !_cancel; start += _pageSize) {
         final assets = await page(start, (start + _pageSize).clamp(0, total));
         await db.addToTrip(tripId!, assets.map((a) => a.id));
-        for (final asset in assets) {
-          if (_cancel) break;
-          if (tagged.contains(asset.id)) {
-            skipped++;
-          } else {
-            // Already-scanned photos only need categorising, not faces.
-            await _scanOne(asset, tmp, facesDone: scanned.contains(asset.id));
-          }
-          final facesBefore = facesFound;
-          done++;
-          _celebrate(facesBefore);
-          // Every photo when scanning (live preview), less often when skipping.
-          if (!tagged.contains(asset.id) || done % 20 == 0) notifyListeners();
-          if (done % 5 == 0) {
-            ScanNotification.update('$done of $total photos · $facesFound faces');
+        // A few photos at once: while one waits on the photo library,
+        // another is in face detection and a third in the labeller.
+        var next = 0;
+        Future<void> lane(File tmp) async {
+          while (!_cancel && next < assets.length) {
+            final asset = assets[next++];
+            if (tagged.contains(asset.id)) {
+              skipped++;
+            } else {
+              // Already-scanned photos only need categorising, not faces.
+              await _scanOne(asset, tmp, facesDone: scanned.contains(asset.id));
+            }
+            final facesBefore = facesFound;
+            done++;
+            _celebrate(facesBefore);
+            // Every photo when scanning (live preview), less often when skipping.
+            if (!tagged.contains(asset.id) || done % 20 == 0) notifyListeners();
+            if (done % 5 == 0) {
+              ScanNotification.update('$done of $total photos · $facesFound faces');
+            }
           }
         }
+
+        await Future.wait([for (final t in tmps) lane(t)]);
       }
       final took = DateTime.now().difference(_startedAt!);
       final work = done - skipped;
@@ -552,7 +621,9 @@ class ScanController extends ChangeNotifier {
       debugPrint('Scan failed: $e\n$st');
       error = '$e';
     } finally {
-      if (await tmp.exists()) await tmp.delete();
+      for (final tmp in tmps) {
+        if (await tmp.exists()) await tmp.delete();
+      }
       await ScanNotification.stop();
       running = false;
       if (_receivedPending) {
@@ -562,6 +633,7 @@ class ScanController extends ChangeNotifier {
       _startedAt = null;
       revision++;
       notifyListeners();
+      unawaited(guessGenders());
     }
   }
 
@@ -582,20 +654,24 @@ class ScanController extends ChangeNotifier {
       // original photo is never touched.
       final bytes = await asset.thumbnailDataWithSize(_sizeFor(asset), quality: 90);
       if (bytes == null) return;
-      await tmp.writeAsBytes(bytes, flush: true);
-      preview = bytes;
+      // Read back by this app only, straight away: no need to force it to disk.
+      await tmp.writeAsBytes(bytes);
+      // Things that don't depend on the faces start now, alongside them.
+      // Each settles to "unknown" on failure: nothing waits on them if the
+      // faces fail first.
+      final labels = _engine!.labels(tmp.path).catchError((Object _) => <String>[]);
+      final where = asset.latlngAsync().then<LatLng?>((v) => v, onError: (Object _) => null);
+      final hash = _hash(asset).catchError((Object _) => null);
+      final faces = facesDone ? const <NewFace>[] : await _engine!.analyze(tmp.path);
+      // The live preview changes in one go, so with several photos in
+      // flight one photo never shows another's face boxes.
       final shown = asset.orientatedSize;
-      previewAspect =
-          shown.width > 0 && shown.height > 0 ? shown.width / shown.height : 1;
-      previewFaces = const [];
-      previewThumbs = const [];
+      preview = bytes;
+      previewAspect = shown.width > 0 && shown.height > 0 ? shown.width / shown.height : 1;
+      previewFaces = [for (final f in faces) Rect.fromLTWH(f.left, f.top, f.width, f.height)];
+      previewThumbs = [for (final f in faces) f.thumb];
       previewId++;
       if (!facesDone) {
-        final faces = await _engine!.analyze(tmp.path);
-        previewFaces = [
-          for (final f in faces) Rect.fromLTWH(f.left, f.top, f.width, f.height),
-        ];
-        previewThumbs = [for (final f in faces) f.thumb];
         facesFound += faces.length;
         for (final f in faces) {
           _countLive(f.embedding);
@@ -608,7 +684,7 @@ class ScanController extends ChangeNotifier {
         }
         await db.savePhoto(asset.id, faces, takenAt: asset.createDateTime);
       }
-      await _tag(asset, tmp.path);
+      await _tag(asset, labels: await labels, where: await where, hash: await hash);
     } catch (e) {
       // One broken photo shouldn't stop a 5,000-photo scan.
       debugPrint('Skipping ${asset.id}: $e');
@@ -661,15 +737,15 @@ class ScanController extends ChangeNotifier {
       : '$n';
 
   /// Works out the photo's categories (selfie, beach, screenshot, …).
-  Future<void> _tag(AssetEntity asset, String imagePath) async {
+  Future<void> _tag(AssetEntity asset,
+      {required List<String> labels, required LatLng? where, required int? hash}) async {
     final stats = await db.faceStats(asset.id);
-    final labels = await _engine!.labels(imagePath);
-    final ll = await asset.latlngAsync();
+    final ll = where;
     final hasLocation = ll != null && (ll.latitude != 0 || ll.longitude != 0);
     final size = asset.orientatedSize;
     await db.savePhotoMeta(
       asset.id,
-      hash: await _hash(asset),
+      hash: hash,
       lat: hasLocation ? ll.latitude : null,
       lng: hasLocation ? ll.longitude : null,
       quality: photoQuality(
@@ -696,8 +772,23 @@ class ScanController extends ChangeNotifier {
     await db.saveTags(asset.id, tags, tagVersion);
   }
 
-  /// Duplicate fingerprint from a tiny thumbnail (cheap to decode).
+  /// Duplicate fingerprint from a tiny thumbnail (cheap to decode). Uses
+  /// Android's stored thumbnail when it can: the photo library plugin would
+  /// decode the whole photo again just for these 72 pixels.
   Future<int?> _hash(AssetEntity asset) async {
+    final stored = await FastThumb.pixels(asset.id, 48, video: asset.type == AssetType.video);
+    if (stored != null) {
+      final tiny = img.copyResize(
+          img.Image.fromBytes(
+              width: stored.width, height: stored.height, bytes: stored.rgba.buffer, numChannels: 4),
+          width: 9,
+          height: 8,
+          interpolation: img.Interpolation.average);
+      return differenceHash([
+        for (var y = 0; y < 8; y++)
+          for (var x = 0; x < 9; x++) tiny.getPixel(x, y).luminance.toInt(),
+      ]);
+    }
     final bytes = await asset.thumbnailDataWithSize(
         const ThumbnailSize.square(48), quality: 80);
     if (bytes == null) return null;
@@ -805,6 +896,29 @@ class ScanController extends ChangeNotifier {
       items.add(FaceReview(m.faceId, thumbs[m.faceId]!, person, m.similarity));
     }
     return items;
+  }
+
+  bool _guessingGenders = false;
+
+  /// Guesses the gender of people who don't have a guess yet (new people,
+  /// or ones that just gained faces), from their clearest faces.
+  Future<void> guessGenders() async {
+    if (_guessingGenders || running) return;
+    _guessingGenders = true;
+    try {
+      final ids = await db.peopleWithoutGenderGuess();
+      if (ids.isEmpty) return;
+      final faces = {
+        for (final id in ids) id: [for (final f in await db.facesOf(id, limit: _genderFaces)) f.thumb],
+      };
+      await db.saveGenderGuesses(await guessFemaleChance(faces));
+      revision++;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Gender guess failed: $e');
+    } finally {
+      _guessingGenders = false;
+    }
   }
 
   /// Call after any manual edit (rename, merge, remove) so screens refresh.

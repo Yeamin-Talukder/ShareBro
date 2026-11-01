@@ -7,6 +7,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import '../data/db.dart';
+import 'places_screen.dart';
+import 'unmatched_screen.dart';
 import '../data/trip_days.dart';
 import '../scan/scan_controller.dart';
 import 'face_cloud.dart';
@@ -41,12 +43,32 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   ScanController get c => widget.controller;
+
+  /// Everyone in the current trip / dates / group, before the gender filter.
+  List<PersonSummary>? _everyone;
   List<PersonSummary>? _people;
+
+  /// Only men or only women; null for everyone.
+  Gender? _gender;
+
+  List<PersonSummary> _byGender(List<PersonSummary> people) =>
+      _gender == null ? people : [for (final p in people) if (p.gender == _gender) p];
+
+  void _setGender(Gender g) {
+    Haptics.tick();
+    setState(() {
+      _gender = _gender == g ? null : g;
+      _people = _byGender(_everyone ?? const []);
+    });
+  }
   List<TripSummary> _trips = const [];
 
   /// The selected trip's days, for the day chips.
   List<TripDay> _days = const [];
   int _reviewCount = 0;
+
+  /// Faces nobody was matched with, to move by hand.
+  int _unmatched = 0;
   int? _tripId;
   DaySpan? _dates;
   List<PersonGroup> _groups = const [];
@@ -120,15 +142,23 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_groupId != null && !groups.any((g) => g.id == _groupId)) _groupId = null;
     final people = await c.db.people(tripId: _tripId, dates: _dates, groupId: _groupId);
     final days = _tripId == null ? const <TripDay>[] : await tripDays(c.db, _tripId!);
+    final unmatched = await c.db.unmatchedCount();
     _countReviewLater();
     if (!mounted) return;
     setState(() {
+      _unmatched = unmatched;
       _days = days;
       _trips = trips;
       _groups = groups;
-      _people = people;
+      _everyone = people;
+      _people = _byGender(people);
     });
+    // New people (or ones that gained faces) get a gender guess.
+    unawaited(c.guessGenders());
   }
+
+  void _openUnmatched() =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => UnmatchedScreen(controller: c)));
 
   /// Picking another trip drops a day picked from the old one.
   void _pickTrip(int? id) {
@@ -314,6 +344,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         context,
                         MaterialPageRoute(
                             builder: (_) => FindMeScreen(controller: c, tripId: trip?.id, tripName: trip?.name)));
+                  case 'unmatched':
+                    _openUnmatched();
                   case 'settings':
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => SettingsScreen(controller: c)));
@@ -330,6 +362,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     value: 'findme',
                     child: ListTile(
                         leading: Icon(Icons.face_retouching_natural_rounded), title: Text('Find my photos link')),
+                  ),
+                if (_unmatched > 0)
+                  PopupMenuItem(
+                    value: 'unmatched',
+                    child: ListTile(
+                      leading: const Icon(Icons.person_search_rounded),
+                      title: const Text('Unmatched faces'),
+                      trailing: Text('$_unmatched'),
+                    ),
                   ),
                 const PopupMenuItem(
                   value: 'settings',
@@ -406,7 +447,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ).animate(key: ValueKey(_tripId)).fadeIn(duration: 250.ms).moveY(begin: -6),
           ),
-        if (people != null && (people.isNotEmpty || _groups.isNotEmpty))
+        if (_everyone != null && (_everyone!.isNotEmpty || _groups.isNotEmpty))
           SliverToBoxAdapter(
             child: SizedBox(
               height: 46,
@@ -414,6 +455,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 children: [
+                  // Male / Female, once anyone is known to be either.
+                  for (final g in Gender.values)
+                    if (_everyone!.any((p) => p.gender == g))
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Center(
+                          child: CapsuleChip(
+                            icon: g == Gender.male ? Icons.male_rounded : Icons.female_rounded,
+                            label: g.label,
+                            count: _everyone!.where((p) => p.gender == g).length,
+                            selected: _gender == g,
+                            onTap: () => _setGender(g),
+                          ),
+                        ),
+                      ),
                   for (final g in _groups)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -431,6 +487,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           onLongPress: () async {
                             if (await showGroupEditor(context, c, group: g)) c.changed();
                           },
+                        ),
+                      ),
+                    ),
+                  if (_unmatched > 0)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Center(
+                        child: CapsuleChip(
+                          outlined: true,
+                          icon: Icons.person_search_rounded,
+                          label: 'Unmatched',
+                          count: _unmatched,
+                          onTap: _openUnmatched,
                         ),
                       ),
                     ),
@@ -465,6 +534,27 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                         ),
+                        ),
+                      ),
+                    ),
+                  if (_tripId != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Center(
+                        child: CapsuleChip(
+                          outlined: true,
+                          icon: Icons.map_rounded,
+                          label: 'Trip map',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PlacesScreen(
+                                controller: c,
+                                tripId: _tripId,
+                                title: _trips.firstWhere((t) => t.id == _tripId).name,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -574,9 +664,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Widget tile = _PersonTile(
                   key: ValueKey(person.id),
                   person: person,
-                  loadFaces: () async => [
-                    for (final f in await c.db.facesOf(person.id, limit: 5)) f.thumb,
-                  ],
+                  loadFaces: () => c.db.bestFaces(person.id),
                   onTap: () => _openPerson(person),
                   onMerge: (dragged) => _dropMerge(dragged, person),
                 );

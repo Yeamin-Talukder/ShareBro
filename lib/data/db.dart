@@ -30,6 +30,19 @@ class FaceRecord {
   final bool locked;
 }
 
+enum Gender {
+  male('m', 'Male'),
+  female('f', 'Female');
+
+  const Gender(this.code, this.label);
+
+  /// How it's stored.
+  final String code;
+  final String label;
+
+  static Gender? fromCode(String? code) => values.where((g) => g.code == code).firstOrNull;
+}
+
 class PersonSummary {
   PersonSummary({
     required this.id,
@@ -37,6 +50,8 @@ class PersonSummary {
     required this.photoCount,
     required this.coverThumb,
     this.nickname,
+    this.gender,
+    this.genderGuessed = false,
   });
 
   final int id;
@@ -44,6 +59,13 @@ class PersonSummary {
   final int photoCount;
   final Uint8List? coverThumb;
   final String? nickname;
+
+  /// Set by hand, or else the app's guess when it's fairly sure; null when
+  /// neither.
+  final Gender? gender;
+
+  /// [gender] is the app's guess, not set by hand.
+  final bool genderGuessed;
 
   String get displayName => name ?? 'Unnamed #$id';
 }
@@ -297,7 +319,7 @@ class AppDb {
     final path = p.join(await getDatabasesPath(), 'photo_organizer.db');
     final db = await openDatabase(
       path,
-      version: 7,
+      version: 8,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, _) async {
         await db.execute('''
@@ -336,6 +358,7 @@ class AppDb {
         await _upgradeTo5(db);
         await _upgradeTo6(db);
         await _upgradeTo7(db);
+        await _upgradeTo8(db);
       },
       onUpgrade: (db, from, _) async {
         if (from < 2) {
@@ -357,6 +380,7 @@ class AppDb {
         if (from < 5) await _upgradeTo5(db);
         if (from < 6) await _upgradeTo6(db);
         if (from < 7) await _upgradeTo7(db);
+        if (from < 8) await _upgradeTo8(db);
       },
     );
     return AppDb._(db);
@@ -461,6 +485,12 @@ class AppDb {
         at INTEGER NOT NULL
       )''');
     await db.execute('ALTER TABLE devices ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0');
+  }
+
+  /// Gender: set by hand, and the app's guess (chance of female, 0..1).
+  static Future<void> _upgradeTo8(Database db) async {
+    await db.execute('ALTER TABLE persons ADD COLUMN gender TEXT');
+    await db.execute('ALTER TABLE persons ADD COLUMN gender_guess REAL');
   }
 
   // ---- Transfer history ----
@@ -858,11 +888,70 @@ class AppDb {
     return [for (final r in rows) r['asset_id'] as String];
   }
 
+  /// Photos with a known location (not 0,0), oldest first, optionally only
+  /// on [tripId] and within [dates].
+  Future<List<({String id, DateTime at, double lat, double lng})>> photoLocations(
+      {int? tripId, DaySpan? dates}) async {
+    final trip = tripId == null ? '' : 'JOIN trip_photos tp ON tp.asset_id = ph.asset_id AND tp.trip_id = ?';
+    final rows = await _db.rawQuery('''
+      SELECT ph.asset_id, ph.taken_at, ph.lat, ph.lng FROM photos ph $trip
+      WHERE ph.hidden = 0 AND ph.lat IS NOT NULL AND ph.lng IS NOT NULL AND ph.taken_at IS NOT NULL
+        AND NOT (ph.lat = 0 AND ph.lng = 0)
+        ${dates == null ? '' : 'AND ph.taken_at BETWEEN ? AND ?'}
+      ORDER BY ph.taken_at''', [
+      ?tripId,
+      if (dates != null) ...[dates.start.millisecondsSinceEpoch, dates.end.millisecondsSinceEpoch],
+    ]);
+    return [
+      for (final r in rows)
+        (
+          id: r['asset_id'] as String,
+          at: DateTime.fromMillisecondsSinceEpoch(r['taken_at'] as int),
+          lat: (r['lat'] as num).toDouble(),
+          lng: (r['lng'] as num).toDouble(),
+        ),
+    ];
+  }
+
+  /// Scanned photos with no location saved (scanned before the app could
+  /// read locations, or taken with location off).
+  Future<List<String>> photosWithoutLocation() async {
+    final rows = await _db.rawQuery('SELECT asset_id FROM photos WHERE lat IS NULL AND hidden = 0');
+    return [for (final r in rows) r['asset_id'] as String];
+  }
+
+  /// Photos checked and found to have no location: stored as 0,0 (which
+  /// every location query skips) so they aren't checked again.
+  Future<void> markNoLocation(Iterable<String> ids) async {
+    final batch = _db.batch();
+    for (final id in ids) {
+      batch.update('photos', {'lat': 0.0, 'lng': 0.0}, where: 'asset_id = ? AND lat IS NULL', whereArgs: [id]);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> setLocations(Map<String, ({double lat, double lng})> at) async {
+    final batch = _db.batch();
+    at.forEach((id, p) => batch.update('photos', {'lat': p.lat, 'lng': p.lng}, where: 'asset_id = ?', whereArgs: [id]));
+    await batch.commit(noResult: true);
+  }
+
+  /// How many photos have a known location.
+  Future<int> locatedCount() async {
+    final rows = await _db.rawQuery('''
+      SELECT COUNT(*) AS n FROM photos
+      WHERE hidden = 0 AND lat IS NOT NULL AND lng IS NOT NULL AND NOT (lat = 0 AND lng = 0)''');
+    return rows.first['n'] as int;
+  }
+
   /// A trip's photos in time order with where they were taken.
   Future<List<({String id, DateTime? at, double? lat, double? lng})>> tripTimeline(
       int tripId) async {
     final rows = await _db.rawQuery('''
-      SELECT ph.asset_id, ph.taken_at, ph.lat, ph.lng
+      SELECT ph.asset_id, ph.taken_at,
+        -- 0,0 marks "checked, no location" (see markNoLocation).
+        CASE WHEN ph.lat = 0 AND ph.lng = 0 THEN NULL ELSE ph.lat END AS lat,
+        CASE WHEN ph.lat = 0 AND ph.lng = 0 THEN NULL ELSE ph.lng END AS lng
       FROM trip_photos tp JOIN photos ph ON ph.asset_id = tp.asset_id
       WHERE tp.trip_id = ? AND ph.hidden = 0 ORDER BY ph.taken_at''', [tripId]);
     return [
@@ -1048,6 +1137,23 @@ class AppDb {
     return (sql.toString(), args);
   }
 
+  /// How clear a face is, for picking the one to show a person by: big,
+  /// sharp, facing the camera, eyes open and smiling score higher. Readings
+  /// missing on older scans count as average. [t] is the faces table alias.
+  static String _faceScore(String t) => '$t.width'
+      ' * MIN(MAX(COALESCE($t.sharpness, 80), 0), 400)'
+      ' * (1 - MIN(ABS(COALESCE($t.yaw, 15)), 60) / 90.0)'
+      ' * MIN(MAX(COALESCE($t.eyes_open, 0.8), 0.15), 1)'
+      ' * (0.7 + 0.3 * COALESCE($t.smile, 0.5))';
+
+  /// A guess only counts once it's at least this sure either way.
+  static const _sureGuess = 0.75;
+
+  /// A person's gender code: set by hand, else a sure enough guess.
+  static String _genderOf(String p) => "COALESCE($p.gender, CASE"
+      " WHEN $p.gender_guess >= $_sureGuess THEN 'f'"
+      " WHEN $p.gender_guess <= ${1 - _sureGuess} THEN 'm' END)";
+
   /// People with at least one face, optionally only in [tripId] / [dates] /
   /// [groupId]. People marked "not in our group" are left out unless
   /// [ignored] is true, which returns only them.
@@ -1059,10 +1165,11 @@ class AppDb {
         : 'JOIN person_group_members gm ON gm.person_id = p.id AND gm.group_id = $groupId';
     final rows = await _db.rawQuery('''
       SELECT p.id, p.name, p.nickname, COUNT(DISTINCT f.asset_id) AS photo_count,
+        ${_genderOf('p')} AS gender, p.gender IS NULL AS guessed,
         COALESCE(
           (SELECT thumb FROM faces cf WHERE cf.id = p.cover_face_id AND cf.person_id = p.id),
           (SELECT thumb FROM faces c WHERE c.person_id = p.id
-             ORDER BY c.locked DESC, c.width * COALESCE(c.sharpness, 80) DESC LIMIT 1)
+             ORDER BY c.locked DESC, ${_faceScore('c')} DESC LIMIT 1)
         ) AS cover
       FROM persons p JOIN faces f ON f.person_id = p.id
         JOIN photos ph0 ON ph0.asset_id = f.asset_id AND ph0.hidden = 0
@@ -1078,8 +1185,40 @@ class AppDb {
           nickname: r['nickname'] as String?,
           photoCount: r['photo_count'] as int,
           coverThumb: r['cover'] as Uint8List?,
+          gender: Gender.fromCode(r['gender'] as String?),
+          genderGuessed: r['guessed'] == 1,
         ),
     ];
+  }
+
+  /// Sets a person's gender by hand; null goes back to the app's guess.
+  Future<void> setGender(int personId, Gender? gender) =>
+      _db.update('persons', {'gender': gender?.code}, where: 'id = ?', whereArgs: [personId]);
+
+  /// People the app hasn't guessed a gender for yet.
+  Future<List<int>> peopleWithoutGenderGuess() async {
+    final rows = await _db.rawQuery('''
+      SELECT DISTINCT p.id FROM persons p JOIN faces f ON f.person_id = p.id
+      WHERE p.gender_guess IS NULL AND p.ignored = 0''');
+    return [for (final r in rows) r['id'] as int];
+  }
+
+  Future<void> saveGenderGuesses(Map<int, double> chanceFemale) async {
+    final batch = _db.batch();
+    chanceFemale.forEach((id, p) => batch.update('persons', {'gender_guess': p}, where: 'id = ?', whereArgs: [id]));
+    await batch.commit(noResult: true);
+  }
+
+  /// Photos with at least one person of [gender] in them, newest first.
+  Future<List<String>> photosWithGender(Gender gender, {int? tripId}) async {
+    final (scope, args) = _photoScope(tripId, null);
+    final rows = await _db.rawQuery('''
+      SELECT f.asset_id FROM faces f JOIN persons p ON p.id = f.person_id
+        JOIN photos ph ON ph.asset_id = f.asset_id $scope
+      WHERE ${_genderOf('p')} = ? AND p.ignored = 0 AND ph.hidden = 0
+      GROUP BY f.asset_id
+      ORDER BY MAX(ph.taken_at) DESC''', [...args, gender.code]);
+    return [for (final r in rows) r['asset_id'] as String];
   }
 
   Future<void> setNickname(int personId, String? nickname) => _db.update(
@@ -1096,6 +1235,41 @@ class AppDb {
 
   Future<void> setCover(int personId, int faceId) => _db.update(
       'persons', {'cover_face_id': faceId}, where: 'id = ?', whereArgs: [personId]);
+
+  /// The clearest few faces of a person, best first, to take turns as
+  /// their picture: only ones nearly as good as the best, and from moments
+  /// apart, so a burst of the same shot doesn't fill the set. Just the
+  /// chosen picture when one was picked by hand.
+  Future<List<Uint8List>> bestFaces(int personId, {int limit = 5}) async {
+    final chosen = await _db.rawQuery('''
+      SELECT f.thumb FROM persons p JOIN faces f ON f.id = p.cover_face_id AND f.person_id = p.id
+      WHERE p.id = ?''', [personId]);
+    if (chosen.isNotEmpty) return [chosen.first['thumb'] as Uint8List];
+    final rows = await _db.rawQuery('''
+      SELECT f.thumb, ph.taken_at, ${_faceScore('f')} AS score
+      FROM faces f JOIN photos ph ON ph.asset_id = f.asset_id AND ph.hidden = 0
+      WHERE f.person_id = ?
+      ORDER BY f.locked DESC, score DESC LIMIT 30''', [personId]);
+    final picked = <Uint8List>[];
+    final times = <int>[];
+    final best = rows.isEmpty ? 0.0 : (rows.first['score'] as num?)?.toDouble() ?? 0;
+    for (final r in rows) {
+      if (picked.length >= limit) break;
+      final score = (r['score'] as num?)?.toDouble() ?? 0;
+      if (picked.isNotEmpty && score < best * _clearEnough) continue;
+      final at = r['taken_at'] as int?;
+      if (at != null && times.any((t) => (t - at).abs() < _apart.inMilliseconds)) continue;
+      picked.add(r['thumb'] as Uint8List);
+      if (at != null) times.add(at);
+    }
+    return picked;
+  }
+
+  /// A face takes a turn only if it's at least this clear next to the best.
+  static const _clearEnough = 0.55;
+
+  /// Faces from photos closer together than this count as the same moment.
+  static const _apart = Duration(minutes: 2);
 
   // ---- Groups of people ----
 
@@ -1209,7 +1383,7 @@ class AppDb {
         columns: ['id', 'asset_id', 'thumb'],
         where: 'person_id = ?',
         whereArgs: [personId],
-        orderBy: 'width * COALESCE(sharpness, 80) DESC',
+        orderBy: '${_faceScore('faces')} DESC',
         limit: limit);
     return [
       for (final r in rows)
@@ -1221,7 +1395,7 @@ class AppDb {
   /// Names a person. If someone with that name already exists, this person
   /// is merged into them; returns the id that now holds the faces.
   Future<int> renamePerson(int id, String name) async {
-    final trimmed = name.trim();
+    final trimmed = cleanName(name);
     final existing = trimmed.isEmpty ? null : await _personNamed(trimmed);
     if (existing != null && existing != id) {
       await mergePeople(existing, [id]);
@@ -1246,8 +1420,11 @@ class AppDb {
     return rows.isEmpty ? null : rows.first['id'] as int;
   }
 
+  /// A name as typed, without stray spaces (inside ones included).
+  static String cleanName(String name) => name.trim().replaceAll(RegExp(r'\s+'), ' ');
+
   Future<int> createPerson(String name) => _db.insert('persons', {
-        'name': name.trim(),
+        'name': cleanName(name),
         'created_at': DateTime.now().millisecondsSinceEpoch,
       });
 
@@ -1256,6 +1433,41 @@ class AppDb {
     final before = await _snapshot('id = ?', [faceId]);
     await _db.update('faces', {'person_id': null, 'locked': 1, 'reviewed': 1},
         where: 'id = ?', whereArgs: [faceId]);
+    return before;
+  }
+
+  /// Faces nobody was matched with (often half turned or partly hidden),
+  /// newest photos first, for moving to a person by hand.
+  Future<List<FaceThumb>> unmatchedFaces() async {
+    final rows = await _db.rawQuery('''
+      SELECT f.id, f.asset_id, f.thumb FROM faces f
+        JOIN photos ph ON ph.asset_id = f.asset_id AND ph.hidden = 0
+      WHERE f.person_id IS NULL
+      ORDER BY ph.taken_at DESC, f.id DESC''');
+    return [
+      for (final r in rows) FaceThumb(r['id'] as int, r['asset_id'] as String, r['thumb'] as Uint8List),
+    ];
+  }
+
+  Future<int> unmatchedCount() async {
+    final rows = await _db.rawQuery('''
+      SELECT COUNT(*) AS n FROM faces f JOIN photos ph ON ph.asset_id = f.asset_id AND ph.hidden = 0
+      WHERE f.person_id IS NULL''');
+    return rows.first['n'] as int;
+  }
+
+  /// Moves [faceIds] to [personId] by hand, for good (grouping won't move
+  /// them back). Returns how they were, for undo.
+  Future<FaceSnapshot> assignFaces(List<int> faceIds, int personId) async {
+    if (faceIds.isEmpty) return FaceSnapshot(const []);
+    final marks = List.filled(faceIds.length, '?').join(',');
+    final before = await _snapshot('id IN ($marks)', faceIds);
+    await _db.transaction((txn) async {
+      await txn.rawUpdate(
+          'UPDATE faces SET person_id = ?, locked = 1, reviewed = 1 WHERE id IN ($marks)', [personId, ...faceIds]);
+      // More faces now: guess again.
+      await txn.update('persons', {'gender_guess': null}, where: 'id = ?', whereArgs: [personId]);
+    });
     return before;
   }
 
@@ -1284,6 +1496,8 @@ class AppDb {
       await txn.rawUpdate(
           'UPDATE faces SET person_id = ?, locked = 1, reviewed = 1 WHERE person_id IN ($marks)',
           [target, ...ids]);
+      // More faces now: guess again.
+      await txn.update('persons', {'gender_guess': null}, where: 'id = ?', whereArgs: [target]);
     });
     return before;
   }

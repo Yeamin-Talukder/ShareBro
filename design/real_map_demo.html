@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Real Map Demo</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{--bg:#F3F1F5;--page:#ECE9EF;--card:#fff;--ink:#141217;--sub:#6b6670;--line:rgba(26,24,32,.12);--coral:#FF6B4A;--glass:rgba(255,255,255,.92);--rim:#fff}
+:root[data-theme=dark]{--bg:#0B0A0F;--page:#050407;--card:#1b1a1f;--ink:#F2EFF4;--sub:#a29ca8;--line:rgba(255,255,255,.12);--glass:rgba(37,35,41,.92);--rim:#2a282e}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0B0A0F;--page:#050407;--card:#1b1a1f;--ink:#F2EFF4;--sub:#a29ca8;--line:rgba(255,255,255,.12);--glass:rgba(37,35,41,.92);--rim:#2a282e}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--page);color:var(--ink);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:20px 16px 40px}
+.top{max-width:900px;margin:0 auto 12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:20px;margin:0}
+.note{max-width:900px;margin:0 auto 16px;color:var(--sub);font-size:14px}
+button{font:inherit;color:inherit;cursor:pointer}
+.pill{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px}
+.wrap{display:flex;justify-content:center}
+.phone{width:375px;max-width:100%;height:760px;background:var(--bg);border-radius:44px;border:10px solid #000;position:relative;overflow:hidden}
+#map{position:absolute;inset:0;background:var(--bg)}
+.leaflet-container{font:inherit;background:var(--bg)}
+.leaflet-control-attribution{font-size:9px;background:var(--glass)!important;color:var(--sub);border-radius:8px 0 0 0}
+.leaflet-control-attribution a{color:var(--sub)}
+/* photo pins */
+.ppin{position:relative;width:56px;height:64px}
+.ppin .ph{width:56px;height:56px;border-radius:16px;background:var(--rim);padding:3px;box-shadow:0 6px 16px rgba(0,0,0,.28)}
+.ppin .ph>div{width:100%;height:100%;border-radius:13px;overflow:hidden;position:relative}
+.ppin .tail{position:absolute;left:22px;bottom:2px;width:12px;height:12px;background:var(--rim);transform:rotate(45deg);border-radius:2px}
+.ppin .n{position:absolute;top:-8px;right:-10px;background:var(--coral);color:#fff;font:700 12px system-ui;min-width:24px;height:24px;border-radius:12px;display:grid;place-items:center;padding:0 6px;border:2px solid var(--rim)}
+.ppin .lbl{position:absolute;top:66px;left:50%;transform:translateX(-50%);white-space:nowrap;font:700 11px system-ui;color:var(--ink);text-shadow:0 0 4px var(--bg),0 0 4px var(--bg)}
+.ppin{animation:pop .45s cubic-bezier(.2,1.4,.4,1) both;transform-origin:50% 100%}
+@keyframes pop{from{transform:scale(.3);opacity:0}}
+.scene{position:absolute;inset:0;width:100%;height:100%}
+/* journey walker */
+.walker{width:22px;height:22px;border-radius:11px;background:var(--coral);border:4px solid #fff;box-shadow:0 0 0 8px rgba(255,107,74,.2)}
+.stop{width:14px;height:14px;border-radius:7px;background:var(--card);border:3px solid var(--coral);transition:transform .3s,background .3s}
+.stop.hit{background:var(--coral);transform:scale(1.25)}
+/* bars */
+.bar{position:absolute;z-index:1000;left:12px;right:12px;top:14px;height:52px;border-radius:26px;background:var(--glass);border:1px solid var(--line);display:flex;align-items:center;padding:0 8px 0 18px;gap:8px;backdrop-filter:blur(18px)}
+.bar b{flex:1;font-size:17px}
+.seg{display:flex;background:var(--line);border-radius:18px;padding:3px}
+.seg button{border:0;background:none;border-radius:15px;padding:5px 11px;font-size:13px;font-weight:600;color:var(--sub)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.fab{position:absolute;z-index:1000;right:14px;bottom:28px;width:44px;height:44px;border-radius:22px;background:var(--glass);border:1px solid var(--line);display:grid;place-items:center;font-size:18px;backdrop-filter:blur(18px)}
+.sheet{position:absolute;z-index:1001;left:0;right:0;bottom:0;background:var(--glass);border-top-left-radius:28px;border-top-right-radius:28px;border:1px solid var(--line);backdrop-filter:blur(18px);transform:translateY(100%);transition:transform .45s cubic-bezier(.2,.8,.2,1);padding:10px 16px 24px}
+.sheet.open{transform:none}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 12px}
+.sheet h3{margin:0;font-size:20px}
+.meta{color:var(--sub);font-size:13px;margin:2px 0 12px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.grid div{aspect-ratio:1;border-radius:8px;position:relative;overflow:hidden;animation:fadeUp .4s both}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}}
+.card{position:absolute;z-index:1000;left:16px;right:16px;bottom:96px;background:var(--card);border-radius:24px;border:1px solid var(--line);padding:12px;display:flex;gap:12px;align-items:center;box-shadow:0 12px 30px rgba(0,0,0,.2);transition:transform .5s cubic-bezier(.2,1.2,.4,1),opacity .3s}
+.card.out{transform:translateY(30px) scale(.95);opacity:0}
+.thumbs{display:flex}.thumbs div{width:58px;height:58px;border-radius:12px;border:3px solid var(--card);position:relative;overflow:hidden;margin-left:-18px}.thumbs div:first-child{margin-left:0}
+.day{color:var(--coral);font-weight:800;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase}
+.place{font-weight:800;font-size:17px}.sub{color:var(--sub);font-size:13px}
+.player{position:absolute;z-index:1000;left:16px;right:16px;bottom:24px;height:56px;border-radius:28px;background:var(--glass);border:1px solid var(--line);backdrop-filter:blur(18px);display:none;align-items:center;gap:12px;padding:0 8px}
+.play{width:42px;height:42px;border-radius:21px;border:0;background:var(--coral);color:#fff;font-size:16px}
+.track{flex:1;height:4px;background:var(--line);border-radius:2px;position:relative;cursor:pointer}
+.track i{position:absolute;left:0;top:0;bottom:0;background:var(--coral);border-radius:2px;width:0}
+.cnt{font:700 12px system-ui;color:var(--sub);width:34px}
+#list{position:absolute;inset:0;z-index:999;padding:80px 16px 24px;overflow:auto;background:var(--bg);display:none}
+.pl{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:10px;margin-bottom:10px;animation:fadeUp .45s both;cursor:pointer}
+.mini{width:84px;height:84px;border-radius:16px;overflow:hidden;flex:none;position:relative;background:var(--line)}
+.mini img{position:absolute;width:256px;height:256px}
+.mini .dot{position:absolute;left:35px;top:35px;width:14px;height:14px;border-radius:7px;background:var(--coral);border:3px solid #fff}
+.pl .t{font-weight:800;font-size:16px}.pl .s{color:var(--sub);font-size:13px}
+.strip{display:flex;gap:3px;margin-top:6px}.strip div{width:30px;height:30px;border-radius:7px;position:relative;overflow:hidden}
+.offline{position:absolute;z-index:1002;left:50%;top:76px;transform:translateX(-50%);background:var(--ink);color:var(--bg);font-size:12px;font-weight:600;padding:6px 12px;border-radius:14px;display:none}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Places on a real map (demo)</h1>
+  <div style="display:flex;gap:8px">
+    <button class="pill" id="style">Map style: Muted</button>
+    <button class="pill" id="theme">Switch light / dark</button>
+  </div>
+</div>
+<p class="note">The same three views on real map tiles (loaded from the internet: Esri's flat light / dark gray style by default, or the standard OpenStreetMap look). Places and pictures are made up. Pinch or scroll to zoom: pins split apart as you zoom in.</p>
+<div class="wrap"><div class="phone">
+  <div id="map"></div>
+  <div id="list"></div>
+  <div class="bar"><b id="title">Places</b>
+    <div class="seg" id="seg"><button class="on" data-m="map">Map</button><button data-m="journey">Journey</button><button data-m="places">Places</button></div>
+  </div>
+  <div class="offline" id="offline">Map can't load offline: photos still show</div>
+  <button class="fab" id="fit" title="Show everything">⤢</button>
+  <div class="card out" id="card"><div class="thumbs" id="cthumbs"></div><div><div class="day" id="cday"></div><div class="place" id="cplace"></div><div class="sub" id="csub"></div></div></div>
+  <div class="player" id="player"><button class="play" id="play">▶</button><div class="track" id="track"><i id="fill"></i></div><span class="cnt" id="cnt">1/7</span></div>
+  <div class="sheet" id="sheet"><div class="grab"></div><h3 id="stitle"></h3><div class="meta" id="smeta"></div><div class="grid" id="sgrid"></div></div>
+</div></div>
+
+<script>
+const PAL=[['#FDE3DA','#FF8A6B','#E5533A'],['#DCEBF5','#7FB3D5','#2E6F99'],['#E4F1E0','#8CC084','#3C7A3B'],['#F7EBD3','#E9B44C','#9B6A16'],['#EDE3F5','#B08BD9','#5E3A8C'],['#FFE9E2','#FFC3B2','#FF6B4A']];
+const KINDS=['scene','face','scene','food','face','scene'];
+function scene(i,kind){const [sky,mid,front]=PAL[i%PAL.length];const s=(i*37)%100;
+  if(kind==='face')return `<svg class="scene" viewBox="0 0 60 60"><rect width="60" height="60" fill="${sky}"/><circle cx="30" cy="27" r="11" fill="${mid}"/><path d="M12 60 q18 -26 36 0z" fill="${front}"/></svg>`;
+  if(kind==='food')return `<svg class="scene" viewBox="0 0 60 60"><rect width="60" height="60" fill="${sky}"/><circle cx="30" cy="32" r="19" fill="#fff" opacity=".85"/><circle cx="30" cy="32" r="12" fill="${mid}"/><circle cx="26" cy="29" r="3" fill="${front}"/></svg>`;
+  return `<svg class="scene" viewBox="0 0 60 60"><rect width="60" height="60" fill="${sky}"/><circle cx="${18+s%26}" cy="18" r="7" fill="${front}"/><path d="M0 60 L0 40 L${16+s%10} 26 L${30+s%8} 38 L44 30 L60 42 L60 60Z" fill="${mid}"/><path d="M0 60 q30 -14 60 0z" fill="${front}" opacity=".7"/></svg>`;}
+// Made-up stops along a real coastline, named after what the photos show (as the app does).
+const P=[
+  {name:'Old Town',lat:15.4989,lng:73.8278,day:1,date:'12 Jun',n:48,c:0},
+  {name:'Food',lat:15.4950,lng:73.8350,day:1,date:'12 Jun',n:12,c:3},
+  {name:'Fort',lat:15.4870,lng:73.7730,day:2,date:'13 Jun',n:64,c:2},
+  {name:'Beach',lat:15.5440,lng:73.7550,day:2,date:'13 Jun',n:92,c:5},
+  {name:'Market',lat:15.5800,lng:73.7430,day:3,date:'14 Jun',n:37,c:1},
+  {name:'Waterfall',lat:15.3170,lng:74.3140,day:4,date:'15 Jun',n:21,c:1},
+  {name:'Beach 2',lat:15.0100,lng:74.0230,day:5,date:'16 Jun',n:30,c:4},
+];
+const $=id=>document.getElementById(id);
+const dark=()=>{const r=document.documentElement;return r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches};
+let styleMode='auto'; // auto follows the theme
+const TILES={light:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',dark:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',osm:'https://tile.openstreetmap.org/{z}/{x}/{y}.png'};
+const map=L.map('map',{zoomControl:false,attributionControl:true}).setView([15.4,73.95],9);
+map.attributionControl.setPrefix(false);
+let tiles;
+function setTiles(){
+  if(tiles)map.removeLayer(tiles);
+  const key=styleMode==='osm'?'osm':(dark()?'dark':'light');
+  tiles=L.tileLayer(TILES[key],{maxZoom:key==='osm'?19:16,attribution:key==='osm'?'© OpenStreetMap':'Esri, HERE, Garmin, © OpenStreetMap'}).addTo(map);
+  tiles.on('tileerror',()=>{$('offline').style.display='block'});
+  $('style').textContent='Map style: '+(styleMode==='osm'?'Standard':'Muted');
+}
+setTiles();
+$('style').onclick=()=>{styleMode=styleMode==='osm'?'auto':'osm';setTiles();if(mode==='places')drawList()};
+$('theme').onclick=()=>{document.documentElement.dataset.theme=dark()?'light':'dark';setTiles();if(mode==='places')drawList()};
+
+// ---------- Map: photo pins that merge when they'd overlap ----------
+const pinLayer=L.layerGroup().addTo(map);
+function pinIcon(c,n,label){return L.divIcon({className:'',iconSize:[56,64],iconAnchor:[28,64],
+  html:`<div class="ppin"><div class="tail"></div><div class="ph"><div>${scene(c,KINDS[c%6])}</div></div><span class="n">${n}</span>${label?`<span class="lbl">${label}</span>`:''}</div>`})}
+function drawPins(){
+  pinLayer.clearLayers();
+  const pts=P.map(p=>map.latLngToContainerPoint([p.lat,p.lng]));
+  const order=P.map((_,i)=>i).sort((a,b)=>P[b].n-P[a].n);
+  const cl=[];
+  order.forEach(i=>{const near=cl.find(c=>c.at.distanceTo(pts[i])<64);if(near)near.m.push(i);else cl.push({at:pts[i],m:[i]})});
+  cl.forEach(c=>{
+    const n=c.m.reduce((a,i)=>a+P[i].n,0);const first=P[c.m[0]];
+    const mk=L.marker([first.lat,first.lng],{icon:pinIcon(first.c,n,c.m.length===1?first.name:null)}).addTo(pinLayer);
+    mk.on('click',()=>{
+      if(c.m.length>1){map.flyToBounds(L.latLngBounds(c.m.map(i=>[P[i].lat,P[i].lng])),{padding:[90,90],duration:.8})}
+      else openSheet(first);
+    });
+  });
+}
+map.on('zoomend',()=>{if(mode==='map')drawPins()});
+function openSheet(p){
+  $('stitle').textContent=p.name;$('smeta').textContent=`${p.n} photos · ${p.date}`;
+  let g='';for(let i=0;i<12;i++)g+=`<div style="animation-delay:${i*30}ms">${scene(p.c+i,KINDS[(p.c+i)%6])}</div>`;
+  $('sgrid').innerHTML=g;$('sheet').classList.add('open');
+  map.flyTo([p.lat,p.lng],Math.max(map.getZoom(),13),{duration:.8,paddingBottomRight:[0,300]});
+}
+$('sheet').onclick=()=>$('sheet').classList.remove('open');
+const all=L.latLngBounds(P.map(p=>[p.lat,p.lng]));
+$('fit').onclick=()=>map.flyToBounds(all,{padding:[70,70],duration:.8});
+
+// ---------- Journey: the route draws, the map follows ----------
+const route=L.polyline([],{color:'#FF6B4A',weight:5,lineCap:'round',lineJoin:'round'});
+const ghost=L.polyline(P.map(p=>[p.lat,p.lng]),{color:'#FF6B4A',weight:3,opacity:.35,dashArray:'2 9'});
+const stops=P.map(p=>L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',iconSize:[14,14],iconAnchor:[7,7],html:'<div class="stop"></div>'})}));
+const walker=L.marker([P[0].lat,P[0].lng],{icon:L.divIcon({className:'',iconSize:[22,22],iconAnchor:[11,11],html:'<div class="walker"></div>'}),zIndexOffset:1000});
+const journey=L.layerGroup([ghost,route,...stops,walker]);
+let t=0,playing=false,last=0,rest=0,shown=-1;
+const LEG=2200,REST=1000;
+function legLerp(tt){const f=tt*(P.length-1);const i=Math.min(P.length-2,Math.floor(f));const k=f-i;return{i,k,lat:P[i].lat+(P[i+1].lat-P[i].lat)*k,lng:P[i].lng+(P[i+1].lng-P[i].lng)*k}}
+function setT(v,follow){
+  t=Math.max(0,Math.min(1,v));const L_=legLerp(t);
+  route.setLatLngs([...P.slice(0,L_.i+1).map(p=>[p.lat,p.lng]),[L_.lat,L_.lng]]);
+  walker.setLatLng([L_.lat,L_.lng]);
+  $('fill').style.width=(t*100)+'%';
+  const k=Math.min(P.length-1,Math.floor(t*(P.length-1)+1e-6));
+  stops.forEach((s,i)=>{const el=s.getElement();if(el)el.firstChild.classList.toggle('hit',i<=k)});
+  if(k!==shown){shown=k;showCard(k);if(playing)rest=REST;
+    // fly to the next stretch: this stop and the next one in view
+    const nxt=P[Math.min(P.length-1,k+1)];
+    if(follow)map.flyToBounds(L.latLngBounds([[P[k].lat,P[k].lng],[nxt.lat,nxt.lng]]),{padding:[110,110],paddingBottomRight:[110,240],duration:1.1,maxZoom:14});
+  }
+}
+function showCard(k){const card=$('card');card.classList.add('out');const p=P[k];
+  setTimeout(()=>{$('cday').textContent=`Day ${p.day} · ${p.date}`;$('cplace').textContent=p.name;$('csub').textContent=`${p.n} photos`;
+    $('cthumbs').innerHTML=[0,1,2].map(i=>`<div>${scene(p.c+i,KINDS[(p.c+i)%6])}</div>`).join('');$('cnt').textContent=`${k+1}/${P.length}`;card.classList.remove('out')},180)}
+function tick(ts){if(!playing)return;const dt=last?ts-last:0;last=ts;
+  if(rest>0)rest-=dt;else setT(t+dt/(LEG*(P.length-1)),true);
+  if(t>=1){playing=false;$('play').textContent='↺';return}requestAnimationFrame(tick)}
+$('play').onclick=()=>{if(t>=1){shown=-1;setT(0,true)}playing=!playing;$('play').textContent=playing?'❚❚':'▶';last=0;if(playing)requestAnimationFrame(tick)};
+$('track').onclick=e=>{const r=e.currentTarget.getBoundingClientRect();playing=false;$('play').textContent='▶';setT((e.clientX-r.left)/r.width,true)};
+$('card').onclick=()=>openSheet(P[shown]);
+
+// ---------- Places list: each with its own little real map ----------
+function tileFor(p,z){const n=2**z;const x=(p.lng+180)/360*n;const lr=p.lat*Math.PI/180;const y=(1-Math.log(Math.tan(lr)+1/Math.cos(lr))/Math.PI)/2*n;return{x:Math.floor(x),y:Math.floor(y),fx:x%1,fy:y%1}}
+function drawList(){
+  const key=styleMode==='osm'?'osm':(dark()?'dark':'light');
+  $('list').innerHTML=[...P].sort((a,b)=>b.n-a.n).map((p,i)=>{const z=13,tl=tileFor(p,z);
+    const url=TILES[key].replace('{z}',z).replace('{x}',tl.x).replace('{y}',tl.y);
+    return `<div class="pl" style="animation-delay:${i*60}ms" data-i="${P.indexOf(p)}"><div class="mini"><img src="${url}" style="left:${42-tl.fx*256}px;top:${42-tl.fy*256}px" alt=""><span class="dot" style="left:35px;top:35px"></span></div>
+    <div style="flex:1;min-width:0"><div class="t">${p.name}</div><div class="s">${p.n} photos · ${p.date}</div><div class="strip">${[0,1,2,3,4].map(k=>`<div>${scene(p.c+k,KINDS[(p.c+k)%6])}</div>`).join('')}</div></div></div>`}).join('');
+  document.querySelectorAll('.pl').forEach(el=>el.onclick=()=>{setMode('map');openSheet(P[+el.dataset.i])});
+}
+
+// ---------- modes ----------
+let mode='map';
+function setMode(m){
+  mode=m;document.querySelectorAll('#seg button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  $('sheet').classList.remove('open');playing=false;$('play').textContent='▶';$('card').classList.add('out');
+  if(m==='map'){map.removeLayer(journey);pinLayer.addTo(map);drawPins();}else{map.removeLayer(pinLayer)}
+  if(m==='journey'){journey.addTo(map);shown=-1;setT(0,false);map.flyToBounds(all,{padding:[60,60],paddingBottomRight:[60,220],duration:.8});setTimeout(()=>showCard(0),300)}
+  else map.removeLayer(journey);
+  $('player').style.display=m==='journey'?'flex':'none';$('fit').style.display=m==='map'?'grid':'none';
+  $('list').style.display=m==='places'?'block':'none';if(m==='places')drawList();
+  $('title').textContent={map:'Places',journey:'Summer trip',places:'All places'}[m];
+}
+document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+map.fitBounds(all,{padding:[70,70]});setMode('map');
+</script>
+</body>
+</html>

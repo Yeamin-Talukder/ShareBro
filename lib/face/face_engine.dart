@@ -112,13 +112,14 @@ class FaceEngine {
     codec.dispose();
     if (data == null) return const [];
     final pixels = TransferableTypedData.fromList([data.buffer.asUint8List()]);
-    _worker ??= await _EmbedWorker.start();
-    return _worker!.run(pixels, w, h, boxes, _layout);
+    final worker = _worker ??= await (_starting ??= _EmbedWorker.start());
+    return worker.run(pixels, w, h, boxes, _layout);
   }
 
   /// One background isolate for the whole scan, instead of starting (and
   /// loading the model library in) a new one for every photo.
   _EmbedWorker? _worker;
+  Future<_EmbedWorker>? _starting;
 
   void dispose() {
     _worker?.stop();

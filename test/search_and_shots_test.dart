@@ -28,6 +28,20 @@ void main() {
     expect(vocab.parse('sam ortiz', now: now).terms.single.personId, 4);
   });
 
+  test('typed names lose stray spaces', () {
+    expect(AppDb.cleanName('  Maya   Lopez \n'), 'Maya Lopez');
+    expect(AppDb.cleanName('   '), '');
+  });
+
+  test('men and women find photos by gender', () {
+    final r = vocab.parse('women beach', now: now);
+    expect(r.terms.first.gender, Gender.female);
+    expect(r.unknown, isEmpty);
+    expect(vocab.parse('boys', now: now).terms.single.gender, Gender.male);
+    // A person's name still wins.
+    expect(vocab.parse('maya', now: now).terms.single.personId, 1);
+  });
+
   test('months and years become date spans', () {
     final june = vocab.parse('food june', now: now).terms.last.dates!;
     expect(june.start, DateTime(2026, 6));

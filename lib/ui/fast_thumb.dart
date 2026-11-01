@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
+import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import 'widgets.dart' show AssetThumb;
@@ -51,6 +53,10 @@ class FastThumb extends ImageProvider<FastThumb> {
         final scale = (size / side).clamp(0.0, 1.0);
         target = ThumbnailSize((w * scale).round().clamp(1, 1 << 14), (h * scale).round().clamp(1, 1 << 14));
       }
+      if (size <= _nativeUpTo) {
+        final fast = await _native(id, target, a.type == AssetType.video);
+        if (fast != null) return fast;
+      }
       final bytes = await a.thumbnailDataWithSize(target, quality: quality);
       if (bytes == null) throw StateError('No thumbnail for $id');
       return await decode(await ui.ImmutableBuffer.fromUint8List(bytes));
@@ -58,6 +64,52 @@ class FastThumb extends ImageProvider<FastThumb> {
       // Don't keep a failed load around in the cache.
       Future<void>.microtask(() => PaintingBinding.instance.imageCache.evict(key));
       rethrow;
+    }
+  }
+
+  static const _channel = MethodChannel('photo_organizer/thumbs');
+
+  /// Android's own ready-made thumbnails cover sizes up to about this;
+  /// bigger ones (the viewer) come from the full photo.
+  static const _nativeUpTo = 512;
+  static bool _nativeWorks = Platform.isAndroid;
+
+  /// Android's stored thumbnail of [id], about [size] px, as RGBA bytes;
+  /// null when there isn't one (Android 9, or no thumbnail).
+  static Future<({int width, int height, Uint8List rgba})?> pixels(String id, int size, {bool video = false}) async {
+    if (!_nativeWorks) return null;
+    try {
+      final r = await _channel.invokeMapMethod<String, Object?>(
+          'thumb', {'id': id, 'width': size, 'height': size, 'video': video});
+      if (r == null) return null;
+      return (width: r['w']! as int, height: r['h']! as int, rgba: r['px']! as Uint8List);
+    } on MissingPluginException {
+      _nativeWorks = false;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Android's stored thumbnail as raw pixels: no full-size decode on the
+  /// phone's side and no JPEG round trip. Null when unavailable (Android 9,
+  /// or a file Android has no thumbnail for).
+  static Future<ui.Codec?> _native(String id, ThumbnailSize target, bool video) async {
+    if (!_nativeWorks) return null;
+    try {
+      final r = await _channel.invokeMapMethod<String, Object?>(
+          'thumb', {'id': id, 'width': target.width, 'height': target.height, 'video': video});
+      if (r == null) return null;
+      final w = r['w']! as int, h = r['h']! as int;
+      final buffer = await ui.ImmutableBuffer.fromUint8List(r['px']! as Uint8List);
+      final descriptor = ui.ImageDescriptor.raw(buffer, width: w, height: h, pixelFormat: ui.PixelFormat.rgba8888);
+      buffer.dispose();
+      return await descriptor.instantiateCodec();
+    } on MissingPluginException {
+      _nativeWorks = false;
+      return null;
+    } catch (_) {
+      return null;
     }
   }
 

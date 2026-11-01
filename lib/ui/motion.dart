@@ -105,7 +105,8 @@ class PhotosSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(2),
+      // Starts where the grid will, below any top bar it runs under.
+      padding: EdgeInsets.fromLTRB(2, MediaQuery.paddingOf(context).top + 2, 2, 2),
       children: [
         for (var section = 0; section < 3; section++) ...[
           const Padding(

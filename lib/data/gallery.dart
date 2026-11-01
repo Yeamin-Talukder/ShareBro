@@ -19,9 +19,14 @@ class Gallery {
 
   static RequestType _type(bool media) => media ? RequestType.common : RequestType.image;
 
-  /// Asks for photo access; false if the user said no.
-  static Future<bool> requestAccess() async =>
-      (await PhotoManager.requestPermissionExtend()).hasAccess;
+  /// Asks for photo access, including where photos were taken (for the
+  /// Places map); false if the user said no.
+  static Future<bool> requestAccess() async => (await PhotoManager.requestPermissionExtend(
+        requestOption: const PermissionRequestOption(
+          androidPermission: AndroidPermission(type: RequestType.common, mediaLocation: true),
+        ),
+      ))
+          .hasAccess;
 
   static Future<List<AssetPathEntity>> albums({DaySpan? dates, bool media = false}) =>
       PhotoManager.getAssetPathList(

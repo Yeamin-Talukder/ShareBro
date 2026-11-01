@@ -258,24 +258,31 @@ class _PhotoViewerState extends State<PhotoViewer> with TickerProviderStateMixin
                       onPressed: () => Navigator.maybePop(context),
                     ),
                     const SizedBox(width: 8),
-                    Flexible(
-                      child: Glass(
-                        kind: GlassKind.clear,
-                        shadow: false,
-                        radius: 24,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        child: Text(
-                          widget.selection == null
-                              ? '${_index + 1} / ${_ids.length}'
-                              : '${_index + 1} / ${_ids.length} · '
-                                    '${_ids.where(widget.selection!.contains).length} selected',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                    // Takes all the room between the buttons and sits at its
+                    // left, so the buttons on the right stay at the edge. (A
+                    // Flexible next to a Spacer split the room and left them
+                    // stranded mid-bar.)
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Glass(
+                          kind: GlassKind.clear,
+                          shadow: false,
+                          radius: 24,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          child: Text(
+                            widget.selection == null
+                                ? '${_index + 1} / ${_ids.length}'
+                                : '${_index + 1} / ${_ids.length} · '
+                                      '${_ids.where(widget.selection!.contains).length} selected',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                          ),
                         ),
                       ),
                     ),
-                    const Spacer(),
+                    const SizedBox(width: 8),
                     if (hasFaces) ...[
                       GlassIconButton(
                         kind: GlassKind.clear,
@@ -651,6 +658,12 @@ class _ZoomPageState extends State<_ZoomPage> with SingleTickerProviderStateMixi
 
   @override
   Widget build(BuildContext context) {
+    // Only the photo on screen flies back to its grid tile. The pages on
+    // either side stay built (ready for a swipe) but must not fly too.
+    return HeroMode(enabled: widget.active, child: _page(context));
+  }
+
+  Widget _page(BuildContext context) {
     return FutureBuilder<AssetEntity?>(
       future: AssetThumb.entity(widget.id),
       // Usually known already (from the grid): no empty first frame.

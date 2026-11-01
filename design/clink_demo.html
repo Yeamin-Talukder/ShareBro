@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clink Animation Options</title>
+<style>
+:root{--page:#ECE9EF;--card:#fff;--ink:#141217;--sub:#6b6670;--line:rgba(26,24,32,.12);--surface:#F6F3F1;--shadow:rgba(20,18,23,.18)}
+:root[data-theme=dark]{--page:#050407;--card:#1b1a1f;--ink:#F2EFF4;--sub:#a29ca8;--line:rgba(255,255,255,.12);--surface:#0E0D12;--shadow:rgba(0,0,0,.6)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--page:#050407;--card:#1b1a1f;--ink:#F2EFF4;--sub:#a29ca8;--line:rgba(255,255,255,.12);--surface:#0E0D12;--shadow:rgba(0,0,0,.6)}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:20px 16px 48px}
+header{max-width:1100px;margin:0 auto 8px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:20px;margin:0}
+.note{max-width:1100px;margin:0 auto 18px;color:var(--sub);font-size:14px}
+button{font:inherit;color:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px}
+button.on{background:var(--ink);color:var(--card)}
+.grid{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px}
+.opt{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.opt h2{margin:0;font-size:16px}
+.opt p{margin:0;color:var(--sub);font-size:13px;min-height:72px}
+.screen{height:460px;border-radius:32px;background:var(--surface);border:6px solid #000;position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.screen svg{width:230px;height:196px;overflow:visible}
+.word{display:flex;font-weight:800;font-size:26px;letter-spacing:-.4px;margin-top:4px}
+.word span{display:inline-block;animation:letter .45s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes letter{from{opacity:0;transform:translateY(14px) scale(.8)}}
+.tag{color:var(--sub);font-size:13px;margin-top:2px;animation:fade .5s both}
+.replay{align-self:flex-start;font-size:13px;padding:6px 12px}
+svg *{transform-box:view-box}
+.spark path{stroke:#E5533A;stroke-width:1.4;stroke-linecap:round;fill:none}
+@keyframes fade{from{opacity:0}}
+@keyframes ray{0%{stroke-dasharray:0 10;opacity:0}100%{stroke-dasharray:10 0;opacity:1}}
+
+/* ============ timing: the clink lands at --hit ============ */
+.screen{--hit:.62s}
+.slow .screen{--k:3}
+.screen *{animation-duration:calc(var(--d,1s) * var(--k,1))!important;animation-delay:calc(var(--w,0s) * var(--k,1))!important}
+
+/* ---------- 1 · Cheers: the original, with weight ---------- */
+/* Fall with a slight wind-up, squash on contact, bounce back, settle with a tiny wobble. */
+.v1 .pl{--d:1.25s;animation:fallL 1s both}
+.v1 .pr{--d:1.25s;animation:fallR 1s both}
+@keyframes fallL{
+  0%{transform:translate(-18px,-110px) rotate(-38deg);opacity:0;animation-timing-function:cubic-bezier(.55,0,.85,.35)}
+  12%{opacity:1}
+  50%{transform:translate(-3px,0) rotate(-4deg) scale(1,1);animation-timing-function:cubic-bezier(.2,.8,.3,1)}
+  55%{transform:translate(-1px,1px) rotate(2deg) scale(1.04,.95)}
+  68%{transform:translate(1px,-1.5px) rotate(5deg) scale(.98,1.03)}
+  82%{transform:translate(-.5px,0) rotate(-1.5deg)}
+  92%{transform:rotate(.6deg)}100%{transform:none}}
+@keyframes fallR{
+  0%{transform:translate(18px,-110px) rotate(38deg);opacity:0;animation-timing-function:cubic-bezier(.55,0,.85,.35)}
+  12%{opacity:1}
+  50%{transform:translate(3px,0) rotate(4deg) scale(1,1);animation-timing-function:cubic-bezier(.2,.8,.3,1)}
+  55%{transform:translate(1px,1px) rotate(-2deg) scale(1.04,.95)}
+  68%{transform:translate(-1px,-1.5px) rotate(-5deg) scale(.98,1.03)}
+  82%{transform:translate(.5px,0) rotate(1.5deg)}
+  92%{transform:rotate(-.6deg)}100%{transform:none}}
+.ring{--d:.7s;--w:.64s;animation:ring 1s ease-out both}
+.ring2{--d:.8s;--w:.72s;animation:ring 1s ease-out both}
+@keyframes ring{from{r:1;opacity:.7;stroke-width:1.2}to{r:20;opacity:0;stroke-width:.2}}
+.v1 .spark path{--d:.45s;--w:.66s;animation:ray 1s cubic-bezier(.2,1.4,.4,1) both}
+.v1 .shadow{--d:1.25s;animation:shadow 1s both}
+@keyframes shadow{0%{transform:scale(.2,1);opacity:0}50%{transform:scale(1.1,1);opacity:1}62%{transform:scale(.92,1)}100%{transform:none;opacity:1}}
+
+/* ---------- 2 · Cheers + glow: screens light up on impact, sparkles fly ---------- */
+.v2 .pl{--d:1.25s;animation:fallL 1s both}
+.v2 .pr{--d:1.25s;animation:fallR 1s both}
+.v2 .scr{--d:.7s;--w:.6s;animation:wake 1s both}
+@keyframes wake{0%{filter:brightness(.3) saturate(.3)}35%{filter:brightness(1.35)}100%{filter:none}}
+.v2 .spark path{--d:.45s;--w:.66s;animation:ray 1s cubic-bezier(.2,1.4,.4,1) both}
+.v2 .bit{--d:.8s;--w:.64s;animation:bit 1s cubic-bezier(.15,.7,.3,1) both}
+@keyframes bit{0%{transform:translate(54px,41px) scale(0);opacity:1}70%{opacity:1}100%{transform:translate(var(--x),var(--y)) scale(1) rotate(var(--r));opacity:0}}
+.v2 .shadow{--d:1.25s;animation:shadow 1s both}
+
+/* ---------- 3 · Cheers + swap: on the clink, the photos trade screens ---------- */
+.v3 .pl{--d:1.25s;animation:fallL 1s both}
+.v3 .pr{--d:1.25s;animation:fallR 1s both}
+.v3 .blank{--d:.25s;--w:.62s;animation:fadeout 1s both}
+@keyframes fadeout{to{opacity:0}}
+.v3 .pa{--d:.75s;--w:.6s;animation:pa 1s cubic-bezier(.3,1.2,.4,1) both}
+.v3 .pb{--d:.75s;--w:.6s;animation:pb 1s cubic-bezier(.3,1.2,.4,1) both}
+@keyframes pa{0%{transform:translate(54px,41px) scale(.15);opacity:0}25%{opacity:1}100%{transform:translate(40.3px,57.6px) rotate(22.5deg) scale(1);opacity:0}}
+@keyframes pb{0%{transform:translate(54px,41px) scale(.15);opacity:0}25%{opacity:1}100%{transform:translate(67.7px,57.6px) rotate(-22.5deg) scale(1);opacity:0}}
+.v3 .shown{--d:.3s;--w:1.15s;animation:fade 1s both}
+.v3 .spark path{--d:.45s;--w:1.1s;animation:ray 1s cubic-bezier(.2,1.4,.4,1) both}
+.v3 .shadow{--d:1.25s;animation:shadow 1s both}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Clink, improved: three takes</h1>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button id="all">Replay all</button>
+    <button id="slow">Slow motion</button>
+    <button id="theme">Switch light / dark</button>
+  </div>
+</header>
+<p class="note">All three keep the toast: the phones fall in and clink at the top. What's new in all: they wind up as they fall, squash a little on impact and bounce apart before settling, a soft shadow lands under them, two rings ripple out, and “ShareBro” drops in letter by letter. The phone would give one light buzz at the clink. Use slow motion to see the details.</p>
+<div class="grid" id="grid"></div>
+<script>
+let uid=0;
+const LEFT={body:'#E5533A',sky:'#FDE3DA',sun:'#FF8A6B',h1:'#FFC3B2',h2:'#FF8A6B',slot:'#B23A25'};
+const RIGHT={body:'#141217',sky:'#3A353F',sun:'#FF8A6B',h1:'#5A5560',h2:'#8A8590',slot:'#000'};
+const SCR='x="-8.1" y="-13.4" width="16.2" height="28.9" rx="3.3"';
+const photo=(c,id)=>`<rect ${SCR} fill="${c.sky}"></rect><g clip-path="url(#${id})"><circle cx="2.6" cy="-5.2" r="2.1" fill="${c.sun}"></circle><path d="M-8.1 4.5 L-2.6 -0.6 L0.2 6 L4 3.5 L8.1 9 L8.1 15.5 L-8.1 15.5Z" fill="${c.h1}"></path><path d="M-8.1 9.6 L-2.6 7.4 L0 12 L3 10.6 L5.5 12.2 L8.1 15.5 L-8.1 15.5Z" fill="${c.h2}"></path></g>`;
+function phone(c,{blank=false}={}){
+  const id='c'+(uid++);
+  return `<rect x="-9.37" y="-16.7" width="18.74" height="33.4" rx="4.37" fill="${c.body}"></rect>
+    <clipPath id="${id}"><rect ${SCR}></rect></clipPath>
+    <g class="scr ${blank?'shown':''}">${photo(c,id)}</g>
+    ${blank?`<rect class="blank" ${SCR} fill="${c===LEFT?'#F3D2C8':'#26232A'}"></rect>`:''}
+    <rect x="-2.1" y="-15.6" width="4.2" height="1.24" rx=".62" fill="${c.slot}"></rect>`;
+}
+const PL='translate(40.3 57.6)',PR='translate(67.7 57.6)';
+const spark=`<g class="spark"><path d="M54 36.3 L54 32.8"></path><path d="M55.9 37.2 L58.6 35"></path><path d="M52.1 37.2 L49.4 35"></path></g>`;
+const shadow=`<ellipse class="shadow" cx="54" cy="79" rx="24" ry="2.2" fill="var(--shadow)" style="transform-origin:54px 79px"></ellipse>`;
+const rings=`<circle class="ring" cx="54" cy="40" r="1" fill="none" stroke="#E5533A"></circle><circle class="ring2 ring" cx="54" cy="40" r="1" fill="none" stroke="#E5533A"></circle>`;
+function bits(){
+  // little coral and ink chips thrown out of the clink
+  const c=['#E5533A','#FF8A6B','#141217','#FFC3B2','#E5533A','#8A8590','#FF8A6B','#E5533A'];
+  return c.map((col,i)=>{const a=-160+i*(140/(c.length-1));const r=14+(i%3)*5;
+    const x=54+Math.cos(a*Math.PI/180)*r,y=41+Math.sin(a*Math.PI/180)*r;
+    const shape=i%2?`<rect x="-.9" y="-.9" width="1.8" height="1.8" rx=".4" fill="${col}"></rect>`:`<circle r="1" fill="${col}"></circle>`;
+    return `<g class="bit" style="--x:${x}px;--y:${y}px;--r:${i*40}deg">${shape}</g>`}).join('');
+}
+function logo({blank=false,under='',over=''}={}){
+  return `<svg viewBox="20 22 68 62">${shadow}${under}
+    <g transform="${PL}"><g class="pl"><g transform="rotate(22.5)">${phone(LEFT,{blank})}</g></g></g>
+    <g transform="${PR}"><g class="pr"><g transform="rotate(-22.5)">${phone(RIGHT,{blank})}</g></g></g>
+    ${over}${spark}</svg>`;
+}
+function swapPhotos(){
+  const p=(c,cls)=>{const id='c'+(uid++);return `<g class="${cls}"><clipPath id="${id}"><rect ${SCR}></rect></clipPath>${photo(c,id)}</g>`};
+  return p(LEFT,'pa')+p(RIGHT,'pb');
+}
+function word(start){
+  return `<div class="word">${[...'ShareBro'].map((ch,i)=>`<span style="--d:.45s;--w:${(start+i*0.04).toFixed(2)}s">${ch}</span>`).join('')}</div>
+    <div class="tag" style="--d:.5s;--w:${(start+0.4).toFixed(2)}s">Share trip photos with friends</div>`;
+}
+const OPTIONS=[
+  ['v1','1 · Cheers','The same toast with real weight: a wind-up as they fall, a squash on contact, a bounce apart and a tiny wobble before they settle. Two rings ripple out and the spark flicks on.',
+    ()=>logo({over:rings})+word(.85)],
+  ['v2','2 · Cheers + glow','Like 1, but the screens are asleep while falling and light up on the clink, and a few coral and ink sparkles fly out of the contact point. The most celebratory.',
+    ()=>logo({over:rings+bits()})+word(.9)],
+  ['v3','3 · Cheers + swap','The phones fall in with blank screens. On the clink, two photos burst out of the contact point and land on each other\'s screens, as if they just shared them. Tells the story of the app.',
+    ()=>logo({blank:true,over:rings+swapPhotos()})+word(1.25)],
+];
+const grid=document.getElementById('grid');
+OPTIONS.forEach(([k,name,desc,make])=>{
+  const card=document.createElement('div');card.className='opt';
+  card.innerHTML=`<h2>${name}</h2><p>${desc}</p><div class="screen ${k}"></div><button class="replay">Replay</button>`;
+  const scr=card.querySelector('.screen');
+  const play=()=>{scr.innerHTML=make()};
+  card.querySelector('.replay').onclick=play;play();
+  grid.appendChild(card);
+});
+const all=()=>document.querySelectorAll('.replay').forEach(b=>b.click());
+document.getElementById('all').onclick=all;
+document.getElementById('slow').onclick=e=>{document.body.classList.toggle('slow');e.target.classList.toggle('on');all()};
+document.getElementById('theme').onclick=()=>{const r=document.documentElement;const d=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=d?'light':'dark'};
+</script>
+</body>
+</html>

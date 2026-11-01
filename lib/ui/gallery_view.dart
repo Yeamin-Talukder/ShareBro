@@ -62,7 +62,9 @@ class _AlbumSource implements GallerySource {
 
   @override
   Future<List<AssetEntity>> page(int start, int size) async =>
-      _path!.getAssetListPaged(page: start ~/ size, size: size);
+      // By range, not page number: once photos are deleted, start is no
+      // longer a whole number of pages and a page number would repeat some.
+      _path!.getAssetListRange(start: start, end: start + size);
 }
 
 class _IdSource implements GallerySource {
@@ -96,6 +98,7 @@ class GalleryView extends StatefulWidget {
     required this.source,
     this.emptyMessage = 'No photos here.',
     this.onPicked,
+    this.onSelectingChanged,
   });
 
   final ScanController controller;
@@ -104,6 +107,10 @@ class GalleryView extends StatefulWidget {
 
   /// Pick mode: taps select, and the bar's button hands back the ids.
   final ValueChanged<List<String>>? onPicked;
+
+  /// Selection mode started or ended, so the page can make way for the
+  /// selection bar.
+  final ValueChanged<bool>? onSelectingChanged;
 
   @override
   State<GalleryView> createState() => _GalleryViewState();
@@ -115,15 +122,17 @@ const _defaultLevel = 2;
 const _monthFrom = 6;
 const _headerHeight = 48.0;
 
+/// The zoom you last pinched to, kept when the dates or the album change.
+int _lastLevel = _defaultLevel;
+
 class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStateMixin {
   final List<AssetEntity> _assets = [];
   int _requested = 0;
   int _total = 0;
-  bool _loading = false;
   bool _ready = false;
 
   final _scroll = ScrollController();
-  int _level = _defaultLevel;
+  int _level = _lastLevel;
 
   // Two-finger pinch (a Listener, so it never fights scrolling). The grid
   // follows the fingers live, then settles into the new column count.
@@ -162,19 +171,25 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
   @override
   void dispose() {
     DockVisibility.show(this);
+    // After this frame: the tree is locked while widgets are disposed.
+    final changed = widget.onSelectingChanged;
+    if (_barShown && changed != null) Future.microtask(() => changed(false));
     _settle.dispose();
     _pinchScale.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
-  /// The dock makes way for the selection bar.
+  /// Whether the selection bar was showing at the last build.
+  bool _barShown = false;
+
+  /// The dock (and the page's own bar) make way for the selection bar.
   void _syncDock() {
-    if (_selected.isNotEmpty && widget.onPicked == null) {
-      DockVisibility.hide(this);
-    } else {
-      DockVisibility.show(this);
-    }
+    final shown = _selected.isNotEmpty && widget.onPicked == null;
+    if (shown == _barShown) return;
+    _barShown = shown;
+    shown ? DockVisibility.hide(this) : DockVisibility.show(this);
+    widget.onSelectingChanged?.call(shown);
   }
 
   int get _columns => _levels[_level];
@@ -234,7 +249,7 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
     final anchor = _indexAt(_focal);
     final oldColumns = _columns;
     setState(() {
-      _level = next;
+      _level = _lastLevel = next;
       _pinching = false;
     });
     // The new grid starts at the size the fingers left the old one at.
@@ -268,27 +283,38 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
       ? a.year == b.year && a.month == b.month
       : a.year == b.year && a.month == b.month && a.day == b.day;
 
+  /// Bumped by every reset, so a page still loading from before it is
+  /// dropped instead of landing in the fresh list as duplicates.
+  int _generation = 0;
+
   Future<void> _reset() async {
+    final gen = ++_generation;
     final total = await widget.source.open();
-    if (!mounted) return;
+    if (!mounted || gen != _generation) return;
     setState(() {
       _total = total;
       _assets.clear();
       _requested = 0;
       _ready = true;
     });
+    _loading = null;
     await _loadMore();
   }
 
-  Future<void> _loadMore() async {
-    if (_loading || _requested >= _total) return;
-    _loading = true;
-    final page = await widget.source.page(_requested, _pageSize);
-    _requested += _pageSize;
+  /// The page being loaded, if any; callers share it.
+  Future<void>? _loading;
+
+  Future<void> _loadMore() => _loading ??= _loadPage().whenComplete(() => _loading = null);
+
+  Future<void> _loadPage() async {
+    if (_requested >= _total) return;
+    final gen = _generation;
+    final start = _requested;
+    final page = await widget.source.page(start, _pageSize);
+    if (!mounted || gen != _generation) return;
+    _requested = start + _pageSize;
     AssetThumb.remember(page);
-    if (!mounted) return;
     setState(() => _assets.addAll(page));
-    _loading = false;
   }
 
   /// Headers (per day, or per month when zoomed out) followed by rows.
@@ -355,8 +381,7 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
       return;
     }
     // Everything, not just what's been scrolled to.
-    while (_requested < _total) {
-      _loading = false;
+    while (_requested < _total && mounted) {
       await _loadMore();
     }
     if (mounted) setState(() => _selected.addAll(_assets.map((a) => a.id)));
@@ -456,11 +481,14 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
 
   Widget _selectionBars(BuildContext context) {
     final pad = MediaQuery.paddingOf(context);
+    // Over the page's own top bar when the grid runs underneath it (that
+    // bar steps aside), else at the top of the grid.
+    final top = widget.onSelectingChanged != null ? MediaQuery.viewPaddingOf(context).top : pad.top;
     final sel = _selectedAssets;
     final allFav = sel.isNotEmpty && sel.every((a) => a.isFavorite);
     return Stack(children: [
       Positioned(
-        top: pad.top + 6,
+        top: top + 6,
         left: 12,
         right: 12,
         child: Glass(
@@ -531,11 +559,22 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _syncDock();
-    });
-    if (!_ready) return PhotosSkeleton(columns: _columns);
-    if (_total == 0) return EmptyIllustration(message: widget.emptyMessage);
+    if ((_selected.isNotEmpty && widget.onPicked == null) != _barShown) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncDock();
+      });
+    }
+    return AnimatedSwitcher(
+      duration: 250.ms,
+      child: !_ready
+          ? PhotosSkeleton(key: const ValueKey('loading'), columns: _columns)
+          : _total == 0
+              ? EmptyIllustration(key: const ValueKey('empty'), message: widget.emptyMessage)
+              : KeyedSubtree(key: const ValueKey('grid'), child: _grid(context)),
+    );
+  }
+
+  Widget _grid(BuildContext context) {
     final text = Theme.of(context).textTheme;
     return LayoutBuilder(builder: (context, box) {
       final columns = _columns;
@@ -883,13 +922,16 @@ class _Tile extends StatelessWidget {
       child: ColoredBox(
         color: selected ? scheme.primaryContainer : Colors.transparent,
         child: Stack(fit: StackFit.expand, children: [
-          AnimatedScale(
-            scale: selected ? 0.84 : 1,
+          TweenAnimationBuilder<double>(
+            tween: Tween(end: selected ? 1 : 0),
             duration: 180.ms,
             curve: Curves.easeOutCubic,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(selected ? 12 : 0),
-              child: Hero(
+            // Shrinks and rounds its corners together.
+            builder: (context, t, child) => Transform.scale(
+              scale: 1 - 0.16 * t,
+              child: ClipRRect(borderRadius: BorderRadius.circular(12 * t), child: child),
+            ),
+            child: Hero(
                 tag: 'photo-${asset.id}',
                 child: Image(
                   image: FastThumb(asset.id, px, cover: true),
@@ -903,7 +945,6 @@ class _Tile extends StatelessWidget {
                       ColoredBox(color: Theme.of(context).colorScheme.surfaceContainerHighest),
                 ),
               ),
-            ),
           ),
           if (video && !small)
             Positioned(
