@@ -105,8 +105,61 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _reviewTimer?.cancel();
+    _edgeTimer?.cancel();
+    _scroll.dispose();
     c.removeListener(_onChange);
     super.dispose();
+  }
+
+  /// The page's scroll position: it scrolls by itself while a person is
+  /// dragged near the top or bottom, so you can drop them on someone who's
+  /// off screen.
+  final _scroll = ScrollController();
+  Timer? _edgeTimer;
+
+  /// Points per tick the page is scrolling (negative: up).
+  double _edgeSpeed = 0;
+
+  /// How deep the scroll zones at the top and bottom of the page are.
+  static const _edgeZone = 110.0;
+
+  void _dragMoved(Offset finger) {
+    final size = MediaQuery.sizeOf(context);
+    final pad = MediaQuery.paddingOf(context);
+    // Below the top bar, above the floating dock.
+    final top = pad.top + 64, bottom = size.height - pad.bottom;
+    double speed = 0;
+    if (finger.dy < top + _edgeZone) {
+      speed = -_speedFor((top + _edgeZone - finger.dy) / _edgeZone);
+    } else if (finger.dy > bottom - _edgeZone) {
+      speed = _speedFor((finger.dy - (bottom - _edgeZone)) / _edgeZone);
+    }
+    _edgeSpeed = speed;
+    if (speed == 0) {
+      _edgeTimer?.cancel();
+      _edgeTimer = null;
+    } else {
+      _edgeTimer ??= Timer.periodic(const Duration(milliseconds: 16), (_) => _edgeTick());
+    }
+  }
+
+  /// Slow at the edge of the zone, quick right at the screen's edge.
+  static double _speedFor(double depth) {
+    final d = depth.clamp(0.0, 1.0);
+    return 3 + 19 * d * d;
+  }
+
+  void _edgeTick() {
+    if (!_scroll.hasClients || _edgeSpeed == 0) return;
+    final p = _scroll.position;
+    final to = (p.pixels + _edgeSpeed).clamp(p.minScrollExtent, p.maxScrollExtent);
+    if (to != p.pixels) _scroll.jumpTo(to);
+  }
+
+  void _dragDone() {
+    _edgeTimer?.cancel();
+    _edgeTimer = null;
+    _edgeSpeed = 0;
   }
 
   bool _wasRunning = false;
@@ -289,6 +342,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ).animate().scale(curve: Curves.easeOutBack, duration: 400.ms),
       ),
       body: GlassScrollView(
+        controller: _scroll,
         title: 'People',
         physics: people != null && people.isNotEmpty && _layout.spatial ? const NeverScrollableScrollPhysics() : null,
         subtitle: people == null || people.isEmpty ? null : '${people.length} ${people.length == 1 ? 'person' : 'people'}',
@@ -667,6 +721,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   loadFaces: () => c.db.bestFaces(person.id),
                   onTap: () => _openPerson(person),
                   onMerge: (dragged) => _dropMerge(dragged, person),
+                  onDragMoved: _dragMoved,
+                  onDragDone: _dragDone,
                 );
                 if (person.id == _popId) {
                   tile = tile
@@ -699,12 +755,19 @@ class _PersonTile extends StatefulWidget {
     required this.loadFaces,
     required this.onTap,
     required this.onMerge,
+    required this.onDragMoved,
+    required this.onDragDone,
   });
 
   final PersonSummary person;
   final Future<List<Uint8List>> Function() loadFaces;
   final VoidCallback onTap;
   final ValueChanged<PersonSummary> onMerge;
+
+  /// Where the finger is while this person is being dragged (screen
+  /// points), and when the drag ends: the page scrolls near its edges.
+  final ValueChanged<Offset> onDragMoved;
+  final VoidCallback onDragDone;
 
   @override
   State<_PersonTile> createState() => _PersonTileState();
@@ -713,8 +776,22 @@ class _PersonTile extends StatefulWidget {
 /// Half the size of the drag feedback, to find the dragged face's centre.
 const _feedbackHalf = Offset(50, 50);
 
-class _PersonTileState extends State<_PersonTile> {
+class _PersonTileState extends State<_PersonTile> with AutomaticKeepAliveClientMixin {
   bool _hovered = false;
+
+  /// Being dragged: kept alive even when scrolled out of view, or the drag
+  /// would stop reporting (and the page would keep scrolling).
+  bool _dragging = false;
+
+  @override
+  bool get wantKeepAlive => _dragging;
+
+  void _setDragging(bool on) {
+    if (_dragging == on) return;
+    _dragging = on;
+    updateKeepAlive();
+    if (!on) widget.onDragDone();
+  }
 
   /// How far the face leans toward a person being dragged over it.
   Offset _pull = Offset.zero;
@@ -731,6 +808,7 @@ class _PersonTileState extends State<_PersonTile> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final scheme = Theme.of(context).colorScheme;
     final person = widget.person;
     final avatar = LivingAvatar(
@@ -764,6 +842,11 @@ class _PersonTileState extends State<_PersonTile> {
       builder: (context, _, _) => LongPressDraggable<PersonSummary>(
         data: person,
         hapticFeedbackOnStart: true,
+        onDragStarted: () => _setDragging(true),
+        onDragUpdate: (d) => widget.onDragMoved(d.globalPosition),
+        onDragEnd: (_) => _setDragging(false),
+        onDraggableCanceled: (_, _) => _setDragging(false),
+        onDragCompleted: () => _setDragging(false),
         feedback: Material(
           type: MaterialType.transparency,
           child: Transform.scale(

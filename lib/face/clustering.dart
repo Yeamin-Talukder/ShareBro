@@ -7,15 +7,17 @@ import 'dart:typed_data';
 /// the defaults lean strict.
 class GroupingThresholds {
   const GroupingThresholds({
-    this.assign = 0.50,
-    this.cluster = 0.50,
-    this.merge = 0.55,
+    this.assign = 0.38,
+    this.cluster = 0.38,
+    this.merge = 0.43,
     this.minGroupSize = 2,
   });
 
   /// From the settings slider: 0 = loose (groups more), 1 = strict.
   factory GroupingThresholds.fromStrictness(double s) {
-    final base = 0.38 + 0.24 * s.clamp(0.0, 1.0);
+    // Tuned for w600k_mbf: the same person usually scores 0.4-0.8, two
+    // different people below about 0.2.
+    final base = 0.28 + 0.20 * s.clamp(0.0, 1.0);
     return GroupingThresholds(assign: base, cluster: base, merge: base + 0.05);
   }
 
@@ -85,8 +87,11 @@ class _Centroid {
     _norm = math.sqrt(n);
   }
 
-  /// Cosine similarity to a unit-length vector.
+  /// Cosine similarity to a unit-length vector. A fingerprint from another
+  /// model (another length, e.g. from a phone on an older version) never
+  /// matches.
   double similarity(Float32List v) {
+    if (v.length != sum.length) return -1;
     if (_norm == 0) return 0;
     var dot = 0.0;
     for (var i = 0; i < sum.length; i++) {
@@ -96,6 +101,7 @@ class _Centroid {
   }
 
   double similarityTo(_Centroid other) {
+    if (other.sum.length != sum.length) return -1;
     if (_norm == 0 || other._norm == 0) return 0;
     var dot = 0.0;
     for (var i = 0; i < sum.length; i++) {
@@ -201,10 +207,10 @@ class SuggestInput {
 List<({int faceId, int personId, double similarity})> suggestMatches(
     SuggestInput input) {
   if (input.people.isEmpty) return const [];
-  final dim = input.people.values.first.first.length;
   final centroids = <int, _Looks>{};
   input.people.forEach((pid, faces) {
-    final c = centroids[pid] = _Looks(dim);
+    if (faces.isEmpty) return;
+    final c = centroids[pid] = _Looks(faces.first.length);
     for (final v in faces) {
       c.add(v, 0);
     }
@@ -240,7 +246,7 @@ int previewGroupCount(GroupingInput input) {
 
 /// Faces closer than this to one of a person's looks join that look;
 /// otherwise they start a new look (beard / no beard, glasses, years apart).
-const _lookSimilarity = 0.62;
+const _lookSimilarity = 0.50;
 const _maxLooks = 6;
 
 /// A person as several "looks" instead of one average, so the same person
@@ -252,6 +258,8 @@ class _Looks {
   final List<_Centroid> looks = [];
 
   void add(Float32List v, int faceIndex) {
+    // Another model's fingerprint can't be averaged in.
+    if (v.length != dim) return;
     _Centroid? best;
     var bestSim = _lookSimilarity;
     for (final l in looks) {
@@ -272,6 +280,7 @@ class _Looks {
 
   /// Similarity to whichever look is closest.
   double similarity(Float32List v) {
+    if (v.length != dim) return -1;
     var best = 0.0;
     for (final l in looks) {
       final s = l.similarity(v);

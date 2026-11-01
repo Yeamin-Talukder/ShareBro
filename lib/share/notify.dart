@@ -149,6 +149,9 @@ class NotifyBridge with WidgetsBindingObserver {
   ReceiveSession? _sessionShown, _sessionDone;
   bool _scanShown = false;
 
+  /// The running "scan" is really a face model upgrade.
+  bool _upgradeShown = false;
+
   /// When this scan's progress was first seen, and how far it was then:
   /// for "about 4 min left".
   DateTime? _scanFrom;
@@ -414,13 +417,15 @@ class NotifyBridge with WidgetsBindingObserver {
       }
       if (!_due(_scan, ms: 1500)) return;
       _scanShown = true;
+      _upgradeShown = c.upgrading;
       final left = _scanLeft();
       final p = c.done / c.total;
       await Notify.show(
         id: _scan,
         kind: 'scan',
-        title: 'Finding faces',
-        text: '${_n(c.done)} of ${_n(c.total)} photos${left == null ? '' : ' · about ${_short(left)} left'}',
+        title: c.upgrading ? 'Updating face matching' : 'Finding faces',
+        text: '${_n(c.done)} of ${_n(c.total)} ${c.upgrading ? 'faces' : 'photos'}'
+            '${left == null ? '' : ' · about ${_short(left)} left'}',
         sub: c.albumName,
         progress: p,
         chip: left == null ? '${(p * 100).round()}%' : '${(p * 100).round()}% · ${_short(left)}',
@@ -433,7 +438,9 @@ class NotifyBridge with WidgetsBindingObserver {
       _scanShown = false;
       await Notify.cancel(_scan);
       // Finished while you were away: say what it found and what's next.
-      if (_foreground || c.error != null || c.stopped) return;
+      final wasUpgrade = _upgradeShown;
+      _upgradeShown = false;
+      if (_foreground || c.error != null || c.stopped || wasUpgrade) return;
       final people = c.peopleFound ?? 0;
       await Notify.show(
         id: _scanDone,

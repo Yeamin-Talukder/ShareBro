@@ -31,8 +31,14 @@ import 'background.dart';
 const _scanSize = 1600;
 
 /// How far below a sure match a face still gets a "Is this them?".
-const _unsureRange = 0.1;
+const _unsureRange = 0.08;
 const _pageSize = 200;
+
+/// Faces re-fingerprinted per step of a face model upgrade.
+const _upgradeBatch = 64;
+
+/// Numbers per fingerprint from the current face model.
+const _embeddingSize = 512;
 
 /// Photos scanned at the same time.
 const _inFlight = 3;
@@ -51,18 +57,22 @@ const _photoMilestones = [100, 250, 500, 1000, 2000, 3000, 5000, 10000];
 const _faceMilestones = [50, 100, 250, 500, 1000, 2500, 5000];
 
 /// Faces at least this similar to a named person are offered in review.
-const _suggestMin = 0.33;
+const _suggestMin = 0.22;
 
 const _strictnessKey = 'strictness';
 const _autoScanKey = 'auto_scan';
 const _appLockKey = 'app_lock';
 
 /// People this much below the auto-merge level are offered as "same person?".
-const _mergeHintRange = 0.12;
+const _mergeHintRange = 0.10;
 const _maxMergeHints = 15;
 
+/// A lone face at least this close to a named person (shown as "75%
+/// match") joins them without asking in Review.
+const _autoAccept = 0.75;
+
 /// Similarity where the app is least sure whether a lone face is someone.
-const _unsure = 0.42;
+const _unsure = 0.30;
 
 /// Something to decide on the review screen.
 sealed class ReviewItem {}
@@ -170,6 +180,7 @@ class ScanController extends ChangeNotifier {
     appLock = (await db.setting(_appLockKey)) == '1';
     backfillDates();
     unawaited(backfillLocations());
+    unawaited(upgradeFaces());
     _watchForNewPhotos();
   }
 
@@ -380,6 +391,75 @@ class ScanController extends ChangeNotifier {
     sharing.groups.refreshMe();
     notifyListeners();
     return found.length;
+  }
+
+  static const _faceModelKey = 'face_model';
+
+  /// Stored faces are being redone for a new face model (shown like a scan).
+  bool upgrading = false;
+
+  /// After the app switches face models, every stored face gets a new
+  /// fingerprint from its saved crop (no photos are rescanned), your
+  /// profile is rebuilt, and faces are grouped again with the new model.
+  /// Runs once per model; picks up again next launch if interrupted.
+  Future<void> upgradeFaces() async {
+    if (running || await db.setting(_faceModelKey) == faceModelId) return;
+    final count = await db.faceCount();
+    if (count == 0) {
+      await db.setSetting(_faceModelKey, faceModelId);
+      return;
+    }
+    running = upgrading = true;
+    _cancel = false;
+    error = null;
+    albumName = 'Updating face matching';
+    done = skipped = facesFound = 0;
+    peopleFound = null;
+    recentFaces.clear();
+    preview = null;
+    total = count;
+    notifyListeners();
+    await ScanNotification.start('Updating face matching…');
+    try {
+      _engine ??= await FaceEngine.load();
+      var after = 0;
+      while (true) {
+        final crops = await db.faceCrops(after: after, limit: _upgradeBatch);
+        if (crops.isEmpty) break;
+        final fresh = await _engine!.embedCrops([for (final c in crops) c.thumb]);
+        await db.setEmbeddings({
+          for (final (i, c) in crops.indexed)
+            // An unreadable crop gets an empty fingerprint: it matches no one
+            // instead of mixing old and new kinds.
+            c.id: fresh[i] ?? Float32List(_embeddingSize),
+        });
+        after = crops.last.id;
+        done += crops.length;
+        notifyListeners();
+        ScanNotification.update('$done of $total faces');
+      }
+      // Your profile's fingerprints were the old kind too.
+      final pid = profile.personId;
+      if (pid != null) {
+        await profileFromPerson(pid);
+      } else if (profile.isSet && profile.thumb != null) {
+        final again = await _engine!.embedCrops([profile.thumb!]);
+        profile = FaceProfile(faces: [?again.first], thumb: profile.thumb, source: profile.source);
+        await profile.save(db);
+        sharing.groups.refreshMe();
+      }
+      await db.setSetting(_faceModelKey, faceModelId);
+      ScanNotification.update('Grouping faces…');
+      await regroup();
+    } catch (e, st) {
+      debugPrint('Face upgrade failed: $e\n$st');
+      error = '$e';
+    } finally {
+      await ScanNotification.stop();
+      running = upgrading = false;
+      revision++;
+      notifyListeners();
+    }
   }
 
   /// Uses [personId]'s faces from People as your profile: many photos of
@@ -890,10 +970,21 @@ class ScanController extends ChangeNotifier {
     // 3. Lone faces, least certain first: those answers teach the most.
     final matches = await Isolate.run(() => suggestMatches(input))
       ..sort((x, y) => (x.similarity - _unsure).abs().compareTo((y.similarity - _unsure).abs()));
+    // A match this strong isn't a question: add it to that person instead.
+    // (Happens to faces left alone before their person was named.)
+    final sure = <int, int>{};
     for (final m in matches) {
       final person = people[m.personId];
       if (person == null) continue;
+      if (m.similarity >= _autoAccept) {
+        sure[m.faceId] = m.personId;
+        continue;
+      }
       items.add(FaceReview(m.faceId, thumbs[m.faceId]!, person, m.similarity));
+    }
+    if (sure.isNotEmpty) {
+      await db.applyGrouping(sure, const []);
+      changed();
     }
     return items;
   }

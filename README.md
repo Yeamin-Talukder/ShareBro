@@ -66,7 +66,8 @@ uploaded: ShareBro only keeps references to them, like shortcuts.
 
 ### 👥 People
 - **Face grouping:** on-device face detection (Google ML Kit) and face
-  recognition (MobileFaceNet), so every person gets their own page.
+  recognition (InsightFace MobileFaceNet, WebFace600K), so every person gets
+  their own page, with or without glasses.
 - **Handles lots of looks:** people are matched across lighting, angles,
   glasses and haircuts, with suggestions to merge look-alikes.
 - **Name and pair:** name people, review uncertain faces, split or merge
@@ -122,7 +123,7 @@ uploaded: ShareBro only keeps references to them, like shortcuts.
 ## How it works
 
 ```
-Gallery ──► ML Kit face detection ──► MobileFaceNet embeddings ──► clustering ──► People
+Gallery ──► ML Kit face detection ──► MobileFaceNet (w600k) embeddings ──► clustering ──► People
    │                                                                              │
    └──────── nothing is copied: photos are referenced by id ──────────────────────┘
 
@@ -132,7 +133,7 @@ Send ──► LocalSend protocol v2 (HTTPS, pinned certificate)  ──► any 
 ```
 
 - **Faces:** detected with ML Kit, cropped and aligned, then turned into
-  128-number "fingerprints" by MobileFaceNet (TensorFlow Lite, running in a
+  512-number "fingerprints" by InsightFace's MobileFaceNet (TensorFlow Lite, running in a
   background isolate) and grouped with a clustering pass that supports
   several looks per person.
 - **Data:** a local SQLite database (faces, people, trips, tags, devices,
@@ -190,7 +191,7 @@ lib/
 ├── share/      LocalSend protocol, sender, receiver, Nearby, web server, notifications
 └── ui/         screens and widgets (gallery, people, share, island, viewer…)
 android/app/src/main/kotlin/…   native helpers: files, trash, notifications
-assets/models/  MobileFaceNet face-recognition model and a small male/female
+assets/models/  InsightFace w600k_mbf face-recognition model and a small male/female
                 classifier (gender_lite.tflite, MIT, from
                 github.com/shubham0204/Age-Gender_Estimation_TF-Android)
                 The Places "Real" map shows OpenStreetMap tiles
@@ -245,9 +246,11 @@ not tested yet.
 - **[LocalSend](https://github.com/localsend/localsend):** ShareBro
   speaks its open protocol (Apache-2.0) so it can exchange files with the
   official LocalSend apps. ShareBro is not affiliated with LocalSend.
-- **MobileFaceNet:** the face-recognition model, exported from
-  [Qualcomm AI Hub](https://aihub.qualcomm.com/). See its model page for
-  license terms.
+- **InsightFace `w600k_mbf`:** the face-recognition model (MobileFaceNet
+  trained on WebFace600K, from the `buffalo_s` pack of
+  [InsightFace](https://github.com/deepinsight/insightface)), converted to
+  TensorFlow Lite with onnx2tf. InsightFace's pretrained models are for
+  **non-commercial research use only**.
 - **[Google ML Kit](https://developers.google.com/ml-kit):** face
   detection and image labeling.
 - Built with Flutter and many great packages, including `photo_manager`,

@@ -11,7 +11,16 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 
 import '../data/db.dart';
 
-const _modelAsset = 'assets/models/mobile_facenet.tflite';
+/// InsightFace's MobileFaceNet trained on WebFace600K (`w600k_mbf` from the
+/// buffalo_s pack, converted to TensorFlow Lite): a 512-number fingerprint
+/// that holds up much better to glasses, angles and age than the older
+/// MS-Celeb model. Research / non-commercial licence.
+const _modelAsset = 'assets/models/w600k_mbf.tflite';
+
+/// Which fingerprints the database holds; stored fingerprints from any
+/// other model are redone from their face crops (see
+/// [ScanController.upgradeFaces]).
+const faceModelId = 'w600k_mbf';
 const _crop = 112;
 
 /// Where the eyes land in the 112x112 crop (the standard ArcFace template),
@@ -29,8 +38,8 @@ const _maxYaw = 50.0;
 /// Scene labels less certain than this are dropped.
 const _minLabelConfidence = 0.7;
 
-/// Finds faces with ML Kit and turns each into a 128-number fingerprint with
-/// MobileFaceNet. Everything runs on the device.
+/// Finds faces with ML Kit and turns each into a 512-number fingerprint with
+/// MobileFaceNet (InsightFace, WebFace600K). Everything runs on the device.
 class FaceEngine {
   FaceEngine._(this._detector, this._labeler, this._interpreter, this._layout);
 
@@ -114,6 +123,14 @@ class FaceEngine {
     final pixels = TransferableTypedData.fromList([data.buffer.asUint8List()]);
     final worker = _worker ??= await (_starting ??= _EmbedWorker.start());
     return worker.run(pixels, w, h, boxes, _layout);
+  }
+
+  /// Fingerprints for stored face crops (the 112x112 aligned JPEGs kept
+  /// for every face), in order; null where a crop can't be read. For
+  /// redoing every face after a model change without rescanning photos.
+  Future<List<Float32List?>> embedCrops(List<Uint8List> jpegs) {
+    final layout = _layout;
+    return Isolate.run(() => _embedCrops(jpegs, layout));
   }
 
   /// One background isolate for the whole scan, instead of starting (and
@@ -230,6 +247,55 @@ List<NewFace> _embed(
     ));
   }
 
+  final embeddings = _runModel(tensors, layout);
+
+  return [
+    for (var i = 0; i < boxes.length; i++)
+      NewFace(
+        left: boxes[i].left / w,
+        top: boxes[i].top / h,
+        width: boxes[i].width / w,
+        height: boxes[i].height / h,
+        embedding: embeddings[i],
+        thumb: thumbs[i],
+        sharpness: sharpness[i],
+        eyesOpen: boxes[i].eyesOpen,
+        smile: boxes[i].smile,
+        yaw: boxes[i].yaw,
+      ),
+  ];
+}
+
+/// Fingerprints for stored face crops (already aligned 112x112 JPEGs).
+List<Float32List?> _embedCrops(List<Uint8List> jpegs, _ModelLayout layout) {
+  final tensors = <Float32List>[];
+  final ok = <int>[];
+  for (final (i, j) in jpegs.indexed) {
+    var face = img.decodeJpg(j);
+    if (face == null) continue;
+    if (face.width != _crop || face.height != _crop) {
+      face = img.copyResize(face, width: _crop, height: _crop, interpolation: img.Interpolation.linear);
+    }
+    final rgb = Uint8List(_crop * _crop * 3);
+    var o = 0;
+    for (final p in face) {
+      rgb[o++] = p.r.toInt();
+      rgb[o++] = p.g.toInt();
+      rgb[o++] = p.b.toInt();
+    }
+    tensors.add(_toTensor(rgb, layout.channelsFirst));
+    ok.add(i);
+  }
+  final out = List<Float32List?>.filled(jpegs.length, null);
+  for (final (k, e) in _runModel(tensors, layout).indexed) {
+    out[ok[k]] = e;
+  }
+  return out;
+}
+
+/// Runs the model over [tensors], [_ModelLayout.inputCount] faces at a time.
+List<Float32List> _runModel(List<Float32List> tensors, _ModelLayout layout) {
+  if (tensors.isEmpty) return const [];
   final interpreter = Interpreter.fromAddress(layout.address, allocated: true);
   final embeddings = <Float32List>[];
   final perRun = layout.inputCount;
@@ -247,22 +313,7 @@ List<NewFace> _embed(
       embeddings.add(_normalize(out[k]));
     }
   }
-
-  return [
-    for (var i = 0; i < boxes.length; i++)
-      NewFace(
-        left: boxes[i].left / w,
-        top: boxes[i].top / h,
-        width: boxes[i].width / w,
-        height: boxes[i].height / h,
-        embedding: embeddings[i],
-        thumb: thumbs[i],
-        sharpness: sharpness[i],
-        eyesOpen: boxes[i].eyesOpen,
-        smile: boxes[i].smile,
-        yaw: boxes[i].yaw,
-      ),
-  ];
+  return embeddings;
 }
 
 /// Variance of the Laplacian over the face crop: blurry faces have little
@@ -354,13 +405,15 @@ void _bilinear(Uint8List src, int w, int h, double x, double y, Uint8List out,
   }
 }
 
-/// RGB 0..1, in whichever channel order the model was exported with.
+/// RGB scaled to -1..1 the way InsightFace feeds its models
+/// ((v - 127.5) / 127.5), in whichever channel order the model was exported
+/// with.
 Float32List _toTensor(Uint8List rgb, bool channelsFirst) {
   const plane = _crop * _crop;
   final t = Float32List(plane * 3);
   for (var p = 0; p < plane; p++) {
     for (var c = 0; c < 3; c++) {
-      final v = rgb[p * 3 + c] / 255.0;
+      final v = (rgb[p * 3 + c] - 127.5) / 127.5;
       if (channelsFirst) {
         t[c * plane + p] = v;
       } else {

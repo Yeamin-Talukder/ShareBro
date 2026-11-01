@@ -87,6 +87,55 @@ class _PersonScreenState extends State<PersonScreen> {
         _selected.clear();
       });
 
+  /// The chosen photos aren't of this person (someone else was matched by
+  /// mistake): take this person off them. Their faces go to Unmatched, to
+  /// move to whoever they really are.
+  Future<void> _notThem() async {
+    final person = _person;
+    final ids = [for (final p in _visible) if (_selected.contains(p.assetId)) p.assetId];
+    if (person == null || ids.isEmpty) return;
+    final name = person.displayName;
+    final what = ids.length == 1 ? 'this photo' : '${ids.length} photos';
+    // Choose starts with everything picked: make sure a big batch is meant.
+    if (ids.length > 3) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Remove $name from $what?'),
+          content: const Text('The faces in them go to Unmatched, where you can move them to the right person.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Remove')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    Haptics.remove();
+    final undo = await c.db.removePersonFrom(person.id, ids);
+    if (!mounted) return;
+    setState(() {
+      _all = [for (final p in _all) if (!ids.contains(p.assetId)) p];
+      _choosing = false;
+      _selected.clear();
+    });
+    c.changed();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text('Removed $name from $what'),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () async {
+            await c.db.restore(undo);
+            c.changed();
+            await _load();
+          },
+        ),
+      ));
+    await _load();
+  }
+
   /// Called whenever the grid or viewer changes the selection.
   void _selectionChanged() => setState(() {
         if (_selected.isNotEmpty) _choosing = true;
@@ -400,20 +449,47 @@ class _PersonScreenState extends State<PersonScreen> {
       _faces = [for (final f in _faces) if (f.id != face.id) f];
     });
     c.changed();
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: const Text('Face removed'),
+    _undoBatch.add(undo);
+    _removedCount.value = _undoBatch.length;
+    // One message for a run of removals that counts up, instead of a new
+    // one sliding in for every face; Undo brings back the whole run.
+    if (_undoBar == null) {
+      final bar = _undoBar = ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        duration: const Duration(seconds: 6),
+        content: ValueListenableBuilder<int>(
+          valueListenable: _removedCount,
+          builder: (_, n, _) => Text(n == 1 ? 'Face removed' : '$n faces removed'),
+        ),
         action: SnackBarAction(
           label: 'Undo',
           onPressed: () async {
-            await c.db.restore(undo);
+            final run = List.of(_undoBatch);
+            _undoBatch.clear();
+            for (final u in run.reversed) {
+              await c.db.restore(u);
+            }
             c.changed();
             await _load();
           },
         ),
       ));
+      unawaited(bar.closed.then((_) {
+        _undoBar = null;
+        _undoBatch.clear();
+      }));
+    }
     if (_faces.isEmpty) await _load();
+  }
+
+  /// Face removals since the "removed" message came up, for its Undo.
+  final List<FaceSnapshot> _undoBatch = [];
+  final _removedCount = ValueNotifier<int>(0);
+  ScaffoldFeatureController<SnackBar, SnackBarClosedReason>? _undoBar;
+
+  @override
+  void dispose() {
+    _removedCount.dispose();
+    super.dispose();
   }
 
   /// The photos a send covers: the chosen ones, or everything shown.
@@ -726,6 +802,26 @@ class _PersonScreenState extends State<PersonScreen> {
                           icon: const Icon(Icons.checklist_rounded),
                           label: const Text('Choose'),
                         ),
+                ),
+                // Someone else's photo got in: take this person off it.
+                AnimatedSwitcher(
+                  duration: 200.ms,
+                  transitionBuilder: (child, a) => SizeTransition(
+                    sizeFactor: a,
+                    axis: Axis.horizontal,
+                    child: FadeTransition(opacity: a, child: child),
+                  ),
+                  child: selecting && _selected.isNotEmpty
+                      ? Padding(
+                          key: const ValueKey('not-them'),
+                          padding: const EdgeInsets.only(left: 6),
+                          child: IconButton.filledTonal(
+                            tooltip: 'Not ${_person?.displayName ?? 'this person'}',
+                            onPressed: _notThem,
+                            icon: const Icon(Icons.person_remove_rounded),
+                          ),
+                        )
+                      : const SizedBox.shrink(key: ValueKey('none')),
                 ),
                 const SizedBox(width: 10),
                 Expanded(

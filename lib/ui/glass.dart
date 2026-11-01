@@ -187,9 +187,14 @@ class GlassScrollView extends StatefulWidget {
     this.actions = const [],
     this.subtitle,
     this.physics,
+    this.controller,
   });
 
   final String title;
+
+  /// The page's scroll position, for a page that scrolls itself (e.g. while
+  /// something is dragged near the edge); one is made when not given.
+  final ScrollController? controller;
 
   /// A quiet line under the large title ("12 people").
   final String? subtitle;
@@ -206,7 +211,8 @@ class GlassScrollView extends StatefulWidget {
 
 class _GlassScrollViewState extends State<GlassScrollView> {
   bool _scrolled = false;
-  final _scroll = ScrollController();
+  final _own = ScrollController();
+  ScrollController get _scroll => widget.controller ?? _own;
 
   @override
   void didUpdateWidget(GlassScrollView old) {
@@ -226,7 +232,7 @@ class _GlassScrollViewState extends State<GlassScrollView> {
 
   @override
   void dispose() {
-    _scroll.dispose();
+    _own.dispose();
     super.dispose();
   }
 

@@ -1436,6 +1436,20 @@ class AppDb {
     return before;
   }
 
+  /// "Not this person" for whole photos: [personId]'s faces in [assetIds]
+  /// leave them and stay out (they go to Unmatched). Returns how they were,
+  /// for undo.
+  Future<FaceSnapshot> removePersonFrom(int personId, Iterable<String> assetIds) async {
+    final ids = assetIds.toList();
+    if (ids.isEmpty) return FaceSnapshot(const []);
+    final marks = List.filled(ids.length, '?').join(',');
+    final where = 'person_id = ? AND asset_id IN ($marks)';
+    final before = await _snapshot(where, [personId, ...ids]);
+    await _db.update('faces', {'person_id': null, 'locked': 1, 'reviewed': 1},
+        where: where, whereArgs: [personId, ...ids]);
+    return before;
+  }
+
   /// Faces nobody was matched with (often half turned or partly hidden),
   /// newest photos first, for moving to a person by hand.
   Future<List<FaceThumb>> unmatchedFaces() async {
@@ -1584,6 +1598,27 @@ class AppDb {
       'DELETE FROM persons WHERE id NOT IN (SELECT DISTINCT person_id FROM faces WHERE person_id IS NOT NULL)');
 
   // Copy into an aligned buffer; BLOB bytes may not be 4-byte aligned.
+  // ---- Face model upgrades ----
+
+  Future<int> faceCount() async =>
+      (await _db.rawQuery('SELECT COUNT(*) AS n FROM faces')).first['n'] as int;
+
+  /// Stored face crops after face [after], in id order, [limit] at a time.
+  Future<List<({int id, Uint8List thumb})>> faceCrops({required int after, required int limit}) async {
+    final rows = await _db.query('faces',
+        columns: ['id', 'thumb'], where: 'id > ?', whereArgs: [after], orderBy: 'id', limit: limit);
+    return [for (final r in rows) (id: r['id'] as int, thumb: r['thumb'] as Uint8List)];
+  }
+
+  /// Replaces faces' fingerprints (after a face model change).
+  Future<void> setEmbeddings(Map<int, Float32List> embeddings) async {
+    final batch = _db.batch();
+    embeddings.forEach((id, e) => batch.update(
+        'faces', {'embedding': e.buffer.asUint8List(e.offsetInBytes, e.lengthInBytes)},
+        where: 'id = ?', whereArgs: [id]));
+    await batch.commit(noResult: true);
+  }
+
   static Float32List _floats(Object? blob) => Float32List.fromList(
       Uint8List.fromList(blob as Uint8List).buffer.asFloat32List());
 }
