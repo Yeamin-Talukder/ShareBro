@@ -218,9 +218,10 @@ the QR code.</sub>
 ### 🧭 Explore
 
 - **Places.** Every photo with a location on a map: pins that split apart as
-  you zoom in, and a card for each place listing what most of its photos
-  show. Choose a drawn map that works fully offline, or a real
-  OpenStreetMap map (needs internet for the map itself).
+  you zoom in, and a card for each place naming the town it's in and what
+  most of its photos show ("Beach · Kuakata"). Choose a drawn map that works
+  fully offline, or a real OpenStreetMap map (needs internet for the map
+  itself).
 - **Journey.** The trip replayed in order like a travel video, with an
   automatic camera you can take over by hand. Filter by dates.
 - **Best group shots.** Bursts of group photos taken seconds apart, with the
@@ -233,8 +234,10 @@ the QR code.</sub>
 
 ### 🔎 Search
 
-Type naturally, for example *"Maya beach June 2026"* or *"women
-mountains"*. Search understands people, trips, categories and scenes,
+Type naturally, for example *"Maya beach June 2026"*, *"women
+mountains"* or *"Kuakata Ruby"*. Search understands people, trips, places
+(towns, spots and countries where your photos were taken, from an offline
+list, so *"Coxs Bazar"* finds Cox's Bazar too), categories and scenes,
 male / female, and dates, and combines them.
 
 ### 📤 Share
@@ -672,7 +675,8 @@ from History.
 
 | Version | Highlights |
 |---|---|
-| [**v1.3.0**](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.3.0) | InsightFace face model: much better matching with glasses and angles; review adds sure matches automatically; "Not [name]" |
+| [**v1.4.0**](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.4.0) | Search by place name (towns, spots and countries, offline); Places cards show the town |
+| [v1.3.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.3.0) | InsightFace face model: much better matching with glasses and angles; review adds sure matches automatically; "Not [name]" |
 | [v1.2.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.2.0) | Places map and Journey, male / female filters, Unmatched faces, faster scans and thumbnails, new notifications |
 | [v1.1.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.1.0) | Trip groups, Profile, Find my photos, Search, best group shots, trip days, new design and icon |
 | [v1.0.2](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.0.2) | Accept / Decline whenever the app is open; darker background |

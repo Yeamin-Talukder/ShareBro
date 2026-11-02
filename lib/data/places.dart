@@ -25,13 +25,21 @@ class Place {
   /// What stands out in its photos; null when nothing does.
   String? scene;
 
+  /// The town or spot it's in ("Kuakata"), from the offline place list.
+  String? town;
+
   /// Order of the first visit, from 1.
   int number = 0;
 
   DateTime get first => times.first;
   DateTime get last => times.last;
   String get cover => photos[photos.length ~/ 2];
-  String get name => scene ?? 'Place $number';
+  String get name => switch ((scene, town)) {
+        (final s?, final t?) => '$s · $t',
+        (final s?, null) => s,
+        (null, final t?) => t,
+        _ => 'Place $number',
+      };
 }
 
 /// Metres between two points on the earth (haversine).

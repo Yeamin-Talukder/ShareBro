@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../data/db.dart';
+import '../data/gazetteer.dart';
 import '../data/search.dart';
 import '../face/tags.dart' show labelPrefix;
 import '../scan/scan_controller.dart';
@@ -65,18 +66,27 @@ class _SearchScreenState extends State<SearchScreen> {
       for (final e in counts.entries.toList()..sort((a, b) => b.value.count.compareTo(a.value.count)))
         if (e.key.startsWith(labelPrefix)) e.key,
     ];
-    final vocab = SearchVocabulary(
-      people: [
-        for (final p in people)
-          if (p.name != null) (id: p.id, name: p.name!, nickname: p.nickname),
-      ],
-      trips: [for (final t in trips) (id: t.id, name: t.name)],
-      tags: {
-        for (final e in builtIn.entries)
-          if (counts.containsKey(e.key)) e.key: e.value,
-        for (final s in scenes) s: s.substring(labelPrefix.length),
-      },
-    );
+    SearchVocabulary vocabWith(PlaceIndex where) => SearchVocabulary(
+          people: [
+            for (final p in people)
+              if (p.name != null) (id: p.id, name: p.name!, nickname: p.nickname),
+          ],
+          trips: [for (final t in trips) (id: t.id, name: t.name)],
+          places: [for (final p in where.places) (name: p.name, spellings: p.spellings, photos: p.photos)],
+          countries: where.countries,
+          tags: {
+            for (final e in builtIn.entries)
+              if (counts.containsKey(e.key)) e.key: e.value,
+            for (final s in scenes) s: s.substring(labelPrefix.length),
+          },
+        );
+    final vocab = vocabWith(PlaceIndex.empty);
+    // Place names come a moment later (worked out from the offline list).
+    placeIndex(c.db, revision: c.revision).then((where) {
+      if (!mounted || where.places.isEmpty) return;
+      setState(() => _vocab = vocabWith(where));
+      _parse();
+    }).catchError((Object e) => debugPrint('Place names failed: $e'));
     if (!mounted) return;
     setState(() {
       _vocab = vocab;
@@ -129,6 +139,7 @@ class _SearchScreenState extends State<SearchScreen> {
         TermKind.person => Icons.person_rounded,
         TermKind.trip => Icons.luggage_rounded,
         TermKind.dates => Icons.calendar_month_rounded,
+        TermKind.place => Icons.place_rounded,
         TermKind.gender => t.gender == Gender.male ? Icons.male_rounded : Icons.female_rounded,
         TermKind.tag => categoryIcon(t.tag!),
       };

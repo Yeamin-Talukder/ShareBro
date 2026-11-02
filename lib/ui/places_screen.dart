@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../data/dates.dart';
+import '../data/gazetteer.dart';
 import '../data/db.dart' show DaySpan;
 import '../data/places.dart';
 import '../scan/scan_controller.dart';
@@ -79,6 +80,15 @@ class _PlacesScreenState extends State<PlacesScreen> {
       _everywhere = everywhere;
       _places = places;
     });
+    // Town names ("Kuakata") from the offline place list, a moment later.
+    placeIndexFor(places, (widget.tripId, dates, c.revision)).then((where) {
+      if (!mounted || !identical(places, _places)) return;
+      setState(() {
+        for (final p in places) {
+          p.town = where.towns[p.number]?.$1;
+        }
+      });
+    }).catchError((Object e) => debugPrint('Place names failed: $e'));
     // Start the pins' photos now, so the map isn't a field of blank pins.
     for (final p in places.take(80)) {
       precacheImage(FastThumb(p.cover, FastThumb.step(_pinPx), cover: true), context);

@@ -1,11 +1,12 @@
 import 'db.dart';
 
-enum TermKind { person, trip, tag, dates, gender }
+enum TermKind { person, trip, place, tag, dates, gender }
 
 /// One thing the search understood: a person, a trip, a category or scene,
 /// or a span of dates.
 class SearchTerm {
-  const SearchTerm(this.kind, this.label, {this.personId, this.tag, this.tripId, this.dates, this.gender});
+  const SearchTerm(this.kind, this.label,
+      {this.personId, this.tag, this.tripId, this.dates, this.gender, this.photos});
 
   final TermKind kind;
 
@@ -19,8 +20,12 @@ class SearchTerm {
   /// Photos with any man / any woman in them.
   final Gender? gender;
 
-  String get key =>
-      '${kind.name}:${personId ?? tag ?? tripId ?? dates?.start.millisecondsSinceEpoch ?? gender?.code}';
+  /// A town, spot or country: the photos taken there, newest first.
+  final List<String>? photos;
+
+  String get key => kind == TermKind.place
+      ? 'place:$label'
+      : '${kind.name}:${personId ?? tag ?? tripId ?? dates?.start.millisecondsSinceEpoch ?? gender?.code}';
 
   @override
   bool operator ==(Object other) => other is SearchTerm && other.key == key;
@@ -55,6 +60,8 @@ class SearchVocabulary {
   SearchVocabulary({
     List<({int id, String name, String? nickname})> people = const [],
     List<({int id, String name})> trips = const [],
+    List<({String name, List<String> spellings, List<String> photos})> places = const [],
+    Map<String, List<String>> countries = const {},
     Map<String, String> tags = const {},
   }) {
     // First come, first served: people beat trips beat categories.
@@ -74,6 +81,15 @@ class SearchVocabulary {
     for (final trip in trips) {
       _add(trip.name, SearchTerm(TermKind.trip, trip.name, tripId: trip.id));
     }
+    // Where photos were taken: towns and spots ("Kuakata"), then countries.
+    for (final p in places) {
+      final t = SearchTerm(TermKind.place, p.name, photos: p.photos);
+      _add(p.name, t);
+      for (final s in p.spellings) {
+        _add(s, t);
+      }
+    }
+    countries.forEach((name, photos) => _add(name, SearchTerm(TermKind.place, name, photos: photos)));
     for (final MapEntry(key: g, value: words) in _genderWords.entries) {
       final t = SearchTerm(TermKind.gender, g.label, gender: g);
       for (final w in words) {
@@ -94,8 +110,11 @@ class SearchVocabulary {
   final Map<String, SearchTerm> _phrases = {};
 
   void _add(String phrase, SearchTerm t) {
-    final key = _words(phrase).where((w) => !_filler.contains(w)).join(' ');
-    if (key.isNotEmpty) _phrases.putIfAbsent(key, () => t);
+    // "Cox's Bazar" is also found as "Coxs Bazar".
+    for (final p in {phrase, phrase.replaceAll(RegExp("['’]"), '')}) {
+      final key = _words(p).where((w) => !_filler.contains(w)).join(' ');
+      if (key.isNotEmpty) _phrases.putIfAbsent(key, () => t);
+    }
   }
 
   static List<String> _words(String s) => s
@@ -194,6 +213,7 @@ Future<List<String>> runSearch(AppDb db, List<SearchTerm> terms) async {
     if (people.isNotEmpty) await db.photosWithAll(people, tripId: trip),
     for (final t in terms)
       if (t.gender != null) await db.photosWithGender(t.gender!, tripId: trip),
+    for (final t in terms) ?t.photos,
     for (final t in terms)
       if (t.tag != null) await db.photosWithTag(t.tag!, dates: dates),
     if (trip != null || dates != null) await db.photosIn(tripId: trip, dates: dates),
