@@ -27,6 +27,12 @@ hotspot, or with no network at all. No cloud, no uploads, no accounts.
 
 <sub>Most phones: <code>ShareBro-…-arm64-v8a.apk</code> · Android 9 or newer</sub>
 
+<br>
+
+<a href="docs/sharebro-reel.mp4"><img src="docs/screenshots/reel-cover.jpg" alt="ShareBro promo video: three phones showing People, Maya's photos and a friend's gallery" width="260"></a>
+
+<sub>▶️ <a href="docs/sharebro-reel.mp4"><b>Watch the 1-minute video</b></a></sub>
+
 </div>
 
 ---
@@ -34,8 +40,8 @@ hotspot, or with no network at all. No cloud, no uploads, no accounts.
 ## Contents
 
 - [Why ShareBro](#why-sharebro)
+- [See it in action](#see-it-in-action)
 - [Highlights](#highlights)
-- [Screenshots](#screenshots)
 - [Features in detail](#features-in-detail)
 - [Install](#install)
 - [How it works](#how-it-works)
@@ -69,9 +75,44 @@ ShareBro does it in three steps:
 3. **Send.** Each friend gets exactly the photos they're in, at full
    quality, straight to their phone.
 
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="docs/screenshots/scanning.jpg" alt="Scanning a trip: 48 of 100 photos, 30 faces, about 4 people so far" width="240"></td>
+    <td align="center" width="33%"><img src="docs/screenshots/people.jpg" alt="People: one circle per friend, with how many photos each is in" width="240"></td>
+    <td align="center" width="33%"><img src="docs/screenshots/send.jpg" alt="Send 12 photos to Ruby: original quality, nearby phones, no Wi-Fi needed, QR code or other apps" width="240"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>1 · Scan</b><br><sub>Faces are found while you watch</sub></td>
+    <td align="center"><b>2 · Check</b><br><sub>One group per friend</sub></td>
+    <td align="center"><b>3 · Send</b><br><sub>Their photos, full quality</sub></td>
+  </tr>
+</table>
+
 Everything happens **on your phone**. Photos are never copied, moved or
 uploaded: ShareBro only keeps references to them, like shortcuts, plus the
 small face "fingerprints" it needs to recognise people.
+
+## See it in action
+
+<table>
+  <tr>
+    <td align="center" width="25%"><img src="docs/screenshots/people-views.gif" alt="People switching from the grid to the Honeycomb and Bubbles views" width="200"></td>
+    <td align="center" width="25%"><img src="docs/screenshots/merge.gif" alt="Long-pressing a small group and dragging it onto Ruby merges the two" width="200"></td>
+    <td align="center" width="25%"><img src="docs/screenshots/trip-group.gif" alt="Starting the Coast Trip group shows a 4-digit join code" width="200"></td>
+    <td align="center" width="25%"><img src="docs/screenshots/find-my-photos.gif" alt="A friend's browser: choose a selfie, ShareBro finds them, and their own gallery opens" width="200"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>People views</b><br><sub>Grid, Honeycomb, Bubbles</sub></td>
+    <td align="center"><b>Fix a split</b><br><sub>Drag one person onto another</sub></td>
+    <td align="center"><b>Trip group</b><br><sub>Friends join with a code</sub></td>
+    <td align="center"><b>Find my photos</b><br><sub>A friend's browser, no app</sub></td>
+  </tr>
+</table>
+
+<sub>Every screenshot and clip here is the current app on a Pixel 7 Pro, with a
+demo trip of free stock photos from Pexels: the people are models and the
+names are made up. The last clip is the web page a friend sees after scanning
+the QR code.</sub>
 
 ## Highlights
 
@@ -86,33 +127,17 @@ small face "fingerprints" it needs to recognise people.
 | 🖼️ **A full gallery** | Photos and videos, albums, favourites, trash, duplicates and best shots |
 | 🔒 **Private by design** | Works fully offline; transfers are encrypted; optional app lock |
 
-## Screenshots
-
-<p align="center">
-  <img src="docs/screenshots/share.png" alt="Share: pick photos, files, folders, text or apps, then tap a nearby device" width="23%">
-  &nbsp;
-  <img src="docs/screenshots/receive.png" alt="Receive: be findable, with quick save, auto-accept and a PIN" width="23%">
-  &nbsp;
-  <img src="docs/screenshots/sending.png" alt="Sending: send every friend their new photos in one tap" width="23%">
-  &nbsp;
-  <img src="docs/screenshots/settings.png" alt="Settings: grouping strictness, send quality, auto-scan, app lock" width="23%">
-</p>
-
-<p align="center">
-  <sub><b>Share</b> — anything to any nearby device &nbsp;·&nbsp;
-  <b>Receive</b> — quick save, auto-accept, PIN &nbsp;·&nbsp;
-  <b>Sending</b> — everyone gets their own photos &nbsp;·&nbsp;
-  <b>Settings</b></sub>
-</p>
-
-<p align="center"><sub>Screenshots are from v1.0; the current design looks a little different.
-The People and Photos screens aren't shown because they'd show real people's faces.</sub></p>
-
 ---
 
 ## Features in detail
 
 ### 👥 People
+
+<p align="center">
+  <img src="docs/screenshots/person.jpg" alt="Maya's page: her 18 photos, with All, Solo and Group filters and a Send all button" width="240">
+  &nbsp;
+  <img src="docs/screenshots/review.jpg" alt="Review faces: is this small group the same person as Maya? Different or Same" width="240">
+</p>
 
 - **Automatic face grouping.** Every face in the scanned photos is detected,
   turned into a fingerprint, and grouped with the faces of the same person.
@@ -140,7 +165,8 @@ The People and Photos screens aren't shown because they'd show real people's fac
   front-facing face, and it changes from time to time in the grid.
 - **Male / Female.** An on-device guess for each person, used as a filter and
   in search. You can correct it per person.
-- **Views.** A grid, or a bubble view where bigger bubbles mean more photos.
+- **Views.** A grid, or Bubbles, Honeycomb and Sunflower views where bigger
+  faces mean more photos.
 - **Profile.** Set your own face once, from a selfie, uploaded photos or
   yourself in People. Trip groups use it to know who you are.
 
@@ -160,6 +186,12 @@ The People and Photos screens aren't shown because they'd show real people's fac
   progress in the notification shade (see [Notifications](#-notifications)).
 
 ### 🖼️ Gallery
+
+<p align="center">
+  <img src="docs/screenshots/photos.jpg" alt="Photos: the trip's photos by day" width="240">
+  &nbsp;
+  <img src="docs/screenshots/explore.jpg" alt="Explore: Places, Best group shots, and automatic categories like Selfies, Solo and Two people" width="240">
+</p>
 
 - **Photos and videos** by day, newest first. Pinch with two fingers to
   change the grid size; drag the date scrubber on the right to jump through
@@ -211,6 +243,12 @@ ShareBro speaks the open **[LocalSend](https://localsend.org)** protocol,
 so it works with the free LocalSend app on Android, iPhone, Windows, macOS
 and Linux, as well as with other ShareBro phones.
 
+<p align="center">
+  <img src="docs/screenshots/share.jpg" alt="Share: send media, files, folders, text, the clipboard or apps to nearby devices" width="240">
+  &nbsp;
+  <img src="docs/screenshots/send.jpg" alt="Send 12 photos to Ruby: Original, No location or Smaller; nearby phones; no-Wi-Fi sending; QR code; other apps" width="240">
+</p>
+
 **Send:**
 - **What:** photos and videos, files, whole folders (the folder layout is
   kept), typed text, the clipboard, and **installed apps** (as `.apk`; apps
@@ -232,6 +270,11 @@ and Linux, as well as with other ShareBro phones.
   in a queue and start automatically when their phone shows up.
 
 **Trip groups:**
+
+<p align="center">
+  <img src="docs/screenshots/trip-group.jpg" alt="Coast Trip group: join code 6 3 2 0 and the members list" width="240">
+</p>
+
 - One person starts a group and everyone else joins with a **4-digit code**.
 - Each member's face (from their Profile) is matched against the photos you
   pick, so **each photo goes only to the members in it**. If a match is
@@ -239,6 +282,18 @@ and Linux, as well as with other ShareBro phones.
 - Photos nobody else in the group is in stay on your phone.
 
 **Find my photos:**
+
+<p align="center">
+  <img src="docs/screenshots/find-my-photos.jpg" alt="Find my photos on the phone: a QR code to show the group" width="180">
+  &nbsp;
+  <img src="docs/screenshots/web-selfie.jpg" alt="In the friend's browser: take a selfie or choose a photo" width="180">
+  &nbsp;
+  <img src="docs/screenshots/web-found.jpg" alt="Found you, Ruby! 12 photos ready for you" width="180">
+  &nbsp;
+  <img src="docs/screenshots/web-gallery.jpg" alt="Ruby's photos: 12 photos with Download all" width="180">
+</p>
+<p align="center"><sub>Your phone shows the code · the friend takes a selfie in their browser · they're found · their own gallery</sub></p>
+
 - One QR code for the whole group. Each friend scans it, takes a selfie (or
   picks one) **in their browser**, and lands on a gallery of just the photos
   they're in.
@@ -531,8 +586,8 @@ android/app/src/main/kotlin/…   Native helpers: files, trash, thumbnails,
                                 installed apps, notifications
 assets/models/                  Face recognition and gender models (TFLite)
 assets/icon/                    App icon
-design/                         HTML design demos and the explainer video
-docs/                           Logo and screenshots for this README
+design/                         HTML design demos
+docs/                           Logo, screenshots, clips and the promo video for this README
 test/                           Unit and widget tests
 tool/                           Icon generator
 ```
@@ -688,6 +743,13 @@ Before sending a pull request, run `flutter analyze` and `flutter test`.
   the real-map view, © OpenStreetMap contributors (ODbL).
 - Built with **Flutter** and the open-source packages listed in
   [Tech stack](#tech-stack).
+- **Demo photos** in the screenshots, clips and video: free stock photos
+  from [Pexels](https://www.pexels.com/license/) by
+  [cottonbro studio](https://www.pexels.com/@cottonbro) and
+  [PNW Production](https://www.pexels.com/@pnw-prod). The people are models;
+  the names are made up.
+- **Promo video:** voice by [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M)
+  (Apache-2.0); music and sound effects made from scratch.
 
 ## License
 
