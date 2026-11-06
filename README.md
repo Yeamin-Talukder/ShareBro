@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/logo.png" alt="ShareBro logo: two phones touching" width="128" height="128">
+<img src="docs/logo.png" alt="ShareBro app icon: two phones touching, each showing a photo" width="128" height="128">
 
-# ShareBro
+# ShareBro: offline face-recognition photo organizer and photo sharing app for Android
 
 **Your trip photos, sorted by face — and sent to every friend in a tap.**
 
@@ -18,10 +18,12 @@
 ![Offline](https://img.shields.io/badge/works-100%25%20offline-FF8A6B)
 ![LocalSend compatible](https://img.shields.io/badge/LocalSend-compatible-7B61FF)
 
-ShareBro is an offline Android app for the friend who takes all the photos.
-It finds every face in your gallery, groups the photos by person, and sends
-each friend their own photos straight to their phone — over Wi-Fi, a
-hotspot, or with no network at all. No cloud, no uploads, no accounts.
+**ShareBro** is a free Android app that **groups your photos by face** with
+on-device AI and **sends each friend only the photos they're in**, straight
+to their phone over Wi-Fi, a hotspot or with no network at all. It's built
+for group trips, weddings and events: the friend who took 2,000 photos can
+share them with everyone in minutes instead of hours. **Works 100% offline:
+no cloud, no uploads, no account.**
 
 ### [⬇️ Download the latest APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest)
 
@@ -37,11 +39,29 @@ hotspot, or with no network at all. No cloud, no uploads, no accounts.
 
 ---
 
+## At a glance
+
+| | |
+|---|---|
+| **What it is** | An offline photo organizer with face recognition, plus a photo and file sharing app |
+| **Best for** | Sharing trip, wedding, party and event photos with each person in them |
+| **Platform** | Android 9 or newer (phones and tablets) |
+| **Price** | Free, no ads, no in-app purchases |
+| **Internet** | Not needed. Face recognition, search and sharing all run on the phone and the local network |
+| **Privacy** | Photos are never uploaded. No account, no analytics |
+| **Works with** | [LocalSend](https://localsend.org) on Android, iPhone, Windows, macOS and Linux, and any web browser |
+| **Latest version** | [Download from GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) |
+
+---
+
 ## Contents
 
 - [Why ShareBro](#why-sharebro)
+- [Who it's for](#who-its-for)
 - [See it in action](#see-it-in-action)
 - [Highlights](#highlights)
+- [ShareBro vs other apps](#sharebro-vs-other-apps)
+- [FAQ](#faq)
 - [Features in detail](#features-in-detail)
 - [Install](#install)
 - [How it works](#how-it-works)
@@ -92,6 +112,19 @@ Everything happens **on your phone**. Photos are never copied, moved or
 uploaded: ShareBro only keeps references to them, like shortcuts, plus the
 small face "fingerprints" it needs to recognise people.
 
+## Who it's for
+
+- **Travellers and friend groups** sharing photos after a trip, without a
+  200-photo dump in the group chat.
+- **Wedding, party and event photographers** (official or not) who want each
+  guest to get the photos they appear in.
+- **Families** sorting years of photos by person: kids, grandparents,
+  cousins.
+- **Anyone who cares about privacy** and wants face grouping like Google
+  Photos, but without uploading their photos to the cloud.
+- **People with slow or no internet**: everything works over local Wi-Fi, a
+  phone hotspot, or Bluetooth / Wi-Fi Direct.
+
 ## See it in action
 
 <table>
@@ -126,6 +159,98 @@ the QR code.</sub>
 | 🗺️ **Places and Journey** | Your photos on a map, and the whole trip replayed like a travel video |
 | 🖼️ **A full gallery** | Photos and videos, albums, favourites, trash, duplicates and best shots |
 | 🔒 **Private by design** | Works fully offline; transfers are encrypted; optional app lock |
+
+## ShareBro vs other apps
+
+| | **ShareBro** | Google Photos | LocalSend | WhatsApp / Messenger |
+|---|---|---|---|---|
+| Groups photos by face | ✅ on the phone | ✅ in the cloud | ❌ | ❌ |
+| Sends each friend only their photos | ✅ automatically | ❌ you pick and share | ❌ you pick the files | ❌ everyone gets everything |
+| Works with no internet | ✅ | ❌ | ✅ | ❌ |
+| Uploads your photos | ❌ never | ✅ to Google's servers | ❌ | ✅ to the chat |
+| Full original quality | ✅ | ✅ | ✅ | ❌ compressed by default |
+| Account needed | ❌ | ✅ Google account | ❌ | ✅ phone number |
+| Friends without the app | ✅ QR code + selfie in the browser | ✅ shared link | ❌ | ❌ |
+| Search by person, place and date | ✅ offline | ✅ online | ❌ | ❌ |
+
+ShareBro speaks the LocalSend protocol, so the two work together: you can
+send from ShareBro to LocalSend on any computer or phone, and back.
+
+## FAQ
+
+<details open>
+<summary><b>How do I share trip photos with each friend automatically?</b></summary>
+
+Scan the trip's album in ShareBro once. It groups the photos by face, one
+page per person. Then either send each person their page, or start a
+**Trip group**: friends join with a 4-digit code and every photo goes only
+to the people in it.
+</details>
+
+<details>
+<summary><b>Is there an offline alternative to Google Photos face grouping?</b></summary>
+
+Yes. ShareBro finds and groups faces entirely on your Android phone, using
+Google ML Kit for detection and an InsightFace MobileFaceNet model for
+recognition. Nothing is uploaded and it works in airplane mode.
+</details>
+
+<details>
+<summary><b>Does ShareBro need internet or an account?</b></summary>
+
+No. Face recognition, search, the drawn map and sharing all work offline.
+Sharing uses your local Wi-Fi, a phone hotspot, or Bluetooth / Wi-Fi Direct.
+The only optional internet use is the real map tiles in Places.
+</details>
+
+<details>
+<summary><b>Can friends get their photos without installing the app?</b></summary>
+
+Yes. Use **Find my photos**: show a QR code, each friend scans it, takes a
+selfie in their phone's browser, and gets a gallery of just the photos
+they're in, with **Download all**. You can add a PIN and stop the link at
+any time.
+</details>
+
+<details>
+<summary><b>Does it recognise people with glasses, at angles, or years apart?</b></summary>
+
+Yes. ShareBro uses InsightFace's MobileFaceNet trained on WebFace600K, which
+copes much better with glasses and head angles than older models, and it
+keeps several "looks" per person so one person isn't split in two. You can
+also merge, split and fix groups by hand.
+</details>
+
+<details>
+<summary><b>Can I search photos by place name without internet?</b></summary>
+
+Yes. ShareBro includes an offline list of places from GeoNames, so you can
+type a town, beach or country (for example *"Kuakata"* or *"Cox's Bazar"*)
+and see the photos taken there, combined with people and dates.
+</details>
+
+<details>
+<summary><b>How is ShareBro different from LocalSend?</b></summary>
+
+LocalSend sends files you pick. ShareBro adds the step before: it finds who
+is in each photo, so it knows what to send to whom. It uses the same open
+protocol, so it works with the LocalSend apps.
+</details>
+
+<details>
+<summary><b>Is ShareBro free? Is it on the Play Store?</b></summary>
+
+It's free, with no ads or purchases. It's available as an APK from
+[GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest),
+not the Play Store yet.
+</details>
+
+<details>
+<summary><b>Is there an iPhone version?</b></summary>
+
+Not yet; ShareBro is Android only. iPhones can still **receive** photos from
+ShareBro through the LocalSend app or the **Find my photos** browser link.
+</details>
 
 ---
 
@@ -592,7 +717,7 @@ assets/icon/                    App icon
 design/                         HTML design demos
 docs/                           Logo, screenshots, clips and the promo video for this README
 test/                           Unit and widget tests
-tool/                           Icon generator
+tool/                           Icon and offline place-name generators
 ```
 
 ## Tech stack
