@@ -45,7 +45,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .nav-links { display: flex; gap: 6px; margin-left: auto; }
 .nav-links a { padding: 8px 14px; border-radius: 999px; color: var(--sub); font-size: 15px; font-weight: 600; transition: color .2s, background .2s; }
 .nav-cta { display: flex; gap: 10px; align-items: center; }
-.menu-btn { display: none; width: 44px; height: 44px; border-radius: 12px; place-items: center; background: var(--card); }
+.menu-btn { display: none; width: 44px; height: 44px; border-radius: 12px; place-items: center; background: var(--card); border: 1px solid var(--line); }
+.menu-extra { display: none; }
 
 /* ---------- buttons ---------- */
 .btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 24px; border-radius: 999px; font-weight: 700; font-size: 17px; transition: transform .25s var(--ease), background .2s, box-shadow .25s; white-space: nowrap; }
@@ -363,7 +364,19 @@ footer li a { display: inline-block; transition: color .2s, transform .25s var(-
   .kicker { font-size: 13px; margin-bottom: 10px; }
 
   /* nav */
-  .nav-cta .btn-sm { display: none; }
+  /* GitHub becomes an icon button, Download a compact pill */
+  .nav-cta { gap: 8px; }
+  .nav-cta .btn-sm { height: 40px; padding: 0 14px; font-size: 14px; gap: 7px; }
+  .nav-cta .btn-sm .icon { width: 19px; height: 19px; }
+  .nav-cta .nav-gh { width: 40px; padding: 0; justify-content: center; }
+  .nav-cta .nav-gh span { display: none; }
+  .menu-btn { width: 40px; height: 40px; }
+  .brand { font-size: 19px; gap: 8px; }
+  .brand img { width: 32px; height: 32px; }
+  /* and both again, full size, at the bottom of the open menu */
+  .menu-extra { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .nav-links .menu-extra a { justify-content: center; padding: 12px 14px; color: inherit; font-size: 15px; }
+  .nav-links .menu-extra .btn-primary { color: #1a0f0c; }
 
   /* hero */
   .hero { padding: 96px 0 24px; --hh: 470px; }
@@ -455,10 +468,15 @@ footer li a { display: inline-block; transition: color .2s, transform .25s var(-
   .bubble small { font-size: 11.5px; }
 }
 @media (max-width: 360px) {
+  .nav .wrap { gap: 8px; }
+  .nav-cta { gap: 6px; }
+  .nav-cta .nav-dl { padding: 0 12px; }
   .dl-split .dl-main { padding: 13px 12px 13px 16px; gap: 8px; font-size: 16px; }
   .dl-split .dl-toggle { padding: 13px 12px; }
 }
 @media (max-width: 340px) {
+  .nav-cta .nav-dl { width: 40px; padding: 0; justify-content: center; }
+  .nav-cta .nav-dl span { display: none; }
   .hero { --hh: 400px; }
   .facts { font-size: 13px; }
   .stat .num { font-size: 40px; }
