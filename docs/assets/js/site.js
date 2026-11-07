@@ -153,12 +153,45 @@
     if (d.open) closeFaq(d); else openFaq(d);
   }));
 
-  // Latest release: version, size and direct APK links from GitHub.
-  // The page works without this; it just keeps the buttons current.
+  // Count up to a number once it's on screen.
+  const countTo = (el, to) => {
+    const show = (v) => (el.textContent = v.toLocaleString('en-US'));
+    if (reduce || !('IntersectionObserver' in window)) return show(to);
+    show(0);
+    const io = new IntersectionObserver((entries) => {
+      if (!entries[0].isIntersecting) return;
+      io.disconnect();
+      const t0 = performance.now(), dur = 1200;
+      const tick = (now) => {
+        const k = Math.min(1, (now - t0) / dur);
+        show(Math.round(to * (1 - Math.pow(1 - k, 4))));
+        if (k < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+      setTimeout(() => show(to), dur + 150); // land on the real number even if frames are throttled
+    }, { threshold: 0.5 });
+    io.observe(el);
+  };
+
+  // Releases from GitHub: the latest one's version, sizes and APK links,
+  // and how many times the app has been downloaded (APK files only, every
+  // release). The page works without this; it just stays as written, and
+  // the download count stays hidden.
   const REPO = 'Yeamin-Talukder/ShareBro';
-  fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' } })
+  fetch(`https://api.github.com/repos/${REPO}/releases?per_page=100`, { headers: { Accept: 'application/vnd.github+json' } })
     .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-    .then((rel) => {
+    .then((list) => {
+      const published = list.filter((r) => !r.draft && !r.prerelease);
+      const downloads = published.reduce((sum, r) => sum + (r.assets || [])
+        .filter((a) => a.name.endsWith('.apk'))
+        .reduce((s, a) => s + a.download_count, 0), 0);
+      if (downloads > 0) {
+        $$('[data-downloads]').forEach((el) => countTo(el, downloads));
+        $$('[data-releases]').forEach((el) => (el.textContent = published.length));
+        $$('[data-dl-count]').forEach((el) => (el.hidden = false));
+      }
+      const rel = published[0];
+      if (!rel) return;
       const version = (rel.tag_name || '').replace(/^v/, '');
       const assets = rel.assets || [];
       const find = (abi) => assets.find((a) => a.name.endsWith(`${abi}.apk`));

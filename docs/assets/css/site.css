@@ -261,6 +261,15 @@ footer .credits { grid-column: 1 / -1; border-top: 1px solid var(--line); paddin
 .swipe .icon { width: 18px; height: 18px; animation: nudge 1.6s ease-in-out infinite; }
 @keyframes nudge { 50% { transform: translateX(6px); } }
 
+/* ---------- download count ---------- */
+[hidden] { display: none !important; }
+.facts .dl-count { color: var(--text); }
+.facts .dl-count b { font-variant-numeric: tabular-nums; }
+.dl-stat { display: inline-flex !important; align-items: center; gap: 10px; margin: 22px auto 0 !important; padding: 9px 18px 9px 12px; border-radius: 999px; background: var(--card-2); border: 1px solid var(--line); color: var(--sub) !important; font-size: 15px; font-weight: 600; }
+.dl-stat[hidden] { display: none !important; }
+.dl-stat .icon { width: 30px; height: 30px; padding: 6px; border-radius: 50%; background: var(--coral); color: #1a0f0c; }
+.dl-stat b { color: var(--text); font-variant-numeric: tabular-nums; }
+
 /* ---------- scroll progress ---------- */
 .progress { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: var(--coral); transform-origin: 0 50%; transform: scaleX(0); }
 
