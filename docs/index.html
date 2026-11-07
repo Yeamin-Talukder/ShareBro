@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ShareBro – Sort trip photos by face &amp; send each friend theirs</title>
+<meta name="description" content="Free, offline Android app that groups your trip photos by face and sends each friend only the photos they're in, at full quality. No cloud, no account.">
+<meta name="keywords" content="share trip photos with friends, sort photos by face, face recognition photo app, group photos by person, send photos to friends offline, LocalSend, Android photo organizer, offline photo sharing, Find my photos selfie">
+<meta name="author" content="Md Yeamin Talukder">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://yeamin-talukder.github.io/ShareBro/">
+<meta name="theme-color" content="#0b0a0f">
+<meta name="color-scheme" content="dark">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ShareBro">
+<meta property="og:title" content="ShareBro – your trip photos, sorted by face and sent to every friend">
+<meta property="og:description" content="A free, offline Android app for the friend who takes all the photos. Groups thousands of photos by person and sends each friend just theirs. No cloud, no account.">
+<meta property="og:url" content="https://yeamin-talukder.github.io/ShareBro/">
+<meta property="og:image" content="https://yeamin-talukder.github.io/ShareBro/assets/img/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="ShareBro on three phones: People grouped by face, Maya's photos, and a friend's gallery">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ShareBro – your trip photos, sorted by face">
+<meta name="twitter:description" content="Free, offline Android app: groups trip photos by face and sends each friend only their photos. No cloud, no account.">
+<meta name="twitter:image" content="https://yeamin-talukder.github.io/ShareBro/assets/img/og-image.jpg">
+
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/img/icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/icon-180.png">
+<link rel="manifest" href="site.webmanifest">
+<link rel="preload" href="screenshots/people.jpg" as="image">
+<link rel="stylesheet" href="assets/css/site.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://yeamin-talukder.github.io/ShareBro/#app",
+      "name": "ShareBro",
+      "alternateName": "Share Bro",
+      "description": "Free, offline Android app that groups trip photos by face and sends each friend only the photos they're in, at full quality, over Wi-Fi, a hotspot, or with no network at all.",
+      "url": "https://yeamin-talukder.github.io/ShareBro/",
+      "downloadUrl": "https://github.com/Yeamin-Talukder/ShareBro/releases/latest",
+      "applicationCategory": "MultimediaApplication",
+      "applicationSubCategory": "Photo organizer",
+      "operatingSystem": "Android 9 or newer",
+      "softwareVersion": "1.4.0",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "author": { "@id": "https://yeamin-talukder.github.io/ShareBro/#author" },
+      "image": "https://yeamin-talukder.github.io/ShareBro/assets/img/icon-512.png",
+      "screenshot": [
+        "https://yeamin-talukder.github.io/ShareBro/screenshots/people.jpg",
+        "https://yeamin-talukder.github.io/ShareBro/screenshots/person.jpg",
+        "https://yeamin-talukder.github.io/ShareBro/screenshots/send.jpg",
+        "https://yeamin-talukder.github.io/ShareBro/screenshots/trip-group.jpg",
+        "https://yeamin-talukder.github.io/ShareBro/screenshots/web-gallery.jpg"
+      ],
+      "featureList": [
+        "On-device face grouping that copes with glasses and angles",
+        "Trip groups: friends join with a 4-digit code and each photo goes only to the people in it",
+        "Find my photos: friends scan a QR code and take a selfie in their browser to get their photos",
+        "LocalSend-compatible sending to Android, iPhone, Windows, Mac and Linux",
+        "Phone-to-phone sending with no network over Bluetooth and Wi-Fi Direct",
+        "Full-quality originals",
+        "Search by person, place, date and scene",
+        "Places map and Journey",
+        "Works fully offline; nothing is uploaded"
+      ]
+    },
+    {
+      "@type": "Person",
+      "@id": "https://yeamin-talukder.github.io/ShareBro/#author",
+      "name": "Md Yeamin Talukder",
+      "url": "https://github.com/Yeamin-Talukder"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://yeamin-talukder.github.io/ShareBro/#site",
+      "name": "ShareBro",
+      "url": "https://yeamin-talukder.github.io/ShareBro/",
+      "inLanguage": "en"
+    },
+    {
+      "@type": "VideoObject",
+      "name": "ShareBro in one minute",
+      "description": "How ShareBro sorts trip photos by face and gets each friend their own photos, shown with the real app.",
+      "thumbnailUrl": "https://yeamin-talukder.github.io/ShareBro/screenshots/reel-cover.jpg",
+      "contentUrl": "https://yeamin-talukder.github.io/ShareBro/sharebro-reel.mp4",
+      "uploadDate": "2026-11-02",
+      "duration": "PT56S"
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        { "@type": "Question", "name": "Is ShareBro free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. ShareBro is a free download from its GitHub releases page. There are no ads, no subscriptions and no account." } },
+        { "@type": "Question", "name": "Does ShareBro upload my photos?", "acceptedAnswer": { "@type": "Answer", "text": "No. Face detection and grouping run on your phone, and photos only leave it when you send them to someone. There is no cloud server, no account and no analytics." } },
+        { "@type": "Question", "name": "Which phones does ShareBro work on?", "acceptedAnswer": { "@type": "Answer", "text": "Android 9 or newer. Most phones need the arm64-v8a APK; there are also builds for older 32-bit phones and for emulators and Chromebooks." } },
+        { "@type": "Question", "name": "My friends have iPhones. Can they still get their photos?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. ShareBro is compatible with the free LocalSend app on iPhone, and anyone can get photos in a browser through a link or QR code, including Find my photos, which works with a selfie." } },
+        { "@type": "Question", "name": "Do my friends need to install ShareBro?", "acceptedAnswer": { "@type": "Answer", "text": "Not for Find my photos, links or LocalSend. Trip groups, where each photo goes to the people in it automatically, need ShareBro on every phone in the group." } },
+        { "@type": "Question", "name": "Does ShareBro need internet?", "acceptedAnswer": { "@type": "Answer", "text": "No. It works on a Wi-Fi network or phone hotspot without internet, and ShareBro phones can send to each other with no network at all over Bluetooth and Wi-Fi Direct. The only optional internet use is the real map in Places." } },
+        { "@type": "Question", "name": "How accurate is the face grouping?", "acceptedAnswer": { "@type": "Answer", "text": "ShareBro uses InsightFace's MobileFaceNet model on the phone, which keeps people together with or without glasses and at different angles. It can still make mistakes, for example with babies, twins or very small faces, so you can review groups, merge them by dragging, and remove wrong faces." } }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-face" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01M8.5 14.5a4.5 4.5 0 0 0 7 0"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14a6.5 6.5 0 0 1 3.5 6"/></symbol>
+    <symbol id="i-luggage" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="7" width="14" height="13" rx="2.5"/><path d="M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7M9 11v5M15 11v5"/></symbol>
+    <symbol id="i-qr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M14 14h2v2h-2zM18 18h2.5M14 20.5h2M20.5 14v2"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 10 14M21 3l-6.5 18-4.5-7-7-4.5z"/></symbol>
+    <symbol id="i-radar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M8.5 15.5a5 5 0 0 1 0-7M15.5 8.5a5 5 0 0 1 0 7M5.6 18.4a9 9 0 0 1 0-12.8M18.4 5.6a9 9 0 0 1 0 12.8"/></symbol>
+    <symbol id="i-bt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 7 10 10-5 4V3l5 4L7 17"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-images" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="14" rx="2.5"/><path d="M7 3h11.5A2.5 2.5 0 0 1 21 5.5V17M3 16l4-4 5 5 2-2 3 3"/><circle cx="12.5" cy="10.5" r="1.3"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v5.5c0 4.5 3 7.8 7 9.5 4-1.7 7-5 7-9.5V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5v-3a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-cloud-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M8.5 8.6A6 6 0 0 0 4 14.5 4.5 4.5 0 0 0 8.5 19H17M11 5.2A6 6 0 0 1 18 11a4 4 0 0 1 2.3 7"/></symbol>
+    <symbol id="i-hq" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 9v6M7 12h3M10 9v6M14 9h1.5a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H14z"/></symbol>
+    <symbol id="i-android" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16a7 7 0 0 1 14 0zM8 10 6.5 7.5M16 10l1.5-2.5"/><path d="M9.5 13h.01M14.5 13h.01"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-github" viewBox="0 0 24 24"><path fill="currentColor" d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/></symbol>
+  </defs>
+</svg>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="ShareBro home"><img src="favicon.svg" alt="" width="34" height="34">ShareBro</a>
+    <nav class="nav-links" id="menu" aria-label="Main">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#find">Find my photos</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-ghost btn-sm" href="https://github.com/Yeamin-Talukder/ShareBro" rel="noopener"><svg class="icon"><use href="#i-github"/></svg>GitHub</a>
+      <a class="btn btn-primary btn-sm" href="#download"><svg class="icon"><use href="#i-download"/></svg>Download</a>
+      <button class="menu-btn" aria-controls="menu" aria-expanded="false" aria-label="Menu"><svg class="icon"><use href="#i-menu"/></svg></button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <!-- ============ HERO ============ -->
+  <section class="hero" id="top">
+    <div class="glow a"></div><div class="glow b"></div>
+    <div class="wrap">
+      <div>
+        <a class="eyebrow rise" href="https://github.com/Yeamin-Talukder/ShareBro/releases/latest" rel="noopener"><b>NEW</b>Search your photos by place name</a>
+        <h1 class="rise" style="--d:.06s">Your trip photos, sorted by face. <span class="accent">Sent to every friend.</span></h1>
+        <p class="lead rise" style="--d:.12s">ShareBro is a free Android app for the friend who takes all the photos. It groups thousands of trip photos by the people in them and sends each friend just their photos, at full quality. No cloud, no uploads, no account.</p>
+        <div class="cta-row rise" style="--d:.18s">
+          <a class="btn btn-primary" href="https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.4.0/ShareBro-v1.4.0-arm64-v8a.apk" data-apk><svg class="icon"><use href="#i-download"/></svg>Download for Android <small><span data-version>v1.4.0</span> · <span data-apk-size>95 MB</span></small></a>
+          <a class="btn btn-ghost" href="#video"><svg class="icon"><use href="#i-play"/></svg>Watch the 1-minute video</a>
+        </div>
+        <div class="facts rise" style="--d:.24s">
+          <span><svg class="icon"><use href="#i-check"/></svg>Free</span>
+          <span><svg class="icon"><use href="#i-cloud-off"/></svg>Works offline</span>
+          <span><svg class="icon"><use href="#i-android"/></svg>Android 9+</span>
+          <span><svg class="icon"><use href="#i-github"/></svg>Source on GitHub</span>
+        </div>
+      </div>
+
+      <div class="stage reveal" style="--d:.2s" aria-label="ShareBro screens">
+        <div class="device back l" aria-hidden="true"><div class="screen"><img src="screenshots/person.jpg" alt="" width="540" height="1114" loading="lazy"></div></div>
+        <div class="device back" aria-hidden="true"><div class="screen"><img src="screenshots/web-gallery.jpg" alt="" width="540" height="1169" loading="lazy"></div></div>
+        <div class="device main">
+          <div class="notch"></div>
+          <div class="screen cycle">
+            <img class="on" src="screenshots/people.jpg" alt="ShareBro People screen: one circle per friend with how many photos each is in" width="540" height="1114">
+            <img src="screenshots/scanning.jpg" alt="Scanning a trip: faces found while the photos are checked" width="540" height="1114" loading="lazy">
+            <img src="screenshots/send.jpg" alt="Send 12 photos to Ruby at original quality" width="540" height="1114" loading="lazy">
+            <img src="screenshots/trip-group.jpg" alt="Trip group with a 4-digit join code" width="540" height="1114" loading="lazy">
+          </div>
+        </div>
+        <div class="bubble" style="left:0;top:70px;animation-delay:-1s"><img src="assets/img/avatars/Maya.png" alt="" width="40" height="40"><span>Maya<small>18 photos</small></span></div>
+        <div class="bubble" style="right:0;top:330px;animation-delay:-3s"><img src="assets/img/avatars/Ruby.png" alt="" width="40" height="40"><span>Ruby<small>12 photos</small></span></div>
+        <div class="bubble" style="left:10px;bottom:70px;animation-delay:-4.5s"><img src="assets/img/avatars/Leo.png" alt="" width="40" height="40"><span>Leo<small>7 photos</small></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PROBLEM ============ -->
+  <section class="problem" aria-labelledby="problem-h">
+    <div class="wrap">
+      <div class="sec-head center reveal">
+        <span class="kicker">The problem</span>
+        <h2 id="problem-h">Every trip has that one friend who takes <span class="accent">all the photos.</span></h2>
+        <p>Then the trip ends, and everyone wants their pictures. Finding them one by one, for every friend, takes hours.</p>
+      </div>
+      <div class="stats">
+        <div class="stat reveal"><div class="num" data-count="5000" data-suffix="+">5,000+</div><div class="lab">Photos</div><p>From one weekend away, all on your phone.</p></div>
+        <div class="stat reveal" style="--d:.1s"><div class="num" data-count="10">10</div><div class="lab">Friends</div><p>Each one waiting for the photos they're in.</p></div>
+        <div class="stat reveal" style="--d:.2s"><div class="num">Hours</div><div class="lab">Of picking</div><p>Scrolling, choosing, sending, again and again.</p></div>
+      </div>
+      <div class="quotes reveal" aria-hidden="true">
+        <span class="quote">Bro, send my photos! 📸</span><span class="quote">Where are my pictures?</span><span class="quote">Send the original ones 😅</span><span class="quote">Did you find that group photo?</span><span class="quote">Please send mine separately 🙏</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ HOW ============ -->
+  <section id="how" aria-labelledby="how-h">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="kicker">How it works</span>
+        <h2 id="how-h">Three steps. <span class="accent">Everyone gets their photos.</span></h2>
+        <p>ShareBro never copies or moves your photos. It looks at them on your phone, groups them by person, and sends the right ones to the right people.</p>
+      </div>
+      <div class="steps">
+        <article class="step reveal">
+          <div class="n">1</div>
+          <h3>Scan the trip</h3>
+          <p>Pick the trip's album or folder. Every face is found on your phone and the photos are grouped into one page per person.</p>
+          <div class="shot"><img src="screenshots/scanning.jpg" alt="Scanning screen: 48 of 100 photos, 30 faces, about 4 people so far" width="540" height="1114" loading="lazy"></div>
+        </article>
+        <article class="step reveal" style="--d:.1s">
+          <div class="n">2</div>
+          <h3>Check the groups</h3>
+          <p>Name your friends, fix the odd mistake, and drag one person onto another to merge them.</p>
+          <div class="shot"><img src="screenshots/person.jpg" alt="Maya's page with her 18 photos" width="540" height="1114" loading="lazy"></div>
+        </article>
+        <article class="step reveal" style="--d:.2s">
+          <div class="n">3</div>
+          <h3>Send</h3>
+          <p>Each friend gets exactly the photos they're in, at full quality, straight to their phone.</p>
+          <div class="shot"><img src="screenshots/send.jpg" alt="Send 12 photos to Ruby: Original quality, nearby phones, no Wi-Fi needed, QR code" width="540" height="1114" loading="lazy"></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ IN ACTION ============ -->
+  <section aria-labelledby="action-h" style="padding-top:20px">
+    <div class="wrap">
+      <div class="sec-head center reveal">
+        <span class="kicker">See it in action</span>
+        <h2 id="action-h">The real app, <span class="accent">recorded on a phone.</span></h2>
+      </div>
+      <div class="clips">
+        <figure class="clip reveal">
+          <div class="device"><div class="screen"><video data-auto muted loop playsinline preload="none" poster="assets/media/people-views.jpg" aria-label="People switching between Grid, Honeycomb and Bubbles views"><source src="assets/media/people-views.mp4" type="video/mp4"></video></div></div>
+          <h3>People, your way</h3><p>Grid, Honeycomb or Bubbles</p>
+        </figure>
+        <figure class="clip reveal" style="--d:.08s">
+          <div class="device"><div class="screen"><video data-auto muted loop playsinline preload="none" poster="assets/media/merge.jpg" aria-label="Dragging a small group onto Ruby merges them"><source src="assets/media/merge.mp4" type="video/mp4"></video></div></div>
+          <h3>Fix a split</h3><p>Drag one person onto another</p>
+        </figure>
+        <figure class="clip reveal" style="--d:.16s">
+          <div class="device"><div class="screen"><video data-auto muted loop playsinline preload="none" poster="assets/media/trip-group.jpg" aria-label="Starting a trip group shows a 4-digit join code"><source src="assets/media/trip-group.mp4" type="video/mp4"></video></div></div>
+          <h3>Trip group</h3><p>Friends join with a code</p>
+        </figure>
+        <figure class="clip reveal" style="--d:.24s">
+          <div class="device"><div class="screen"><video data-auto muted loop playsinline preload="none" poster="assets/media/pick-photos.jpg" aria-label="Picking photos to send"><source src="assets/media/pick-photos.mp4" type="video/mp4"></video></div></div>
+          <h3>Pick and send</h3><p>Or send each friend all of theirs</p>
+        </figure>
+      </div>
+      <p class="note">Every screen on this page is the real app. The demo trip uses free stock photos from Pexels: the people are models and the names are made up.</p>
+    </div>
+  </section>
+
+  <!-- ============ FEATURES ============ -->
+  <section id="features" aria-labelledby="features-h">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="kicker">Features</span>
+        <h2 id="features-h">Everything the trip photographer needs.</h2>
+      </div>
+      <div class="features">
+        <article class="feature reveal"><div class="tile t-coral"><svg class="icon"><use href="#i-face"/></svg></div><h3>Face grouping on your phone</h3><p>On-device face recognition (InsightFace MobileFaceNet) keeps people together with or without glasses and at different angles.</p></article>
+        <article class="feature reveal" style="--d:.06s"><div class="tile t-green"><svg class="icon"><use href="#i-luggage"/></svg></div><h3>Trip groups</h3><p>Everyone joins with a 4-digit code. Each photo goes only to the friends who are in it, and you're asked when a face is unclear.</p></article>
+        <article class="feature reveal" style="--d:.12s"><div class="tile t-amber"><svg class="icon"><use href="#i-qr"/></svg></div><h3>Find my photos</h3><p>Friends scan a QR code and take a selfie in their browser. They get a gallery of just their photos. No app needed.</p></article>
+        <article class="feature reveal"><div class="tile t-violet"><svg class="icon"><use href="#i-send"/></svg></div><h3>LocalSend-compatible</h3><p>Send photos, videos, files, folders, text and apps to any device running the free LocalSend app: Android, iPhone, Windows, Mac or Linux.</p></article>
+        <article class="feature reveal" style="--d:.06s"><div class="tile t-blue"><svg class="icon"><use href="#i-bt"/></svg></div><h3>No network needed</h3><p>ShareBro phones send to each other over Bluetooth and Wi-Fi Direct. Any Wi-Fi or hotspot works too, without internet.</p></article>
+        <article class="feature reveal" style="--d:.12s"><div class="tile t-pink"><svg class="icon"><use href="#i-hq"/></svg></div><h3>Full quality</h3><p>Send the originals, originals without location details, or smaller copies that send faster. Your choice per send.</p></article>
+        <article class="feature reveal"><div class="tile t-teal"><svg class="icon"><use href="#i-search"/></svg></div><h3>Search like you talk</h3><p>"Maya beach June 2026" or "Kuakata Ruby". Search understands people, places, dates, scenes and more, all offline.</p></article>
+        <article class="feature reveal" style="--d:.06s"><div class="tile t-coral"><svg class="icon"><use href="#i-map"/></svg></div><h3>Places and Journey</h3><p>Your photos on a map with town names, and the whole trip replayed in order like a travel video.</p></article>
+        <article class="feature reveal" style="--d:.12s"><div class="tile t-slate"><svg class="icon"><use href="#i-images"/></svg></div><h3>A full gallery</h3><p>Albums, favourites, trash, duplicate clean-up and the best shot from every burst of group photos.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FIND MY PHOTOS ============ -->
+  <section id="find" class="problem" aria-labelledby="find-h">
+    <div class="wrap">
+      <div class="sec-head center reveal">
+        <span class="kicker">Find my photos</span>
+        <h2 id="find-h">Friends without the app? <span class="accent">Just a QR code and a selfie.</span></h2>
+        <p>Show one code to the whole group. Each friend opens it in their phone's browser, takes a selfie, and lands on a gallery of only the photos they're in. Their face is matched on your phone.</p>
+      </div>
+      <div class="flow">
+        <figure class="reveal"><div class="device"><div class="screen"><img src="screenshots/find-my-photos.jpg" alt="Find my photos on ShareBro: a QR code to show the group" width="540" height="1114" loading="lazy"></div></div><figcaption>Show the code<small>On your phone</small></figcaption></figure>
+        <figure class="reveal" style="--d:.08s"><div class="device light"><div class="screen" style="aspect-ratio:540/1169"><img src="screenshots/web-selfie.jpg" alt="Friend's browser: take a selfie or choose a photo" width="540" height="1169" loading="lazy"></div></div><figcaption>They take a selfie<small>In any browser</small></figcaption></figure>
+        <figure class="reveal" style="--d:.16s"><div class="device light"><div class="screen" style="aspect-ratio:540/1169"><img src="screenshots/web-found.jpg" alt="Found you, Ruby! 12 photos ready" width="540" height="1169" loading="lazy"></div></div><figcaption>ShareBro finds them<small>"Found you, Ruby!"</small></figcaption></figure>
+        <figure class="reveal" style="--d:.24s"><div class="device light"><div class="screen" style="aspect-ratio:540/1169"><img src="screenshots/web-gallery.jpg" alt="Ruby's photos: 12 photos with Download all" width="540" height="1169" loading="lazy"></div></div><figcaption>Their own gallery<small>Ready to download</small></figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PRIVACY ============ -->
+  <section id="privacy" aria-labelledby="privacy-h">
+    <div class="wrap split">
+      <div class="reveal">
+        <span class="kicker">Private by design</span>
+        <h2 id="privacy-h">Your photos never leave your phone. <span class="accent">Unless you send them.</span></h2>
+        <ul class="list">
+          <li><svg class="icon"><use href="#i-cloud-off"/></svg><span><b>No cloud, no account.</b> Nothing is uploaded to any server. No ads, no analytics.</span></li>
+          <li><svg class="icon"><use href="#i-face"/></svg><span><b>Face data stays on the phone.</b> Small face "fingerprints" in the app's private storage, never shared.</span></li>
+          <li><svg class="icon"><use href="#i-lock"/></svg><span><b>Encrypted transfers.</b> HTTPS with mutual TLS, and devices checked by certificate fingerprints.</span></li>
+          <li><svg class="icon"><use href="#i-shield"/></svg><span><b>Your say-so.</b> Accept or decline every incoming send, add a PIN, and lock the app with your fingerprint.</span></li>
+        </ul>
+        <p class="note" style="text-align:left"><a href="privacy.html">Read the full privacy details</a></p>
+      </div>
+      <div class="privacy-card reveal" style="--d:.12s">
+        <div class="shield"><svg class="icon"><use href="#i-shield"/></svg></div>
+        <h3>Works 100% offline.</h3>
+        <p>The only time ShareBro uses the internet is the optional real map in Places. Everything else (scanning, grouping, search and sending) runs on your phone and your local network.</p>
+        <div class="pills"><span class="pill">On-device AI</span><span class="pill">No uploads</span><span class="pill">Mutual TLS</span><span class="pill">App lock</span><span class="pill">PIN to receive</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ VIDEO ============ -->
+  <section id="video" class="problem" aria-labelledby="video-h">
+    <div class="wrap video-box">
+      <div class="device reveal">
+        <div class="screen"><video controls playsinline preload="none" poster="screenshots/reel-cover.jpg" aria-label="ShareBro in one minute"><source src="sharebro-reel.mp4" type="video/mp4"></video></div>
+      </div>
+      <div class="reveal" style="--d:.1s">
+        <span class="kicker">One minute</span>
+        <h2 id="video-h">See the whole story in <span class="accent">56 seconds.</span></h2>
+        <p class="lead" style="margin-top:16px">From the photographer's buzzing phone to every friend holding their own photos, all shown with the real app.</p>
+        <ul class="list">
+          <li><svg class="icon"><use href="#i-check"/></svg><span>Scanning and face grouping</span></li>
+          <li><svg class="icon"><use href="#i-check"/></svg><span>Naming friends and merging groups</span></li>
+          <li><svg class="icon"><use href="#i-check"/></svg><span>Trip groups and Find my photos</span></li>
+          <li><svg class="icon"><use href="#i-check"/></svg><span>Full-quality sending, no internet needed</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FAQ ============ -->
+  <section id="faq" aria-labelledby="faq-h">
+    <div class="wrap">
+      <div class="sec-head center reveal">
+        <span class="kicker">FAQ</span>
+        <h2 id="faq-h">Questions, answered.</h2>
+      </div>
+      <div class="faq reveal">
+        <details><summary>Is ShareBro free?<svg class="icon"><use href="#i-plus"/></svg></summary><div class="ans">Yes. ShareBro is a free download from its <a href="https://github.com/Yeamin-Talukder/ShareBro/releases/latest" rel="noopener">GitHub releases page</a>. There are no ads, no subscriptions and no account.</div></details>
+        <details><summary>Does ShareBro upload my photos?<svg class="icon"><use href="#i-plus"/></svg></summary><div class="ans">No. Face detection and grouping run on your phone, and photos only leave it when you send them to someone. There is no cloud server, no account and no analytics.</div></details>
+        <details><summary>Which phones does it work on?<svg class="icon"><use href="#i-plus"/></svg></summary><div class="ans">Android 9 or newer. Almost every phone from the last seven years needs the <b>arm64-v8a</b> APK. There are also builds for older 32-bit phones and for emulators and Chromebooks (see <a href="#download">Download</a>).</div></details>
+        <details><summary>My friends have iPhones. Can they still get their photos?<svg class="icon"><use href="#i-plus"/></svg></summary><div class="ans">Yes. ShareBro works with the free <a href="https://localsend.org" rel="noopener">LocalSend</a> app on iPhone, and anyone can get photos in a browser through a link or QR code, including Find my photos with a selfie.</div></details>
+        <details><summary>Do my friends need to install ShareBro?<svg class="icon"><use href="#i-plus"/></svg></summary><div class="ans">Not for Find my photos, links or LocalSend. Trip groups, where each photo goes to the people in it automatically, need ShareBro on every phone in the group.</div></details>
+        <details><summary>Does it need internet?<svg class="icon"><use href="#i-plus"/></svg></summary><div class="ans">No. It works on a Wi-Fi network or phone hotspot without internet, and ShareBro phones can send to each other with no network at all over Bluetooth and Wi-Fi Direct. The only optional internet use is the real map in Places.</div></details>
+        <details><summary>How accurate is the face grouping?<svg class="icon"><use href="#i-plus"/></svg></summary><div class="ans">ShareBro uses InsightFace's MobileFaceNet on the phone, which keeps people together with or without glasses and at different angles. It can still make mistakes, for example with babies, twins or very small faces, so you can review groups, merge them by dragging and remove wrong faces in a tap.</div></details>
+        <details><summary>How do I install the APK?<svg class="icon"><use href="#i-plus"/></svg></summary><div class="ans">Download the APK on your phone and open it. If Android asks, allow "Install unknown apps" for your browser or file manager. To update later, install the newer APK over the old one; your people, names and settings are kept.</div></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DOWNLOAD ============ -->
+  <section id="download" class="download" aria-labelledby="dl-h">
+    <div class="wrap">
+      <div class="dl-card reveal">
+        <svg class="logo-big logo-anim" viewBox="0 0 108 108" role="img" aria-label="ShareBro logo: two phones touching"><rect width="108" height="108" rx="25" fill="#F6F3F1"/><defs><clipPath id="s0"><path d="M41.81,41.56 L50.56,45.18 A3.32,3.32 0 0 1 52.36,49.52 L43.12,71.82 A3.32,3.32 0 0 1 38.78,73.62 L30.03,70 A3.32,3.32 0 0 1 28.24,65.66 L37.47,43.36 A3.32,3.32 0 0 1 41.81,41.56 Z"/></clipPath><clipPath id="s1"><path d="M57.44,45.18 L66.19,41.56 A3.32,3.32 0 0 1 70.53,43.36 L79.76,65.66 A3.32,3.32 0 0 1 77.97,70 L69.22,73.62 A3.32,3.32 0 0 1 64.88,71.82 L55.64,49.52 A3.32,3.32 0 0 1 57.44,45.18 Z"/></clipPath></defs><g class="pl"><path d="M42.07,40.25 L51.3,44.07 A4.37,4.37 0 0 1 53.67,49.78 L44.23,72.57 A4.37,4.37 0 0 1 38.52,74.93 L29.29,71.11 A4.37,4.37 0 0 1 26.92,65.4 L36.36,42.61 A4.37,4.37 0 0 1 42.07,40.25 Z" fill="#E5533A"/><g clip-path="url(#s0)"><path d="M41.81,41.56 L50.56,45.18 A3.32,3.32 0 0 1 52.36,49.52 L43.12,71.82 A3.32,3.32 0 0 1 38.78,73.62 L30.03,70 A3.32,3.32 0 0 1 28.24,65.66 L37.47,43.36 A3.32,3.32 0 0 1 41.81,41.56 Z" fill="#FDE3DA"/><path d="M43.53,53.14 A2.09,2.09 0 1 0 47.72,53.14 A2.09,2.09 0 1 0 43.53,53.14 Z" fill="#FF8A6B"/><path d="M31.44,57.92 L39.22,55.14 L41.09,63.25 L47.5,61.24 L41.85,74.89 L26.96,68.73 Z" fill="#FFC3B2"/><path d="M29.32,63.04 L37.69,60.51 L39.74,67.35 L43.3,65.5 L44.44,68.64 L41.85,74.89 L26.96,68.73 Z" fill="#FF8A6B"/></g><path d="M44.16,43.53 L47.51,44.91 A0.62,0.62 0 0 1 47.85,45.73 L47.85,45.73 A0.62,0.62 0 0 1 47.03,46.06 L43.68,44.68 A0.62,0.62 0 0 1 43.35,43.86 L43.35,43.86 A0.62,0.62 0 0 1 44.16,43.53 Z" fill="#E5533A"/></g><g class="pr"><path d="M56.7,44.07 L65.93,40.25 A4.37,4.37 0 0 1 71.64,42.61 L81.08,65.4 A4.37,4.37 0 0 1 78.71,71.11 L69.48,74.93 A4.37,4.37 0 0 1 63.77,72.57 L54.33,49.78 A4.37,4.37 0 0 1 56.7,44.07 Z" fill="#141217"/><g clip-path="url(#s1)"><path d="M57.44,45.18 L66.19,41.56 A3.32,3.32 0 0 1 70.53,43.36 L79.76,65.66 A3.32,3.32 0 0 1 77.97,70 L69.22,73.62 A3.32,3.32 0 0 1 64.88,71.82 L55.64,49.52 A3.32,3.32 0 0 1 57.44,45.18 Z" fill="#3A353F"/><path d="M66.23,50.67 A2.09,2.09 0 1 0 70.42,50.67 A2.09,2.09 0 1 0 66.23,50.67 Z" fill="#FF8A6B"/><path d="M61.68,64.09 L65.21,56.62 L72.27,61.03 L75.38,55.08 L81.04,68.73 L66.15,74.89 Z" fill="#5A5560"/><path d="M63.8,69.2 L67.93,61.5 L74.21,64.89 L75.42,61.06 L78.44,62.47 L81.04,68.73 L66.15,74.89 Z" fill="#8A8590"/></g><path d="M60.49,44.91 L63.84,43.53 A0.62,0.62 0 0 1 64.65,43.86 L64.65,43.86 A0.62,0.62 0 0 1 64.32,44.68 L60.97,46.06 A0.62,0.62 0 0 1 60.15,45.73 L60.15,45.73 A0.62,0.62 0 0 1 60.49,44.91 Z" fill="#141217"/></g><g class="sp" stroke="#E5533A" stroke-width="1.25" stroke-linecap="round" fill="none"><path d="M54,36.33 L54,32.81" pathLength="1"/><path d="M55.91,37.22 L58.6,34.96" pathLength="1"/><path d="M52.09,37.22 L49.4,34.96" pathLength="1"/></g></svg>
+        <span class="kicker">Download</span>
+        <h2 id="dl-h">Get ShareBro <span data-version>v1.4.0</span></h2>
+        <p>Free for Android 9 or newer. Install it, scan your last trip, and send everyone their photos tonight.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.4.0/ShareBro-v1.4.0-arm64-v8a.apk" data-apk><svg class="icon"><use href="#i-download"/></svg>Download APK <small><span data-apk-size>95 MB</span></small></a>
+          <a class="btn btn-ghost" href="https://github.com/Yeamin-Talukder/ShareBro/releases/latest" rel="noopener"><svg class="icon"><use href="#i-github"/></svg>All releases</a>
+        </div>
+        <div class="abis">
+          <a href="https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.4.0/ShareBro-v1.4.0-arm64-v8a.apk" data-abi="arm64-v8a"><b>arm64-v8a</b><em>Almost every phone from the last ~7 years</em><span>95 MB</span></a>
+          <a href="https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.4.0/ShareBro-v1.4.0-armeabi-v7a.apk" data-abi="armeabi-v7a"><b>armeabi-v7a</b><em>Older 32-bit phones</em><span>83 MB</span></a>
+          <a href="https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.4.0/ShareBro-v1.4.0-x86_64.apk" data-abi="x86_64"><b>x86_64</b><em>Emulators and Chromebooks</em><span>100 MB</span></a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a class="brand" href="#top"><img src="favicon.svg" alt="" width="34" height="34">ShareBro</a>
+      <p style="margin-top:12px;max-width:26em">Your trip photos, sorted by face and sent to every friend. Made by <a class="u" href="https://github.com/Yeamin-Talukder" rel="noopener">Md Yeamin Talukder</a>.</p>
+    </div>
+    <div>
+      <h4>App</h4>
+      <ul>
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#faq">FAQ</a></li>
+        <li><a href="privacy.html">Privacy</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>GitHub</h4>
+      <ul>
+        <li><a href="https://github.com/Yeamin-Talukder/ShareBro" rel="noopener">Source code</a></li>
+        <li><a href="https://github.com/Yeamin-Talukder/ShareBro/releases" rel="noopener">Releases</a></li>
+        <li><a href="https://github.com/Yeamin-Talukder/ShareBro/issues" rel="noopener">Report a bug</a></li>
+      </ul>
+    </div>
+    <div class="credits">
+      © <span data-year>2026</span> Md Yeamin Talukder. All rights reserved.
+      Screenshots use free stock photos from <a class="u" href="https://www.pexels.com/license/" rel="noopener">Pexels</a> (cottonbro studio, PNW Production); the people are models.
+      Face recognition model: InsightFace (non-commercial research licence). LocalSend is a separate project; ShareBro is not affiliated with it.
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/site.js" defer></script>
+</body>
+</html>

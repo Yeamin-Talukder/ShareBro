@@ -1,0 +1,15 @@
+{
+  "name": "ShareBro",
+  "short_name": "ShareBro",
+  "description": "Sort trip photos by face and send each friend theirs. Free, offline Android app.",
+  "start_url": "/ShareBro/",
+  "scope": "/ShareBro/",
+  "display": "standalone",
+  "background_color": "#0b0a0f",
+  "theme_color": "#0b0a0f",
+  "icons": [
+    { "src": "assets/img/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/img/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

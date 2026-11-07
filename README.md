@@ -25,7 +25,7 @@ for group trips, weddings and events: the friend who took 2,000 photos can
 share them with everyone in minutes instead of hours. **Works 100% offline:
 no cloud, no uploads, no account.**
 
-### [⬇️ Download the latest APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest)
+### [⬇️ Download the latest APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) &nbsp;·&nbsp; [🌐 Website](https://yeamin-talukder.github.io/ShareBro/)
 
 <sub>Most phones: <code>ShareBro-…-arm64-v8a.apk</code> · Android 9 or newer</sub>
 

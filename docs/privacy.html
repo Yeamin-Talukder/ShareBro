@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Privacy – ShareBro</title>
+<meta name="description" content="How ShareBro handles your photos and face data: everything stays on your phone, nothing is uploaded, transfers are encrypted, and there is no account or analytics.">
+<link rel="canonical" href="https://yeamin-talukder.github.io/ShareBro/privacy.html">
+<meta name="theme-color" content="#0b0a0f">
+<meta name="color-scheme" content="dark">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="ShareBro">
+<meta property="og:title" content="ShareBro privacy: your photos never leave your phone">
+<meta property="og:description" content="Everything runs on your phone. No cloud, no account, no analytics. Transfers are encrypted.">
+<meta property="og:url" content="https://yeamin-talukder.github.io/ShareBro/privacy.html">
+<meta property="og:image" content="https://yeamin-talukder.github.io/ShareBro/assets/img/og-image.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/img/icon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/icon-180.png">
+<link rel="manifest" href="site.webmanifest">
+<link rel="stylesheet" href="assets/css/site.css">
+<script type="application/ld+json">
+{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
+  { "@type": "ListItem", "position": 1, "name": "ShareBro", "item": "https://yeamin-talukder.github.io/ShareBro/" },
+  { "@type": "ListItem", "position": 2, "name": "Privacy", "item": "https://yeamin-talukder.github.io/ShareBro/privacy.html" } ] }
+</script>
+</head>
+<body>
+<header class="nav scrolled">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="favicon.svg" alt="" width="34" height="34">ShareBro</a>
+    <div class="nav-cta"><a class="btn btn-primary btn-sm" href="./#download">Download</a></div>
+  </div>
+</header>
+
+<main class="prose">
+  <div class="wrap">
+    <span class="kicker">Privacy</span>
+    <h1>Your photos never leave your phone.</h1>
+    <p class="updated">Last updated 8 November 2026 · ShareBro v1.4.0</p>
+
+    <h2>The short version</h2>
+    <ul>
+      <li>ShareBro works fully offline. Nothing is uploaded to any server.</li>
+      <li>There are no accounts, ads or analytics.</li>
+      <li>Photos only leave your phone when you send them to someone.</li>
+      <li>Transfers are encrypted.</li>
+    </ul>
+
+    <h2>Your photos</h2>
+    <p>ShareBro never copies or moves your photos. They stay in your phone's own photo library, and ShareBro refers to them by their gallery ID, like a shortcut. It only changes your library when you ask it to: deleting, moving, or adding a favourite.</p>
+
+    <h2>Face data</h2>
+    <p>To recognise people, ShareBro turns each face into a small "fingerprint" (a list of numbers) and keeps it, with a small crop of the face, in the app's private storage on your phone. Face detection and recognition run on the phone. Face data is never sent anywhere, except inside a backup file if you choose to make one, so keep backups private.</p>
+
+    <h2>Sending and receiving</h2>
+    <ul>
+      <li><b>Nearby devices</b> use the LocalSend protocol over your Wi-Fi or hotspot: HTTPS with mutual TLS, and each device is checked against its certificate fingerprint.</li>
+      <li><b>ShareBro phones with no network</b> talk over Bluetooth and Wi-Fi Direct (Nearby Connections).</li>
+      <li><b>Links and Find my photos</b> are served by a small web server on your phone that only works on your local network, and stop when you stop sharing. A friend's selfie is checked on your phone and deleted straight away. Add a PIN in a crowd: someone holding up a photo of a friend could otherwise get that friend's photos.</li>
+      <li><b>Nothing is saved on your phone without your say-so</b>, unless you turn on Quick save or auto-accept. You can require a PIN from senders.</li>
+    </ul>
+
+    <h2>Internet use</h2>
+    <p>The only time ShareBro uses the internet is the optional real map in Places, which loads map tiles from OpenStreetMap. The drawn map and everything else work offline.</p>
+
+    <h2>Permissions</h2>
+    <p>ShareBro asks for access to photos and videos (to find faces and show your gallery), photo locations (for the Places map), notifications, Wi-Fi and nearby devices (to find and talk to other phones), a foreground service (to keep scans and transfers going), installing packages (only when you open an app a friend sent you), and biometrics (for the optional app lock).</p>
+
+    <h2>This website</h2>
+    <p>This site has no cookies, no analytics and no trackers. It is hosted on GitHub Pages, and your browser asks GitHub for the latest version number so the download button stays current. GitHub's own <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener">privacy statement</a> applies to that.</p>
+
+    <h2>Questions</h2>
+    <p>Open an issue on <a href="https://github.com/Yeamin-Talukder/ShareBro/issues" rel="noopener">GitHub</a>.</p>
+
+    <p style="margin-top:44px"><a class="btn btn-ghost" href="./">← Back to ShareBro</a></p>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="credits" style="border:0;padding:0">© <span data-year>2026</span> Md Yeamin Talukder. All rights reserved.</div>
+  </div>
+</footer>
+<script src="assets/js/site.js" defer></script>
+</body>
+</html>
