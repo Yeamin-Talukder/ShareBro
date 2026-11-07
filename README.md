@@ -25,15 +25,13 @@ for group trips, weddings and events: the friend who took 2,000 photos can
 share them with everyone in minutes instead of hours. **Works 100% offline:
 no cloud, no uploads, no account.**
 
-### [⬇️ Download the latest APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) &nbsp;·&nbsp; [🌐 Website](https://yeamin-talukder.github.io/ShareBro/)
+### [⬇️ Download the APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) &nbsp;·&nbsp; [🌐 Website](https://yeamin-talukder.github.io/ShareBro/) &nbsp;·&nbsp; [▶️ 1-minute video](https://yeamin-talukder.github.io/ShareBro/#video)
 
-<sub>Most phones: <code>ShareBro-…-arm64-v8a.apk</code> · Android 9 or newer</sub>
+<sub>Most phones: <code>ShareBro-…-arm64-v8a.apk</code> · Android 9 or newer · free</sub>
 
 <br>
 
-<a href="docs/sharebro-reel.mp4"><img src="docs/screenshots/reel-cover.jpg" alt="ShareBro promo video: three phones showing People, Maya's photos and a friend's gallery" width="260"></a>
-
-<sub>▶️ <a href="docs/sharebro-reel.mp4"><b>Watch the 1-minute video</b></a></sub>
+<a href="https://yeamin-talukder.github.io/ShareBro/"><img src="docs/assets/img/og-image.jpg" alt="ShareBro on three phones: People grouped by face, Maya's photos, and a friend's own gallery" width="820"></a>
 
 </div>
 
@@ -50,33 +48,40 @@ no cloud, no uploads, no account.**
 | **Internet** | Not needed. Face recognition, search and sharing all run on the phone and the local network |
 | **Privacy** | Photos are never uploaded. No account, no analytics |
 | **Works with** | [LocalSend](https://localsend.org) on Android, iPhone, Windows, macOS and Linux, and any web browser |
-| **Latest version** | [Download from GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) |
+| **Get it** | APK from [GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) (not on the Play Store yet) |
+| **Website** | [yeamin-talukder.github.io/ShareBro](https://yeamin-talukder.github.io/ShareBro/) |
 
 ---
 
 ## Contents
 
-- [Why ShareBro](#why-sharebro)
-- [Who it's for](#who-its-for)
-- [See it in action](#see-it-in-action)
-- [Highlights](#highlights)
-- [ShareBro vs other apps](#sharebro-vs-other-apps)
-- [FAQ](#faq)
-- [Features in detail](#features-in-detail)
-- [Install](#install)
-- [How it works](#how-it-works)
-- [Privacy and security](#privacy-and-security)
-- [Android version support](#android-version-support)
-- [Build from source](#build-from-source)
-- [Project structure](#project-structure)
-- [Tech stack](#tech-stack)
-- [Troubleshooting](#troubleshooting)
-- [Release history](#release-history)
-- [Known limitations](#known-limitations)
-- [Contributing](#contributing)
-- [Developer](#developer)
-- [Credits and third-party licences](#credits-and-third-party-licences)
-- [License](#license)
+**Using ShareBro:**
+[Why ShareBro](#why-sharebro) ·
+[See it in action](#see-it-in-action) ·
+[Get started in 5 minutes](#get-started-in-5-minutes) ·
+[Highlights](#highlights) ·
+[Who it's for](#who-its-for) ·
+[ShareBro vs other apps](#sharebro-vs-other-apps) ·
+[Features in detail](#features-in-detail) ·
+[Install](#install) ·
+[FAQ](#faq) ·
+[Privacy and security](#privacy-and-security) ·
+[Android version support](#android-version-support)
+
+**For developers:**
+[How it works](#how-it-works) ·
+[Build from source](#build-from-source) ·
+[Project structure](#project-structure) ·
+[Tech stack](#tech-stack)
+
+**More:**
+[Troubleshooting](#troubleshooting) ·
+[Release history](#release-history) ·
+[Known limitations](#known-limitations) ·
+[Contributing](#contributing) ·
+[Developer](#developer) ·
+[Credits](#credits-and-third-party-licences) ·
+[License](#license)
 
 ---
 
@@ -112,19 +117,6 @@ Everything happens **on your phone**. Photos are never copied, moved or
 uploaded: ShareBro only keeps references to them, like shortcuts, plus the
 small face "fingerprints" it needs to recognise people.
 
-## Who it's for
-
-- **Travellers and friend groups** sharing photos after a trip, without a
-  200-photo dump in the group chat.
-- **Wedding, party and event photographers** (official or not) who want each
-  guest to get the photos they appear in.
-- **Families** sorting years of photos by person: kids, grandparents,
-  cousins.
-- **Anyone who cares about privacy** and wants face grouping like Google
-  Photos, but without uploading their photos to the cloud.
-- **People with slow or no internet**: everything works over local Wi-Fi, a
-  phone hotspot, or Bluetooth / Wi-Fi Direct.
-
 ## See it in action
 
 <table>
@@ -145,7 +137,31 @@ small face "fingerprints" it needs to recognise people.
 <sub>Every screenshot and clip here is the current app on a Pixel 7 Pro, with a
 demo trip of free stock photos from Pexels: the people are models and the
 names are made up. The last clip is the web page a friend sees after scanning
-the QR code.</sub>
+the QR code. The [1-minute video](https://yeamin-talukder.github.io/ShareBro/#video)
+shows the whole flow.</sub>
+
+## Get started in 5 minutes
+
+1. **Install** the APK from the
+   [latest release](https://github.com/Yeamin-Talukder/ShareBro/releases/latest)
+   (most phones need `arm64-v8a`; see [Install](#install)).
+2. **Scan your trip.** Open ShareBro, tap **Scan photos** and pick the trip's
+   album or folder. Faces appear as they're found, and the scan keeps going
+   with the screen off.
+3. **Name your friends.** Tap **See people**, open a face and tap **Add a
+   name**. If one friend shows up twice, long-press and drag one onto the
+   other to merge them. **Review faces** (top bar) asks about faces
+   ShareBro isn't sure of.
+4. **Send everyone their photos.** Pick whichever suits the group:
+
+   | Your friends have… | Do this |
+   |---|---|
+   | ShareBro | **Share › Trip group › Start**, friends join with the 4-digit code, then **Pick photos to share**. Each photo goes only to the people in it. |
+   | LocalSend (Android, iPhone, PC) | Open a friend's page, tap **Send all**, pick their device. |
+   | Just a browser | **Share › Find my photos** and show the QR code. They take a selfie and download their own photos. |
+   | No shared Wi-Fi | Turn on a phone hotspot, or use **Find phones nearby** (Bluetooth and Wi-Fi Direct, ShareBro to ShareBro). |
+
+5. **Done.** Stop any shared link when everyone has their photos.
 
 ## Highlights
 
@@ -160,14 +176,27 @@ the QR code.</sub>
 | 🖼️ **A full gallery** | Photos and videos, albums, favourites, trash, duplicates and best shots |
 | 🔒 **Private by design** | Works fully offline; transfers are encrypted; optional app lock |
 
+## Who it's for
+
+- **Travellers and friend groups** sharing photos after a trip, without a
+  200-photo dump in the group chat.
+- **Wedding, party and event photographers** (official or not) who want each
+  guest to get the photos they appear in.
+- **Families** sorting years of photos by person: kids, grandparents,
+  cousins.
+- **Anyone who cares about privacy** and wants face grouping like Google
+  Photos, but without uploading their photos to the cloud.
+- **People with slow or no internet**: everything works over local Wi-Fi, a
+  phone hotspot, or Bluetooth / Wi-Fi Direct.
+
 ## ShareBro vs other apps
 
 | | **ShareBro** | Google Photos | LocalSend | WhatsApp / Messenger |
 |---|---|---|---|---|
 | Groups photos by face | ✅ on the phone | ✅ in the cloud | ❌ | ❌ |
 | Sends each friend only their photos | ✅ automatically | ❌ you pick and share | ❌ you pick the files | ❌ everyone gets everything |
-| Works with no internet | ✅ | ❌ | ✅ | ❌ |
-| Uploads your photos | ❌ never | ✅ to Google's servers | ❌ | ✅ to the chat |
+| Works with no internet | ✅ | ❌ grouping and sharing need it | ✅ | ❌ |
+| Uploads your photos | ❌ never | ✅ to Google's servers | ❌ | ✅ through WhatsApp's servers |
 | Full original quality | ✅ | ✅ | ✅ | ❌ compressed by default |
 | Account needed | ❌ | ✅ Google account | ❌ | ✅ phone number |
 | Friends without the app | ✅ QR code + selfie in the browser | ✅ shared link | ❌ | ❌ |
@@ -175,82 +204,6 @@ the QR code.</sub>
 
 ShareBro speaks the LocalSend protocol, so the two work together: you can
 send from ShareBro to LocalSend on any computer or phone, and back.
-
-## FAQ
-
-<details open>
-<summary><b>How do I share trip photos with each friend automatically?</b></summary>
-
-Scan the trip's album in ShareBro once. It groups the photos by face, one
-page per person. Then either send each person their page, or start a
-**Trip group**: friends join with a 4-digit code and every photo goes only
-to the people in it.
-</details>
-
-<details>
-<summary><b>Is there an offline alternative to Google Photos face grouping?</b></summary>
-
-Yes. ShareBro finds and groups faces entirely on your Android phone, using
-Google ML Kit for detection and an InsightFace MobileFaceNet model for
-recognition. Nothing is uploaded and it works in airplane mode.
-</details>
-
-<details>
-<summary><b>Does ShareBro need internet or an account?</b></summary>
-
-No. Face recognition, search, the drawn map and sharing all work offline.
-Sharing uses your local Wi-Fi, a phone hotspot, or Bluetooth / Wi-Fi Direct.
-The only optional internet use is the real map tiles in Places.
-</details>
-
-<details>
-<summary><b>Can friends get their photos without installing the app?</b></summary>
-
-Yes. Use **Find my photos**: show a QR code, each friend scans it, takes a
-selfie in their phone's browser, and gets a gallery of just the photos
-they're in, with **Download all**. You can add a PIN and stop the link at
-any time.
-</details>
-
-<details>
-<summary><b>Does it recognise people with glasses, at angles, or years apart?</b></summary>
-
-Yes. ShareBro uses InsightFace's MobileFaceNet trained on WebFace600K, which
-copes much better with glasses and head angles than older models, and it
-keeps several "looks" per person so one person isn't split in two. You can
-also merge, split and fix groups by hand.
-</details>
-
-<details>
-<summary><b>Can I search photos by place name without internet?</b></summary>
-
-Yes. ShareBro includes an offline list of places from GeoNames, so you can
-type a town, beach or country (for example *"Kuakata"* or *"Cox's Bazar"*)
-and see the photos taken there, combined with people and dates.
-</details>
-
-<details>
-<summary><b>How is ShareBro different from LocalSend?</b></summary>
-
-LocalSend sends files you pick. ShareBro adds the step before: it finds who
-is in each photo, so it knows what to send to whom. It uses the same open
-protocol, so it works with the LocalSend apps.
-</details>
-
-<details>
-<summary><b>Is ShareBro free? Is it on the Play Store?</b></summary>
-
-It's free, with no ads or purchases. It's available as an APK from
-[GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest),
-not the Play Store yet.
-</details>
-
-<details>
-<summary><b>Is there an iPhone version?</b></summary>
-
-Not yet; ShareBro is Android only. iPhones can still **receive** photos from
-ShareBro through the LocalSend app or the **Find my photos** browser link.
-</details>
 
 ---
 
@@ -504,74 +457,92 @@ and settings are kept.
 **Checking a download:** each release includes `SHA256SUMS.txt` with the
 checksum of every APK.
 
----
+## FAQ
 
-## How it works
+<details open>
+<summary><b>How do I share trip photos with each friend automatically?</b></summary>
 
-### Recognising faces
+Scan the trip's album in ShareBro once. It groups the photos by face, one
+page per person. Then either send each person their page, or start a
+**Trip group**: friends join with a 4-digit code and every photo goes only
+to the people in it.
+</details>
 
-```
-photo ─► Google ML Kit ─► face found ─► aligned 112×112 crop ─► InsightFace MobileFaceNet ─► 512-number fingerprint
-                                                                                                     │
-           People ◄── one group per person (several "looks" each) ◄── clustering ◄───────────────────┘
-```
+<details>
+<summary><b>Is there an offline alternative to Google Photos face grouping?</b></summary>
 
-1. **Detection.** Google ML Kit finds faces and reports eye positions,
-   smiles, eyes open and head angle. Faces that are too small or turned too
-   far away are skipped.
-2. **Alignment.** Each face is cropped and rotated so the eyes land on the
-   standard ArcFace template (112 × 112 pixels).
-3. **Fingerprint.** InsightFace's MobileFaceNet (trained on WebFace600K,
-   running on TensorFlow Lite) turns the crop into 512 numbers. Faces of the
-   same person get similar numbers, even with glasses or at a different
-   angle.
-4. **Grouping.** Fingerprints are clustered into people. A person can have
-   several "looks" (clusters), so one person isn't split in two.
-   Look-alikes are suggested for merging rather than merged automatically.
-5. **Tags.** Each photo also gets scene labels (ML Kit image labelling),
-   face statistics (selfie, group, eyes closed, blurry), a duplicate
-   fingerprint and its location, which power Explore and Search.
+Yes. ShareBro finds and groups faces entirely on your Android phone, using
+Google ML Kit for detection and an InsightFace MobileFaceNet model for
+recognition. Nothing is uploaded and it works in airplane mode.
+</details>
 
-Scanning runs on several photos at once in a background worker, reads
-downscaled copies from Android rather than full images, and remembers every
-photo it has done.
+<details>
+<summary><b>Does ShareBro need internet or an account?</b></summary>
 
-### Storing data
+No. Face recognition, search, the drawn map and sharing all work offline.
+Sharing uses your local Wi-Fi, a phone hotspot, or Bluetooth / Wi-Fi Direct.
+The only optional internet use is the real map tiles in Places.
+</details>
 
-A local SQLite database holds faces (fingerprints and small crops), people,
-trips, tags, devices, groups and transfer history. **Photos stay in the
-phone's own photo library.** ShareBro refers to them by their gallery ID and
-never copies them.
+<details>
+<summary><b>Can friends get their photos without installing the app?</b></summary>
 
-### Sharing
+Yes. Use **Find my photos**: show a QR code, each friend scans it, takes a
+selfie in their phone's browser, and gets a gallery of just the photos
+they're in, with **Download all**. You can add a PIN and stop the link at
+any time.
+</details>
 
-```
-Send ─► LocalSend protocol v2 (HTTPS, mutual TLS, pinned certificates) ─► any LocalSend device
-     ├─► Nearby Connections (Bluetooth / Wi-Fi Direct)                  ─► ShareBro phones
-     └─► built-in web server + QR code                                  ─► any browser
-```
+<details>
+<summary><b>Does it recognise people with glasses, at angles, or years apart?</b></summary>
 
-- **Discovery:** UDP multicast on `224.0.0.167:53317`, answered with
-  `POST /register`. If multicast is blocked, there's a subnet scan and
-  manual IP entry as fallbacks.
-- **Transfers:** `prepare-upload` (the receiver accepts or declines), then
-  one `upload` per file, two files at a time. Failed uploads retry on a
-  fresh connection.
-- **Security:**
-  - Each phone has its own TLS certificate, and its fingerprint is the
-    SHA-256 of that certificate.
-  - Both sides present certificates (mutual TLS), as current LocalSend
-    versions require.
-  - Each side checks that the other's certificate matches the fingerprint
-    it announced.
-- **Web links** (Link / QR, Find my photos): a separate local web server on
-  port `53318`, reachable only on your Wi-Fi or hotspot.
-- **Trip groups:** ShareBro's own API on the same HTTPS server.
+Yes. ShareBro uses InsightFace's MobileFaceNet trained on WebFace600K, which
+copes much better with glasses and head angles than older models, and it
+keeps several "looks" per person so one person isn't split in two. You can
+also merge, split and fix groups by hand.
+</details>
 
-Everything runs in a foreground service, so transfers and scans keep going
-when you switch apps or turn the screen off.
+<details>
+<summary><b>Can I search photos by place name without internet?</b></summary>
 
----
+Yes. ShareBro includes an offline list of places from GeoNames, so you can
+type a town, beach or country (for example *"Kuakata"* or *"Cox's Bazar"*)
+and see the photos taken there, combined with people and dates.
+</details>
+
+<details>
+<summary><b>How is ShareBro different from LocalSend?</b></summary>
+
+LocalSend sends files you pick. ShareBro adds the step before: it finds who
+is in each photo, so it knows what to send to whom. It uses the same open
+protocol, so it works with the LocalSend apps.
+</details>
+
+<details>
+<summary><b>Is ShareBro free? Is it on the Play Store?</b></summary>
+
+It's free, with no ads or purchases. It's available as an APK from
+[GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest),
+not the Play Store yet.
+</details>
+
+<details>
+<summary><b>Is there an iPhone version?</b></summary>
+
+Not yet; ShareBro is Android only. iPhones can still **receive** photos from
+ShareBro through the LocalSend app or the **Find my photos** browser link.
+</details>
+
+<details>
+<summary><b>Is it safe to install an APK from GitHub?</b></summary>
+
+The APKs are built from the code in this repository and published on its
+[Releases page](https://github.com/Yeamin-Talukder/ShareBro/releases). Each
+release includes `SHA256SUMS.txt`, so you can check your download wasn't
+changed. Android asks once before allowing an app from your browser, and
+ShareBro only asks for the permissions listed under
+[Permissions](#permissions).
+</details>
 
 ## Privacy and security
 
@@ -617,15 +588,84 @@ Developed and tested on a **Pixel 7 Pro** (Android 16).
 
 ---
 
-## Build from source
+## For developers
 
-### Requirements
+### How it works
+
+#### Recognising faces
+
+```
+photo ─► Google ML Kit ─► face found ─► aligned 112×112 crop ─► InsightFace MobileFaceNet ─► 512-number fingerprint
+                                                                                                     │
+           People ◄── one group per person (several "looks" each) ◄── clustering ◄───────────────────┘
+```
+
+1. **Detection.** Google ML Kit finds faces and reports eye positions,
+   smiles, eyes open and head angle. Faces that are too small or turned too
+   far away are skipped.
+2. **Alignment.** Each face is cropped and rotated so the eyes land on the
+   standard ArcFace template (112 × 112 pixels).
+3. **Fingerprint.** InsightFace's MobileFaceNet (trained on WebFace600K,
+   running on TensorFlow Lite) turns the crop into 512 numbers. Faces of the
+   same person get similar numbers, even with glasses or at a different
+   angle.
+4. **Grouping.** Fingerprints are clustered into people. A person can have
+   several "looks" (clusters), so one person isn't split in two.
+   Look-alikes are suggested for merging rather than merged automatically.
+5. **Tags.** Each photo also gets scene labels (ML Kit image labelling),
+   face statistics (selfie, group, eyes closed, blurry), a duplicate
+   fingerprint and its location, which power Explore and Search.
+
+Scanning runs on several photos at once in a background worker, reads
+downscaled copies from Android rather than full images, and remembers every
+photo it has done.
+
+#### Storing data
+
+A local SQLite database holds faces (fingerprints and small crops), people,
+trips, tags, devices, groups and transfer history. **Photos stay in the
+phone's own photo library.** ShareBro refers to them by their gallery ID and
+never copies them.
+
+#### Sharing
+
+```
+Send ─► LocalSend protocol v2 (HTTPS, mutual TLS, pinned certificates) ─► any LocalSend device
+     ├─► Nearby Connections (Bluetooth / Wi-Fi Direct)                  ─► ShareBro phones
+     └─► built-in web server + QR code                                  ─► any browser
+```
+
+- **Discovery:** UDP multicast on `224.0.0.167:53317`, answered with
+  `POST /register`. If multicast is blocked, there's a subnet scan and
+  manual IP entry as fallbacks.
+- **Transfers:** `prepare-upload` (the receiver accepts or declines), then
+  one `upload` per file, two files at a time. Failed uploads retry on a
+  fresh connection.
+- **Security:**
+  - Each phone has its own TLS certificate, and its fingerprint is the
+    SHA-256 of that certificate.
+  - Both sides present certificates (mutual TLS), as current LocalSend
+    versions require.
+  - Each side checks that the other's certificate matches the fingerprint
+    it announced.
+- **Web links** (Link / QR, Find my photos): a separate local web server on
+  port `53318`, reachable only on your Wi-Fi or hotspot.
+- **Trip groups:** ShareBro's own API on the same HTTPS server.
+
+Everything runs in a foreground service, so transfers and scans keep going
+when you switch apps or turn the screen off.
+
+---
+
+### Build from source
+
+#### Requirements
 
 - [Flutter](https://docs.flutter.dev/get-started/install) **3.47+** (Dart 3.13)
 - Android SDK with **API 36** (compile SDK)
 - An Android phone or emulator running Android 9 or newer
 
-### Run
+#### Run
 
 ```bash
 git clone https://github.com/Yeamin-Talukder/ShareBro.git
@@ -634,10 +674,10 @@ flutter pub get
 flutter run
 ```
 
-### Release build
+#### Release build
 
-One APK per processor type (about 80 MB for modern phones, instead of one
-150 MB universal APK):
+One APK per processor type (about 95 MB for modern phones, instead of one
+~140 MB universal APK):
 
 ```bash
 flutter build apk --release --split-per-abi --split-debug-info=build/symbols
@@ -651,7 +691,7 @@ The APKs are written to `build/app/outputs/flutter-apk/`.
 > - Release builds are signed with the debug key for now. Use your own
 >   signing key before publishing anywhere else.
 
-### Tests and checks
+#### Tests and checks
 
 ```bash
 flutter analyze
@@ -660,17 +700,18 @@ flutter test
 
 The tests cover face tagging and grouping, duplicates, the LocalSend
 protocol, mutual TLS, recovery from dropped connections, the receive flow,
-the transfer screens, the island, thumbnails, trash and app sending.
+trip groups, Find my photos, search and place names, the transfer screens,
+the island, thumbnails, trash and app sending.
 
-### Regenerating the icon
+#### Regenerating the icon and place names
 
-`tool/make_icon.py` draws the icon and writes every version of it: the
-adaptive, themed and status-bar vectors, the launcher PNGs, and the
-Windows icon.
+- `tool/make_icon.py` draws the icon and writes every version of it: the
+  adaptive, themed and status-bar vectors, the launcher PNGs, and the
+  Windows icon.
+- `tool/make_places.py` builds the offline place list in `assets/geo/` from
+  GeoNames.
 
----
-
-## Project structure
+### Project structure
 
 ```
 lib/
@@ -680,7 +721,9 @@ lib/
 │   ├── gallery.dart       Reading the phone's photo library
 │   ├── profile.dart       Your own face (for trip groups)
 │   ├── places.dart        Grouping photos into places
+│   ├── gazetteer.dart     Offline place names for search and Places
 │   ├── search.dart        Understanding search queries
+│   ├── dates.dart         Date labels and ranges
 │   ├── trip_days.dart     Splitting a trip into named days
 │   ├── group_shots.dart   Finding the best photo of each burst
 │   ├── group_match.dart   Who gets which photo in a trip group
@@ -693,12 +736,16 @@ lib/
 │   ├── clustering.dart    Grouping fingerprints into people
 │   ├── gender.dart        Male / female guess
 │   └── tags.dart          Scene labels and photo categories
-├── scan/                  Scanning, auto-scan and background work
+├── scan/
+│   ├── scan_controller.dart  Scanning, auto-scan and regrouping
+│   └── background.dart       Foreground service that keeps work going
 ├── share/                 Sending and receiving
 │   ├── protocol.dart      LocalSend protocol v2 messages
 │   ├── tls.dart           This phone's certificate
 │   ├── client.dart        HTTPS client with mutual TLS
 │   ├── discovery.dart     Finding nearby devices
+│   ├── net.dart           Local address and multicast lock
+│   ├── prepare.dart       Original, no-location or smaller copies
 │   ├── sender.dart        Sending to LocalSend devices
 │   ├── server.dart        Receiving, web links, trip-group API
 │   ├── receive.dart       Accepting and saving incoming files
@@ -706,6 +753,8 @@ lib/
 │   ├── group.dart         Trip groups
 │   ├── find_page.dart     The "Find my photos" web page
 │   ├── web_page.dart      The shared-link web gallery
+│   ├── zip_stream.dart    "Download all" ZIPs, streamed
+│   ├── native_files.dart  Saving to Download/ShareBro, opening files
 │   ├── send_center.dart   The queue of sends
 │   └── notify.dart        Rich Android notifications
 └── ui/                    Screens and widgets
@@ -713,14 +762,16 @@ lib/
 android/app/src/main/kotlin/…   Native helpers: files, trash, thumbnails,
                                 installed apps, notifications
 assets/models/                  Face recognition and gender models (TFLite)
+assets/geo/                     Offline place names (GeoNames)
 assets/icon/                    App icon
+docs/                           The website (GitHub Pages), plus the screenshots,
+                                clips and video in this README
 design/                         HTML design demos
-docs/                           Logo, screenshots, clips and the promo video for this README
 test/                           Unit and widget tests
-tool/                           Icon and offline place-name generators
+tool/                           Icon and place-name generators
 ```
 
-## Tech stack
+### Tech stack
 
 | Area | What's used |
 |---|---|
@@ -811,7 +862,11 @@ from History.
 ## Known limitations
 
 - **Android only.** The iOS and Windows folders are Flutter scaffolding and
-  aren't tested.
+  aren't tested. iPhones can still receive photos (LocalSend or a browser).
+- **Not on the Play Store yet.** Install the APK from GitHub Releases.
+- **Sharing needs the same network.** Nearby sending, links and Find my
+  photos work on a shared Wi-Fi or hotspot, not over the internet. ShareBro
+  phones can also use Bluetooth and Wi-Fi Direct.
 - **Signed with a development key.** If a future release switches to a
   proper key, ShareBro will need to be uninstalled once before updating
   (back up first in Settings).
@@ -844,6 +899,7 @@ Before sending a pull request, run `flutter analyze` and `flutter test`.
       Designed and built ShareBro.<br><br>
       🧑‍💻 GitHub: <a href="https://github.com/Yeamin-Talukder">@Yeamin-Talukder</a><br>
       📦 Repository: <a href="https://github.com/Yeamin-Talukder/ShareBro">github.com/Yeamin-Talukder/ShareBro</a><br>
+      🌐 Website: <a href="https://yeamin-talukder.github.io/ShareBro/">yeamin-talukder.github.io/ShareBro</a><br>
       🐞 Found a bug or have an idea? <a href="https://github.com/Yeamin-Talukder/ShareBro/issues">Open an issue</a>
     </td>
   </tr>
