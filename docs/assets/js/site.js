@@ -5,8 +5,14 @@
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
   // Nav: solid once you scroll, and the mobile menu.
-  const nav = $('.nav');
-  const onScroll = () => nav && nav.classList.toggle('scrolled', window.scrollY > 10);
+  const nav = $('.nav'), bar = $('.progress');
+  const onScroll = () => {
+    if (nav) nav.classList.toggle('scrolled', window.scrollY > 10);
+    if (bar) {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      bar.style.transform = `scaleX(${max > 0 ? Math.min(1, window.scrollY / max) : 0})`;
+    }
+  };
   onScroll();
   window.addEventListener('scroll', onScroll, { passive: true });
   const menuBtn = $('.menu-btn'), links = $('.nav-links');
@@ -64,10 +70,33 @@
     stage.addEventListener('pointermove', (e) => {
       const r = stage.getBoundingClientRect();
       const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
-      main.style.transform = `rotateY(${x * 14}deg) rotateX(${-y * 10}deg)`;
+      main.style.transform = `translateX(-50%) rotateY(${x * 14}deg) rotateX(${-y * 10}deg)`;
     });
     stage.addEventListener('pointerleave', () => { main.style.transform = ''; });
   }
+
+  // Download button: the arrow opens the list of APK versions.
+  $$('.dl-split').forEach((split) => {
+    const toggle = $('.dl-toggle', split), items = $$('.dl-menu a', split);
+    const set = (open, focusFirst) => {
+      split.classList.toggle('open', open);
+      toggle.setAttribute('aria-expanded', open);
+      if (open && focusFirst) items[0].focus();
+    };
+    toggle.addEventListener('click', (e) => { e.stopPropagation(); set(!split.classList.contains('open'), e.detail === 0); });
+    document.addEventListener('click', (e) => { if (!split.contains(e.target)) set(false); });
+    split.addEventListener('keydown', (e) => {
+      if (!split.classList.contains('open')) {
+        if (e.key === 'ArrowDown' && document.activeElement === toggle) { e.preventDefault(); set(true, true); }
+        return;
+      }
+      const i = items.indexOf(document.activeElement);
+      if (e.key === 'Escape') { set(false); toggle.focus(); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+    });
+    items.forEach((a) => a.addEventListener('click', () => set(false)));
+  });
 
   // Screen recordings play only while on screen (saves battery and data).
   const vids = $$('video[data-auto]');
@@ -99,8 +128,8 @@
         $$('[data-apk-size]').forEach((e) => (e.textContent = mb(arm)));
       }
       ['arm64-v8a', 'armeabi-v7a', 'x86_64'].forEach((abi) => {
-        const a = find(abi), row = $(`[data-abi="${abi}"]`);
-        if (a && row) { row.href = a.browser_download_url; const s = $('span', row); if (s) s.textContent = mb(a); }
+        const a = find(abi);
+        if (a) $$(`[data-abi="${abi}"]`).forEach((row) => { row.href = a.browser_download_url; const s = $('span', row); if (s) s.textContent = mb(a); });
       });
     })
     .catch(() => {});
