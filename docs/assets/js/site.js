@@ -111,6 +111,48 @@
     vids.forEach((v) => vio.observe(v));
   }
 
+  // FAQ: answers glide open and shut, one at a time.
+  const faqs = $$('.faq details');
+  faqs.forEach((d) => {
+    const ans = $('.ans', d);
+    const inner = document.createElement('div');
+    inner.className = 'ans-in';
+    while (ans.firstChild) inner.appendChild(ans.firstChild);
+    ans.appendChild(inner);
+  });
+  const ease = 'cubic-bezier(.2,.8,.2,1)';
+  // Run `done` when the animation ends, or after its duration if the
+  // browser never reports the end (e.g. a throttled background tab).
+  const after = (anim, ms, done) => {
+    let fired = false;
+    const once = () => { if (!fired) { fired = true; done(); } };
+    anim.onfinish = once;
+    setTimeout(() => { anim.cancel(); once(); }, ms + 80);
+  };
+  const openFaq = (d) => {
+    faqs.forEach((o) => o !== d && o.open && closeFaq(o));
+    d.open = true;
+    if (reduce || !d.animate) return;
+    const ans = $('.ans', d);
+    d.dataset.busy = '1';
+    const a = ans.animate([{ height: '0px', opacity: 0 }, { height: `${ans.scrollHeight}px`, opacity: 1 }], { duration: 420, easing: ease });
+    after(a, 420, () => delete d.dataset.busy);
+    $('.ans-in', d).animate([{ transform: 'translateY(-10px)' }, { transform: 'none' }], { duration: 520, easing: ease });
+  };
+  const closeFaq = (d) => {
+    if (reduce || !d.animate) { d.open = false; return; }
+    const ans = $('.ans', d);
+    d.dataset.busy = '1';
+    d.classList.add('closing');
+    const a = ans.animate([{ height: `${ans.offsetHeight}px`, opacity: 1 }, { height: '0px', opacity: 0 }], { duration: 300, easing: 'cubic-bezier(.4,0,.2,1)', fill: 'forwards' });
+    after(a, 300, () => { d.open = false; d.classList.remove('closing'); a.cancel(); delete d.dataset.busy; });
+  };
+  faqs.forEach((d) => $('summary', d).addEventListener('click', (e) => {
+    e.preventDefault();
+    if (d.dataset.busy) return;
+    if (d.open) closeFaq(d); else openFaq(d);
+  }));
+
   // Latest release: version, size and direct APK links from GitHub.
   // The page works without this; it just keeps the buttons current.
   const REPO = 'Yeamin-Talukder/ShareBro';
