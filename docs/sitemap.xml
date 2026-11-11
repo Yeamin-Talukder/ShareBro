@@ -2,7 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
   <url>
     <loc>https://yeamin-talukder.github.io/ShareBro/</loc>
-    <lastmod>2026-11-08</lastmod>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <image:image><image:loc>https://yeamin-talukder.github.io/ShareBro/screenshots/people.jpg</image:loc></image:image>
@@ -11,15 +11,17 @@
     <image:image><image:loc>https://yeamin-talukder.github.io/ShareBro/screenshots/web-gallery.jpg</image:loc></image:image>
     <video:video>
       <video:thumbnail_loc>https://yeamin-talukder.github.io/ShareBro/screenshots/reel-cover.jpg</video:thumbnail_loc>
-      <video:title>ShareBro in one minute</video:title>
+      <video:title>ShareBro in one minute – sort trip photos by face and share them</video:title>
       <video:description>How ShareBro sorts trip photos by face and gets each friend their own photos, shown with the real app.</video:description>
       <video:content_loc>https://yeamin-talukder.github.io/ShareBro/sharebro-reel.mp4</video:content_loc>
       <video:duration>56</video:duration>
+      <video:publication_date>2026-11-02T13:50:00+06:00</video:publication_date>
+      <video:family_friendly>yes</video:family_friendly>
     </video:video>
   </url>
   <url>
     <loc>https://yeamin-talukder.github.io/ShareBro/privacy.html</loc>
-    <lastmod>2026-11-08</lastmod>
+    <lastmod>2026-11-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>

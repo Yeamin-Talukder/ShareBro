@@ -67,6 +67,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .eyebrow b { background: var(--coral); color: #1a0f0c; padding: 2px 9px; border-radius: 999px; font-size: 12px; letter-spacing: .02em; }
 h1 { font-size: clamp(40px, min(6vw, 8.2vh), 80px); line-height: 1.02; letter-spacing: -.045em; font-weight: 800; margin: clamp(14px, 2.4vh, 22px) 0; }
 h1 .accent, h2 .accent { color: var(--coral); }
+.h1-brand { display: block; font-size: clamp(15px, 1.3vw, 18px); letter-spacing: .16em; text-transform: uppercase; color: var(--coral); font-weight: 800; line-height: 1; margin-bottom: clamp(10px, 1.6vh, 16px); }
 .lead { font-size: clamp(17px, min(1.5vw, 2.4vh), 20px); color: var(--sub); max-width: 34em; }
 .cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: clamp(20px, 3.6vh, 32px); }
 .facts { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: clamp(16px, 2.8vh, 26px); color: var(--dim); font-size: 15px; font-weight: 600; }

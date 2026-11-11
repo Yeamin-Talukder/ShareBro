@@ -1,0 +1,28 @@
+# ShareBro
+
+> ShareBro is a free, offline Android app that groups your photos by face with on-device AI and sends each friend only the photos they're in, over Wi-Fi, a phone hotspot, or Bluetooth / Wi-Fi Direct. No cloud, no uploads, no account. It is compatible with the LocalSend protocol.
+
+ShareBro is made by Md Yeamin Talukder (GitHub: Yeamin-Talukder). It is built with Flutter for Android 9 and newer, and is distributed as APK files on GitHub Releases (not the Play Store). It is free, with no ads or in-app purchases. All rights reserved; no open-source licence has been chosen.
+
+Key facts:
+
+- Face recognition runs entirely on the phone: Google ML Kit finds faces, and InsightFace's MobileFaceNet (w600k_mbf, trained on WebFace600K) turns each face into a 512-number fingerprint. Faces are grouped into people, with several "looks" per person, so glasses, angles and age changes stay together.
+- Trip groups: one person starts a group, friends nearby join with a 4-digit code, and each photo is sent only to the members who appear in it. Uncertain faces are asked about; photos with nobody from the group stay on the phone.
+- Find my photos: friends without the app scan a QR code, take a selfie in their web browser, and get a gallery of only their photos, with Download all. Optional PIN; the link can be stopped at any time.
+- Sharing uses the open LocalSend protocol v2 (HTTPS with mutual TLS), so it works with LocalSend on Android, iPhone, Windows, macOS and Linux. ShareBro phones can also send to each other with no network using Bluetooth / Wi-Fi Direct (Nearby Connections).
+- Search understands people, trips, places (offline place names from GeoNames, e.g. "Kuakata", "Cox's Bazar"), scenes, male/female and dates, combined: "Maya beach June 2026".
+- Places and Journey: photos on a drawn offline map or an OpenStreetMap map, and a trip replayed like a travel video.
+- Also: a full gallery (albums, favourites, trash, videos), best group shots, duplicate cleanup, rich notifications, app lock, backup and restore.
+- Privacy: photos are never uploaded; face data stays in the app's private storage; the only optional internet use is OpenStreetMap map tiles.
+
+## Links
+
+- [README](https://github.com/Yeamin-Talukder/ShareBro/blob/main/README.md): features, how it works, FAQ, comparison with Google Photos, LocalSend and WhatsApp
+- [Download the latest APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest): use the arm64-v8a file for almost every phone
+- [All releases and changelog](https://github.com/Yeamin-Talukder/ShareBro/releases)
+- [Report a bug or request a feature](https://github.com/Yeamin-Talukder/ShareBro/issues)
+
+## Optional
+
+- [Source code](https://github.com/Yeamin-Talukder/ShareBro): Flutter / Dart, with native Android helpers in Kotlin
+- [LocalSend protocol](https://github.com/localsend/protocol): the open protocol ShareBro implements

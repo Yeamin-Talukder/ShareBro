@@ -3,12 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>ShareBro – Sort trip photos by face &amp; send each friend theirs</title>
-<meta name="description" content="Free, offline Android app that groups your trip photos by face and sends each friend only the photos they're in, at full quality. No cloud, no account.">
-<meta name="keywords" content="share trip photos with friends, sort photos by face, face recognition photo app, group photos by person, send photos to friends offline, LocalSend, Android photo organizer, offline photo sharing, Find my photos selfie">
+<title>ShareBro – Offline Face Recognition Photo Sharing App</title>
+<meta name="description" content="ShareBro is a free, offline Android app that groups trip photos by face and sends each friend only the photos they're in, at full quality. No cloud, no account.">
+<meta name="keywords" content="ShareBro, Share Bro, ShareBro app, ShareBro APK, ShareBro Android, share trip photos with friends, sort photos by face, face recognition photo app, group photos by person, send photos to friends offline, LocalSend, Android photo organizer, offline photo sharing, Find my photos selfie">
 <meta name="author" content="Md Yeamin Talukder">
+<meta name="application-name" content="ShareBro">
+<meta name="apple-mobile-web-app-title" content="ShareBro">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <link rel="canonical" href="https://yeamin-talukder.github.io/ShareBro/">
+<link rel="alternate" hreflang="en" href="https://yeamin-talukder.github.io/ShareBro/">
+<link rel="alternate" hreflang="x-default" href="https://yeamin-talukder.github.io/ShareBro/">
 <meta name="theme-color" content="#0b0a0f">
 <meta name="color-scheme" content="dark">
 
@@ -20,12 +24,14 @@
 <meta property="og:image" content="https://yeamin-talukder.github.io/ShareBro/assets/img/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/jpeg">
 <meta property="og:image:alt" content="ShareBro on three phones: People grouped by face, Maya's photos, and a friend's gallery">
 <meta property="og:locale" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="ShareBro – your trip photos, sorted by face">
 <meta name="twitter:description" content="Free, offline Android app: groups trip photos by face and sends each friend only their photos. No cloud, no account.">
 <meta name="twitter:image" content="https://yeamin-talukder.github.io/ShareBro/assets/img/og-image.jpg">
+<meta name="twitter:image:alt" content="ShareBro on three phones: People grouped by face, Maya's photos, and a friend's gallery">
 
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="assets/img/icon-32.png" sizes="32x32" type="image/png">
@@ -42,7 +48,7 @@
       "@type": "SoftwareApplication",
       "@id": "https://yeamin-talukder.github.io/ShareBro/#app",
       "name": "ShareBro",
-      "alternateName": "Share Bro",
+      "alternateName": ["Share Bro", "ShareBro app", "ShareBro for Android"],
       "description": "Free, offline Android app that groups trip photos by face and sends each friend only the photos they're in, at full quality, over Wi-Fi, a hotspot, or with no network at all.",
       "url": "https://yeamin-talukder.github.io/ShareBro/",
       "downloadUrl": "https://github.com/Yeamin-Talukder/ShareBro/releases/latest",
@@ -50,6 +56,12 @@
       "applicationSubCategory": "Photo organizer",
       "operatingSystem": "Android 9 or newer",
       "softwareVersion": "1.4.0",
+      "fileSize": "95 MB",
+      "isAccessibleForFree": true,
+      "inLanguage": "en",
+      "keywords": "ShareBro, face recognition, photo sharing, photo organizer, offline, LocalSend, Android",
+      "sameAs": ["https://github.com/Yeamin-Talukder/ShareBro"],
+      "publisher": { "@id": "https://yeamin-talukder.github.io/ShareBro/#author" },
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
       "author": { "@id": "https://yeamin-talukder.github.io/ShareBro/#author" },
       "image": "https://yeamin-talukder.github.io/ShareBro/assets/img/icon-512.png",
@@ -76,22 +88,30 @@
       "@type": "Person",
       "@id": "https://yeamin-talukder.github.io/ShareBro/#author",
       "name": "Md Yeamin Talukder",
-      "url": "https://github.com/Yeamin-Talukder"
+      "url": "https://github.com/Yeamin-Talukder",
+      "sameAs": ["https://github.com/Yeamin-Talukder"]
     },
     {
       "@type": "WebSite",
       "@id": "https://yeamin-talukder.github.io/ShareBro/#site",
       "name": "ShareBro",
+      "alternateName": ["Share Bro", "ShareBro app"],
       "url": "https://yeamin-talukder.github.io/ShareBro/",
-      "inLanguage": "en"
+      "inLanguage": "en",
+      "publisher": { "@id": "https://yeamin-talukder.github.io/ShareBro/#author" },
+      "about": { "@id": "https://yeamin-talukder.github.io/ShareBro/#app" }
     },
     {
       "@type": "VideoObject",
-      "name": "ShareBro in one minute",
+      "@id": "https://yeamin-talukder.github.io/ShareBro/#video",
+      "embedUrl": "https://yeamin-talukder.github.io/ShareBro/#video",
+      "inLanguage": "en",
+      "publisher": { "@id": "https://yeamin-talukder.github.io/ShareBro/#author" },
+      "name": "ShareBro in one minute – sort trip photos by face and share them",
       "description": "How ShareBro sorts trip photos by face and gets each friend their own photos, shown with the real app.",
       "thumbnailUrl": "https://yeamin-talukder.github.io/ShareBro/screenshots/reel-cover.jpg",
       "contentUrl": "https://yeamin-talukder.github.io/ShareBro/sharebro-reel.mp4",
-      "uploadDate": "2026-11-02",
+      "uploadDate": "2026-11-02T13:50:00+06:00",
       "duration": "PT56S"
     },
     {
@@ -172,7 +192,7 @@
     <div class="wrap">
       <div>
         <a class="eyebrow rise" href="https://github.com/Yeamin-Talukder/ShareBro/releases/latest" rel="noopener"><b>NEW</b>Search your photos by place name</a>
-        <h1 class="rise" style="--d:.06s">Your trip photos, sorted by face. <span class="accent">Sent to every friend.</span></h1>
+        <h1 class="rise" style="--d:.06s"><span class="h1-brand">ShareBro</span>Your trip photos, sorted by face. <span class="accent">Sent to every friend.</span></h1>
         <p class="lead rise" style="--d:.12s">ShareBro is a free Android app for the friend who takes all the photos. It groups thousands of trip photos by the people in them and sends each friend just their photos, at full quality. No cloud, no uploads, no account.</p>
         <div class="cta-row rise" style="--d:.18s">
           <div class="dl-split">
