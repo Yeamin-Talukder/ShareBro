@@ -31,7 +31,7 @@ no cloud, no uploads, no account.**
 
 <br>
 
-<a href="https://yeamin-talukder.github.io/ShareBro/"><img src="docs/assets/img/og-image.jpg" alt="ShareBro on three phones: People grouped by face, Maya's photos, and a friend's own gallery" width="820"></a>
+<a href="https://yeamin-talukder.github.io/ShareBro/"><img src="docs/cover.jpg" alt="ShareBro: trip photos sorted by face and sent to every friend. Three phones show People grouped by face, Maya's photos, and a friend's own gallery" width="100%"></a>
 
 </div>
 

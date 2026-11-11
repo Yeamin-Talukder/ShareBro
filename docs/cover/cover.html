@@ -1,0 +1,47 @@
+<!doctype html>
+<!-- Source of docs/cover.jpg (README cover). Render at 1280x640, scale 2:
+     chrome --headless=new --hide-scrollbars --force-device-scale-factor=2 --window-size=1280,640 --screenshot=cover.png cover.html -->
+<html><head><meta charset="utf-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:1280px;height:640px;overflow:hidden;background:#0b0a0f;color:#f6f3f1;font-family:"Segoe UI Variable Display","Segoe UI",Roboto,Arial,sans-serif;position:relative}
+.glow{position:absolute;border-radius:50%;filter:blur(90px)}
+.g1{width:640px;height:640px;background:rgba(255,138,107,.30);right:60px;top:-40px}
+.g2{width:420px;height:420px;background:rgba(123,97,255,.16);left:-120px;bottom:-160px}
+.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);background-size:40px 40px;-webkit-mask-image:radial-gradient(ellipse at 30% 50%,#000 30%,transparent 75%)}
+.left{position:absolute;left:72px;top:0;bottom:0;width:590px;display:flex;flex-direction:column;justify-content:center}
+.brand{display:flex;align-items:center;gap:18px}
+.brand img{width:76px;height:76px;border-radius:20px;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.brand b{font-size:46px;font-weight:800;letter-spacing:-1.2px}
+.brand small{display:block;font-size:15px;font-weight:700;color:#ff8a6b;letter-spacing:2.5px;text-transform:uppercase;margin-top:2px}
+h1{white-space:nowrap;font-size:47px;line-height:1.04;letter-spacing:-2px;font-weight:800;margin-top:30px}
+h1 span{color:#ff8a6b}
+p{color:#b7b0bb;font-size:21px;line-height:1.4;margin-top:18px;max-width:500px}
+.chips{display:flex;flex-wrap:wrap;gap:9px;margin-top:28px}
+.chip{display:flex;align-items:center;gap:8px;padding:8px 15px;border-radius:999px;background:#18161e;border:1px solid #2b2832;font-size:16px;font-weight:700}
+.chip i{width:8px;height:8px;border-radius:50%;background:#ff8a6b}
+.dev{position:absolute;padding:8px;border-radius:34px;background:#16151a;box-shadow:0 0 0 1.5px #302d36 inset,0 0 0 2px #050506,0 30px 60px rgba(0,0,0,.6)}
+.dev img{display:block;width:100%;border-radius:27px}
+.d1{width:200px;left:672px;top:150px;transform:rotate(-8deg)}
+.d2{width:232px;left:808px;top:62px;z-index:3}
+.d3{width:200px;left:990px;top:128px;transform:rotate(7deg);z-index:2}
+.d3.light{background:#e9e6ec;box-shadow:0 0 0 1.5px #d4d0d8 inset,0 30px 60px rgba(0,0,0,.55)}
+.bub{position:absolute;z-index:5;display:flex;align-items:center;gap:9px;padding:6px 14px 6px 6px;border-radius:999px;background:rgba(28,26,33,.95);border:1px solid #2b2832;box-shadow:0 12px 26px rgba(0,0,0,.45);font-size:15px;font-weight:700;line-height:1.15}
+.bub img{width:38px;height:38px;border-radius:50%;border:2px solid #ff8a6b}
+.bub small{display:block;color:#8a838f;font-size:12px;font-weight:600}
+.url{position:absolute;right:56px;bottom:26px;color:#8a838f;font-size:15px;font-weight:600;letter-spacing:.3px}
+</style></head><body>
+<div class="glow g1"></div><div class="glow g2"></div><div class="grid"></div>
+<div class="left">
+  <div class="brand"><img src="../assets/img/icon-180.png" alt=""><div><b>ShareBro</b><small>Free · Offline · Android</small></div></div>
+  <h1>Trip photos, sorted by face.<br><span>Sent to every friend.</span></h1>
+  <p>Groups your photos by person on the phone, then sends each friend only the photos they're in.</p>
+  <div class="chips"><span class="chip"><i></i>On-device AI</span><span class="chip"><i></i>Full quality</span><span class="chip"><i></i>No cloud</span><span class="chip"><i></i>LocalSend</span></div>
+</div>
+<div class="dev d1"><img src="../screenshots/person.jpg"></div>
+<div class="dev d2"><img src="../screenshots/people.jpg"></div>
+<div class="dev d3 light"><img src="../screenshots/web-gallery.jpg"></div>
+<div class="bub" style="left:676px;top:96px"><img src="../assets/img/avatars/Maya.png"><span>Maya<small>18 photos</small></span></div>
+<div class="bub" style="left:1078px;top:470px"><img src="../assets/img/avatars/Ruby.png"><span>Ruby<small>12 photos</small></span></div>
+<div class="bub" style="left:740px;top:520px"><img src="../assets/img/avatars/Leo.png"><span>Leo<small>7 photos</small></span></div>
+<div class="url">yeamin-talukder.github.io/ShareBro</div>
+</body></html>
