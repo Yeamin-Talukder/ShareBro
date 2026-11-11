@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/logo.png" alt="ShareBro app icon: two phones touching, each showing a photo" width="128" height="128">
+<a href="https://yeamin-talukder.github.io/ShareBro/"><img src="docs/cover.jpg" alt="ShareBro: trip photos sorted by face and sent to every friend. Three phones show People grouped by face, Maya's photos, and a friend's own gallery" width="100%"></a>
 
 # ShareBro: offline face-recognition photo organizer and photo sharing app for Android
 
@@ -28,10 +28,6 @@ no cloud, no uploads, no account.**
 ### [⬇️ Download the APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) &nbsp;·&nbsp; [🌐 Website](https://yeamin-talukder.github.io/ShareBro/) &nbsp;·&nbsp; [▶️ 1-minute video](https://yeamin-talukder.github.io/ShareBro/#video)
 
 <sub>Most phones: <code>ShareBro-…-arm64-v8a.apk</code> · Android 9 or newer · free</sub>
-
-<br>
-
-<a href="https://yeamin-talukder.github.io/ShareBro/"><img src="docs/cover.jpg" alt="ShareBro: trip photos sorted by face and sent to every friend. Three phones show People grouped by face, Maya's photos, and a friend's own gallery" width="100%"></a>
 
 </div>
 
