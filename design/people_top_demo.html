@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>People: a tidier top</title>
+<style>
+:root{--page:#050407;--bg:#0F0E12;--card:rgba(28,28,31,.92);--sheet:#1C1A22;--ink:#F2EFF5;--sub:#a29ca8;--line:rgba(255,255,255,.1);--fill:rgba(118,118,128,.24);--accent:#FF8A6B;--onaccent:#2A0D06;--glass:rgba(44,42,50,.82)}
+:root[data-theme=light]{--page:#ECE9EF;--bg:#F6F5F8;--card:rgba(255,255,255,.9);--sheet:#fff;--ink:#1A1820;--sub:#6b6670;--line:rgba(20,18,23,.1);--fill:rgba(118,118,128,.12);--accent:#D9432B;--onaccent:#fff;--glass:rgba(255,255,255,.86)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--page);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:20px 16px 48px}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+header{max-width:1040px;margin:0 auto 14px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+h1{font-size:20px}
+.pill{border:1px solid var(--line);background:var(--sheet);border-radius:999px;padding:8px 14px}
+.layout{max-width:1040px;margin:0 auto;display:flex;gap:28px;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.side{flex:1;min-width:270px;max-width:400px;display:flex;flex-direction:column;gap:8px}
+.side>button{text-align:left;border:1px solid var(--line);background:var(--sheet);border-radius:16px;padding:12px 14px}
+.side>button.on{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent)}
+.side b{display:block}
+.side span,.side li{color:var(--sub);font-size:13px}
+.moved{border:1px solid var(--line);background:var(--sheet);border-radius:16px;padding:12px 14px 12px 14px;margin-top:6px}
+.moved ul{margin:6px 0 0 18px}
+.moved li{margin:3px 0}
+.moved li b{display:inline;color:var(--ink);font-weight:600}
+.tally{display:flex;gap:8px;margin-top:6px}
+.tally div{flex:1;border:1px solid var(--line);background:var(--sheet);border-radius:16px;padding:10px 12px}
+.tally strong{font-size:22px;display:block}
+.tally small{color:var(--sub);font-size:12px}
+
+.phone{width:432px;height:840px;border-radius:44px;border:10px solid #000;background:var(--bg);position:relative;overflow:hidden;flex:none}
+.screen{position:absolute;inset:0;overflow:auto;padding:46px 0 96px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.bar{display:flex;align-items:flex-start;justify-content:space-between;padding:0 16px 8px 20px}
+.bar h2{font-size:32px;font-weight:800;letter-spacing:-.6px;line-height:1.1}
+.bar small{color:var(--sub);font-size:13px}
+.caps{display:flex;background:var(--glass);border:1px solid var(--line);border-radius:24px;margin-top:2px}
+.caps button{width:42px;height:44px;display:grid;place-items:center;position:relative}
+.caps.many button{width:38px}
+svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.dot{position:absolute;top:5px;right:2px;min-width:16px;height:16px;border-radius:8px;background:var(--accent);color:var(--onaccent);font-size:10.5px;font-weight:800;display:grid;place-items:center;padding:0 4px}
+.rowx{display:flex;gap:8px;overflow-x:auto;padding:5px 16px;scrollbar-width:none;align-items:center}
+.rowx::-webkit-scrollbar{display:none}
+.chip{height:36px;border-radius:18px;background:var(--fill);padding:0 13px 0 11px;display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600;white-space:nowrap;flex:none;transition:background .2s,color .2s,transform .12s}
+.chip:active{transform:scale(.94)}
+.chip svg{width:17px;height:17px}
+.chip i{font-style:normal;font-weight:500;font-size:12.5px;opacity:.65}
+.chip.on{background:var(--accent);color:var(--onaccent)}
+.chip.out{background:none;box-shadow:inset 0 0 0 1.5px var(--fill);color:var(--sub)}
+.chip .dn{width:14px;height:14px;opacity:.7;margin-left:-2px}
+.chip.icon{padding:0;width:36px;justify-content:center}
+.fbar{display:flex;align-items:center;padding:5px 16px 5px 0}
+.fbar .rowx{flex:1;padding:0 8px 0 16px;mask-image:linear-gradient(90deg,#000 calc(100% - 18px),transparent)}
+.tripcard{margin:8px 16px 0;background:var(--card);border:1px solid var(--line);border-radius:24px;padding:12px 0 10px;animation:drop .3s both}
+@keyframes drop{from{opacity:0;transform:translateY(-6px)}}
+.tripcard .head{display:flex;align-items:center;gap:12px;padding:0 12px 0 14px}
+.tile{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;color:#fff;flex:none}
+.tile svg{width:19px;height:19px}
+.tripcard .tx{flex:1;min-width:0}
+.tripcard .tx b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tripcard .tx small{color:var(--sub);font-size:12.5px}
+.sq{width:36px;height:36px;border-radius:12px;background:var(--fill);display:grid;place-items:center}
+.sq svg{width:18px;height:18px}
+.tripcard .rowx{padding:10px 14px 0}
+.tripcard .chip{height:32px;font-size:13px}
+.hint{color:var(--sub);font-size:12.5px;padding:12px 20px 0}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 10px;padding:16px 14px 0}
+.person{text-align:center;font-size:13px;font-weight:600}
+.person .av{width:80px;height:80px;border-radius:50%;margin:0 auto 6px;display:grid;place-items:center;font-size:26px;font-weight:700;color:rgba(255,255,255,.92);box-shadow:0 0 0 3px var(--accent)}
+.person small{display:block;color:var(--sub);font-weight:500;font-size:11.5px}
+.dock{position:absolute;left:16px;right:16px;bottom:16px;height:62px;border-radius:31px;background:var(--glass);border:1px solid var(--line);display:flex;justify-content:space-around;align-items:center;color:var(--sub);font-size:10.5px;font-weight:600;backdrop-filter:blur(14px)}
+.dock div{display:flex;flex-direction:column;align-items:center;gap:2px}
+.dock .me{color:var(--accent)}
+.fab{position:absolute;right:18px;bottom:92px;height:52px;border-radius:26px;background:var(--accent);color:var(--onaccent);font-weight:700;display:flex;align-items:center;gap:8px;padding:0 18px 0 14px;box-shadow:0 8px 20px rgba(0,0,0,.3)}
+
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .25s;z-index:8}
+.scrim.show{opacity:1;pointer-events:auto}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--sheet);border-radius:30px 30px 0 0;padding:10px 0 22px;transform:translateY(105%);transition:transform .42s cubic-bezier(.2,.9,.25,1);z-index:9;max-height:78%;overflow:auto}
+.sheet.show{transform:none}
+.grab{width:38px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 10px}
+.sheet h3{font-size:20px;font-weight:800;padding:0 20px 8px}
+.sheet h4{font-size:12.5px;color:var(--sub);font-weight:700;padding:12px 20px 4px}
+.opt{display:flex;align-items:center;gap:12px;width:100%;padding:10px 20px;text-align:left;min-height:52px}
+.opt .tx{flex:1}
+.opt .tx b{display:block;font-weight:600;font-size:15.5px}
+.opt .tx small{color:var(--sub);font-size:12.5px}
+.opt .ck{color:var(--accent);visibility:hidden}
+.opt.on .ck{visibility:visible}
+.opt .n{color:var(--sub);font-size:13px}
+.seg{display:flex;background:var(--fill);border-radius:20px;padding:2px;margin:2px 20px 4px}
+.seg button{flex:1;height:36px;border-radius:18px;font-weight:500;font-size:14.5px}
+.seg button.on{background:color-mix(in srgb,var(--ink) 22%,var(--sheet));font-weight:700}
+.seg i{font-style:normal;color:var(--sub);font-size:12px}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:4px 18px 4px}
+.tiles button{border-radius:18px;background:var(--fill);padding:12px 2px 9px;font-size:11.5px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:6px}
+.tiles button.on{background:var(--accent);color:var(--onaccent)}
+.tiles svg{width:24px;height:24px}
+.menu{position:absolute;right:14px;top:92px;width:238px;background:var(--sheet);border:1px solid var(--line);border-radius:20px;padding:6px 0;z-index:9;box-shadow:0 16px 40px rgba(0,0,0,.4);transform-origin:top right;transform:scale(.6);opacity:0;pointer-events:none;transition:transform .2s,opacity .2s}
+.menu.show{transform:none;opacity:1;pointer-events:auto}
+.menu .opt{min-height:46px;padding:8px 16px;font-size:15px}
+.toast{position:absolute;left:50%;top:14px;transform:translate(-50%,-80px);background:var(--glass);border:1px solid var(--line);border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:600;transition:transform .35s cubic-bezier(.2,1.2,.4,1);z-index:12;white-space:nowrap}
+.toast.show{transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<header>
+  <h1>People: a tidier top</h1>
+  <button class="pill" id="theme">Light / dark</button>
+</header>
+<div class="layout">
+  <div class="phone">
+    <div class="screen" id="screen"></div>
+    <button class="fab"><svg><use href="#scan"/></svg>Scan</button>
+    <div class="dock"><div class="me"><svg><use href="#people"/></svg>People</div><div><svg><use href="#photo"/></svg>Photos</div><div><svg><use href="#album"/></svg>Albums</div><div><svg><use href="#globe"/></svg>Explore</div><div><svg><use href="#swap"/></svg>Share</div></div>
+    <div class="scrim" id="scrim"></div>
+    <div class="menu" id="menu"></div>
+    <div class="sheet" id="sheet"></div>
+    <div class="toast" id="toast"></div>
+  </div>
+  <div class="side">
+    <button data-v="a"><b>A · One filter bar (my pick)</b><span>Trip, date, who and view each become one button that opens a short list. One row instead of four.</span></button>
+    <button data-v="b"><b>B · Trips row + filter bar</b><span>Trips stay one tap away as chips; date, who and view sit in a bar under them. Two rows.</span></button>
+    <button data-v="now"><b>Now</b><span>What the app has today, for comparison. Pick a trip to see all four rows.</span></button>
+    <div class="tally">
+      <div><strong id="t1">1</strong><small>rows above the faces</small></div>
+      <div><strong id="t2">3</strong><small>buttons in the top bar</small></div>
+    </div>
+    <div class="moved">
+      <b>Where everything went (A and B)</b>
+      <ul>
+        <li><b>Scan</b> stays on the big Scan button, and in the ⋯ menu.</li>
+        <li><b>Sending</b> moves into ⋯ (the Share tab is already in the dock).</li>
+        <li><b>Review</b> stays in the top bar, and only shows when there is something to review.</li>
+        <li><b>Men / Women, groups, New group</b> live in the “Everyone” button.</li>
+        <li><b>Date</b> is the round calendar button; it shows the dates once you pick some.</li>
+        <li><b>Trip days, Timeline, Map</b> sit together in a trip card that appears when a trip is picked.</li>
+        <li><b>Unmatched faces</b> stays in ⋯ (it was there twice).</li>
+        <li><b>The eight views</b> open from the square button on the right.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<svg style="display:none">
+  <symbol id="search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></symbol>
+  <symbol id="scan" viewBox="0 0 24 24"><rect x="3" y="6" width="14" height="14" rx="3"/><circle cx="8" cy="11" r="1.5"/><path d="M4 18l4-4 3 3 2-2 4 4M20 3v6M17 6h6"/></symbol>
+  <symbol id="send" viewBox="0 0 24 24"><path d="M4 11.5 20 4l-6 16-3-7z"/></symbol>
+  <symbol id="review" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19c0-3 2.7-5 6-5s6 2 6 5M16 10.5l2 2 4-4.5"/></symbol>
+  <symbol id="more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/></symbol>
+  <symbol id="cal" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M8 3v4M16 3v4"/></symbol>
+  <symbol id="trip" viewBox="0 0 24 24"><rect x="6" y="7" width="12" height="13" rx="2.5"/><path d="M9.5 7V4.5h5V7M10 11v5M14 11v5"/></symbol>
+  <symbol id="people" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19c0-3 2.7-5 6-5s6 2 6 5"/><circle cx="17.5" cy="9.5" r="2.4"/><path d="M17 14c2.4 0 4.2 1.6 4.2 4"/></symbol>
+  <symbol id="dn" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="map" viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"/></symbol>
+  <symbol id="time" viewBox="0 0 24 24"><path d="M4 17l5-6 4 3 7-8"/><circle cx="4" cy="17" r="1.4"/><circle cx="20" cy="6" r="1.4"/></symbol>
+  <symbol id="male" viewBox="0 0 24 24"><circle cx="10" cy="14" r="5"/><path d="M14 10l6-6M15 4h5v5"/></symbol>
+  <symbol id="female" viewBox="0 0 24 24"><circle cx="12" cy="9" r="5"/><path d="M12 14v7M9 18h6"/></symbol>
+  <symbol id="group" viewBox="0 0 24 24"><circle cx="12" cy="7" r="2.6"/><circle cx="5.5" cy="10" r="2.2"/><circle cx="18.5" cy="10" r="2.2"/><path d="M7.5 19c0-2.6 2-4.5 4.5-4.5s4.5 1.9 4.5 4.5M2 18c0-2 1.5-3.5 3.5-3.5M22 18c0-2-1.5-3.5-3.5-3.5"/></symbol>
+  <symbol id="unm" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 19c0-3 2.7-5 6-5"/><circle cx="16.5" cy="16" r="3"/><path d="M19 18.5l2.5 2.5"/></symbol>
+  <symbol id="tune" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+  <symbol id="join" viewBox="0 0 24 24"><circle cx="9" cy="12" r="5.5"/><circle cx="15" cy="12" r="5.5"/></symbol>
+  <symbol id="link" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="9" cy="10.5" r=".8" fill="currentColor"/><circle cx="15" cy="10.5" r=".8" fill="currentColor"/><path d="M8.5 14.5c1 1.2 2.2 1.8 3.5 1.8s2.5-.6 3.5-1.8"/></symbol>
+  <symbol id="edit" viewBox="0 0 24 24"><path d="M4 20l1-4L16 5l3 3L8 19z"/></symbol>
+  <symbol id="photo" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M5 17l4.5-4.5 3.5 3.5 2.5-2.5L19 17"/></symbol>
+  <symbol id="album" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 3v8l2-1.5 2 1.5V3"/></symbol>
+  <symbol id="swap" viewBox="0 0 24 24"><path d="M4 9h15l-3-3M20 15H5l3 3"/></symbol>
+  <symbol id="grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></symbol>
+  <symbol id="bubbles" viewBox="0 0 24 24"><circle cx="8" cy="14.5" r="4.5"/><circle cx="16.5" cy="8" r="3.5"/><circle cx="17" cy="17.5" r="2"/></symbol>
+  <symbol id="honeycomb" viewBox="0 0 24 24"><path d="M12 3l7.5 4.5v9L12 21l-7.5-4.5v-9z"/></symbol>
+  <symbol id="sunflower" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="5" r="2.2"/><circle cx="12" cy="19" r="2.2"/><circle cx="5" cy="12" r="2.2"/><circle cx="19" cy="12" r="2.2"/></symbol>
+  <symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><ellipse cx="12" cy="12" rx="3.8" ry="8.5"/><path d="M3.5 12h17"/></symbol>
+  <symbol id="orbit" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5"/><ellipse cx="12" cy="12" rx="9" ry="4.5" transform="rotate(-25 12 12)"/></symbol>
+  <symbol id="magnifier" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5M10.5 8v5M8 10.5h5"/></symbol>
+  <symbol id="carousel" viewBox="0 0 24 24"><rect x="8" y="5" width="8" height="14" rx="2"/><path d="M4 8v8M20 8v8"/></symbol>
+</svg>
+
+<script>
+const ic = (id, cls = '') => `<svg class="${cls}"><use href="#${id}"/></svg>`;
+const trips = [
+  {id: 1, name: "Cox's Bazar", photos: 1240, span: '14 – 17 Mar', days: [['Fri 14', 320], ['Sat 15', 410], ['Sun 16', 365], ['Mon 17', 145]]},
+  {id: 2, name: 'Sajek Valley', photos: 860, span: '2 – 4 Jan', days: [['Thu 2', 280], ['Fri 3', 390], ['Sat 4', 190]]},
+  {id: 3, name: 'Sylhet tea gardens', photos: 512, span: '9 – 10 Nov', days: [['Sat 9', 300], ['Sun 10', 212]]},
+];
+const groups = [{id: 1, name: 'Uni friends', n: 8}, {id: 2, name: 'Family', n: 5}];
+const views = ['Grid', 'Bubbles', 'Honeycomb', 'Sunflower', 'Globe', 'Orbit', 'Magnifier', 'Carousel'];
+const names = ['Ayaan', 'Mira', 'Tanvir', 'Nadia', 'Rafi', 'Sara', 'Imran', 'Lina', 'Joy', 'Farah', 'Nabil', 'Tisha'];
+const hues = [12, 210, 150, 280, 40, 330, 190, 95, 250, 20, 170, 305];
+const s = {v: 'a', trip: null, day: null, date: null, gender: null, group: null, view: 'Grid'};
+const $ = id => document.getElementById(id);
+const trip = () => trips.find(t => t.id === s.trip);
+
+function toast(text) {
+  const t = $('toast');
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove('show'), 1400);
+}
+
+function chip(label, o = {}) {
+  return `<button class="chip ${o.on ? 'on' : ''} ${o.out ? 'out' : ''}" data-act="${o.act || ''}">${o.icon ? ic(o.icon) : ''}${label}${o.n != null ? `<i>${o.n}</i>` : ''}${o.menu ? ic('dn', 'dn') : ''}</button>`;
+}
+
+function whoLabel() {
+  if (s.group) return groups.find(g => g.id === s.group).name;
+  return s.gender || 'Everyone';
+}
+
+function topBar() {
+  const now = s.v === 'now';
+  const buttons = now
+    ? [['search', 'Search'], ['scan', 'Scan photos'], ['send', 'Sending'], ['review', 'Review', 6], ['more', 'more']]
+    : [['search', 'Search'], ['review', 'Review', 6], ['more', 'more']];
+  return `<div class="bar"><div><h2>People</h2><small>${s.gender || s.group ? 9 : 24} people</small></div>
+    <div class="caps ${now ? 'many' : ''}">${buttons.map(([i, label, n]) =>
+      `<button data-act="${label === 'more' ? 'menu' : 'go:' + label}">${ic(i)}${n ? `<span class="dot">${n}</span>` : ''}</button>`).join('')}</div></div>`;
+}
+
+function tripCard() {
+  const t = trip();
+  if (!t) return '';
+  return `<div class="tripcard"><div class="head">
+      <div class="tile" style="background:#FF9F0A">${ic('trip')}</div>
+      <div class="tx"><b>${t.name}</b><small>${t.photos.toLocaleString()} photos · ${t.span}</small></div>
+      <button class="sq" data-act="go:Trip timeline" title="Timeline">${ic('time')}</button>
+      <button class="sq" data-act="go:Trip map" title="Map">${ic('map')}</button>
+    </div><div class="rowx">${chip('All days', {on: s.day == null, act: 'day:'})}${t.days.map(([d, n], i) =>
+      chip(d, {n, on: s.day === i, act: 'day:' + i})).join('')}</div></div>`;
+}
+
+function filters() {
+  const t = trip();
+  const now = s.v === 'now';
+  const date = now || s.date
+    ? chip(s.date || 'Any date', {icon: 'cal', on: !!s.date, act: 'date'})
+    : `<button class="chip icon" data-act="date" title="Any date">${ic('cal')}</button>`;
+  const who = chip(whoLabel(), {icon: 'people', on: !!(s.gender || s.group), menu: true, act: 'who'});
+  const view = `<button class="chip icon" data-act="view" title="View: ${s.view}">${ic(s.view.toLowerCase())}</button>`;
+  if (s.v === 'a') {
+    return `<div class="fbar"><div class="rowx">${chip(t ? t.name : 'All trips', {icon: 'trip', on: !!t, menu: true, act: 'trips'})}${who}${date}</div>${view}</div>${tripCard()}`;
+  }
+  if (s.v === 'b') {
+    return `<div class="rowx">${chip('All trips', {on: !t, act: 'trip:'})}${trips.map(x => chip(x.name, {n: x.photos, on: s.trip === x.id, act: 'trip:' + x.id})).join('')}</div>
+      <div class="fbar"><div class="rowx">${who}${date}</div>${view}</div>${tripCard()}`;
+  }
+  // Today's four rows.
+  return `<div class="rowx">${date}${chip('All trips', {on: !t, act: 'trip:'})}${trips.map(x => chip(x.name, {n: x.photos, on: s.trip === x.id, act: 'trip:' + x.id})).join('')}</div>
+    ${t ? `<div class="rowx">${t.days.map(([d, n], i) => chip(d, {icon: 'cal', n, on: s.day === i, act: 'day:' + i})).join('')}</div>` : ''}
+    <div class="rowx">${chip('Male', {icon: 'male', n: 11, on: s.gender === 'Men', act: 'gender:Men'})}${chip('Female', {icon: 'female', n: 13, on: s.gender === 'Women', act: 'gender:Women'})}
+      ${groups.map(g => chip(g.name, {icon: 'group', n: g.n, on: s.group === g.id, act: 'group:' + g.id})).join('')}
+      ${chip('Unmatched', {icon: 'unm', n: 12, out: true, act: 'go:Unmatched faces'})}${chip('New group', {icon: 'plus', out: true, act: 'go:New group'})}
+      ${t ? chip('Trip timeline', {icon: 'time', out: true, act: 'go:Trip timeline'}) + chip('Trip map', {icon: 'map', out: true, act: 'go:Trip map'}) : ''}</div>
+    <div class="rowx">${views.map(v => chip(v, {icon: v.toLowerCase(), on: s.view === v, act: 'setview:' + v})).join('')}</div>`;
+}
+
+function render() {
+  const count = s.gender || s.group ? 9 : 12;
+  $('screen').innerHTML = topBar() + filters() +
+    `<div class="hint">Long-press and drag one person onto another to merge them.</div>
+     <div class="grid">${names.slice(0, count).map((n, i) => `<div class="person"><div class="av" style="background:hsl(${hues[i]} 45% 42%)">${n[0]}</div>${n}<small>${180 - i * 13} photos</small></div>`).join('')}</div>`;
+  document.querySelectorAll('.side>button').forEach(b => b.classList.toggle('on', b.dataset.v === s.v));
+  const t = trip();
+  $('t1').textContent = s.v === 'a' ? 1 : s.v === 'b' ? 2 : t ? 4 : 3;
+  $('t2').textContent = s.v === 'now' ? 5 : 3;
+}
+
+function opt(title, o = {}) {
+  return `<button class="opt ${o.on ? 'on' : ''}" data-act="${o.act}">${o.icon ? ic(o.icon) : ''}<span class="tx"><b>${title}</b>${o.sub ? `<small>${o.sub}</small>` : ''}</span>${o.n != null ? `<span class="n">${o.n}</span>` : ''}${o.tail || ic('check', 'ck')}</button>`;
+}
+
+function openSheet(kind) {
+  let html = '<div class="grab"></div>';
+  if (kind === 'trips') {
+    html += '<h3>Trip</h3>' + opt('All trips', {icon: 'people', on: !s.trip, act: 'trip:', sub: 'Everyone from every scan'}) +
+      trips.map(t => opt(t.name, {icon: 'trip', on: s.trip === t.id, act: 'trip:' + t.id, sub: `${t.photos.toLocaleString()} photos · ${t.span}`})).join('') +
+      '<h4>Hold a trip to rename or remove it</h4>';
+  } else if (kind === 'who') {
+    html += `<h3>Who</h3><div class="seg">${[['Everyone', null, 24], ['Men', 'Men', 11], ['Women', 'Women', 13]].map(([l, g, n]) =>
+      `<button class="${s.gender === g ? 'on' : ''}" data-act="gender:${g || ''}">${l} <i>${n}</i></button>`).join('')}</div><h4>Groups</h4>` +
+      groups.map(g => opt(g.name, {icon: 'group', on: s.group === g.id, act: 'group:' + g.id, sub: `${g.n} people`})).join('') +
+      opt('New group', {icon: 'plus', act: 'go:New group', tail: ' '});
+  } else if (kind === 'view') {
+    html += `<h3>View</h3><div class="tiles">${views.map(v => `<button class="${s.view === v ? 'on' : ''}" data-act="setview:${v}">${ic(v.toLowerCase())}${v}</button>`).join('')}</div>`;
+  }
+  $('sheet').innerHTML = html;
+  $('sheet').classList.add('show');
+  $('scrim').classList.add('show');
+}
+
+function openMenu() {
+  const rows = s.v === 'now'
+    ? [['join', 'Photos together'], ['link', 'Find my photos link'], ['unm', 'Unmatched faces', 12], ['tune', 'Settings']]
+    : [['scan', 'Scan photos'], ['send', 'Sending'], ['join', 'Photos together'], ['link', 'Find my photos link'], ['unm', 'Unmatched faces', 12], ['tune', 'Settings']];
+  $('menu').innerHTML = rows.map(([i, label, n]) => opt(label, {icon: i, act: 'go:' + label, n, tail: ' '})).join('');
+  $('menu').classList.add('show');
+  $('scrim').classList.add('show');
+}
+
+function closeAll() {
+  for (const id of ['sheet', 'menu', 'scrim']) $(id).classList.remove('show');
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (e.target.closest('.side>button')) {
+    s.v = e.target.closest('.side>button').dataset.v;
+    closeAll();
+    return render();
+  }
+  if (!b) return;
+  const [act, arg] = b.dataset.act.split(/:(.*)/);
+  let keep = false;
+  if (act === 'trips' || act === 'who' || act === 'view') return openSheet(act);
+  if (act === 'menu') return openMenu();
+  if (act === 'trip') { s.trip = arg ? +arg : null; s.day = null; }
+  else if (act === 'day') s.day = arg === '' ? null : (s.day === +arg && s.v === 'now' ? null : +arg);
+  else if (act === 'date') { s.date = s.date ? null : '1 – 9 Mar'; toast(s.date ? 'The date picker opens here' : 'Date cleared'); }
+  else if (act === 'gender') { s.gender = s.v === 'now' && s.gender === arg ? null : arg || null; if (s.v !== 'now') s.group = null; }
+  else if (act === 'group') { s.group = s.group === +arg ? null : +arg; if (s.v !== 'now') s.gender = null; }
+  else if (act === 'setview') { s.view = arg; keep = s.v === 'now'; }
+  else if (act === 'go') toast('Opens ' + arg);
+  if (!keep) closeAll();
+  render();
+});
+$('scrim').onclick = closeAll;
+$('theme').onclick = () => {
+  const r = document.documentElement;
+  r.dataset.theme = r.dataset.theme === 'light' ? '' : 'light';
+};
+render();
+</script>
+</body>
+</html>

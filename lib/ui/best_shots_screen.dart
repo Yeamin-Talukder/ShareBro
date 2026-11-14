@@ -41,7 +41,10 @@ class _BestShotsScreenState extends State<BestShotsScreen> {
 
   Future<void> _load() async {
     final bursts = findBursts(await c.db.groupShots(tripId: widget.tripId));
-    if (mounted) setState(() => _bursts = bursts);
+    if (!mounted) return;
+    await routeSettled(context);
+    if (!mounted) return;
+    setState(() => _bursts = bursts);
   }
 
   int _keeper(ShotBurst b) => _pick[b.shots.first.assetId] ?? b.best;

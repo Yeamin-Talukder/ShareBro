@@ -27,6 +27,12 @@
         android:label="ShareBro"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- The graphics chip's OpenCL driver, for running the face model on
+             the GPU. Android 12+ only lets an app load the maker's libraries
+             it names here; phones without one stay on the CPU. -->
+        <uses-native-library android:name="libOpenCL.so" android:required="false"/>
+        <uses-native-library android:name="libOpenCL-car.so" android:required="false"/>
+        <uses-native-library android:name="libOpenCL-pixel.so" android:required="false"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

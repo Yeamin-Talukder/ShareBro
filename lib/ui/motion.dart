@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -210,4 +211,73 @@ class _PressableState extends State<Pressable> {
       ),
     );
   }
+}
+
+/// Whether a route animation is running: the page this widget sits on is
+/// sliding in or out, or another page is sliding over or off it.
+bool _moving(Animation<double>? a) =>
+    a != null && (a.status == AnimationStatus.forward || a.status == AnimationStatus.reverse);
+
+/// Builds [builder] with `moving: true` while this page's route animates
+/// (opening, closing, being covered, a back gesture), so expensive effects
+/// can rest during the motion. Rebuilds only when the motion starts or
+/// stops, never per frame.
+class RouteMotion extends StatefulWidget {
+  const RouteMotion({super.key, required this.builder});
+
+  final Widget Function(BuildContext context, bool moving) builder;
+
+  @override
+  State<RouteMotion> createState() => _RouteMotionState();
+}
+
+class _RouteMotionState extends State<RouteMotion> {
+  Animation<double>? _in, _over;
+  bool _isMoving = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route?.animation != _in || route?.secondaryAnimation != _over) {
+      _in?.removeStatusListener(_onStatus);
+      _over?.removeStatusListener(_onStatus);
+      _in = route?.animation?..addStatusListener(_onStatus);
+      _over = route?.secondaryAnimation?..addStatusListener(_onStatus);
+    }
+    _isMoving = _moving(_in) || _moving(_over);
+  }
+
+  void _onStatus(AnimationStatus _) {
+    final now = _moving(_in) || _moving(_over);
+    if (now != _isMoving && mounted) setState(() => _isMoving = now);
+  }
+
+  @override
+  void dispose() {
+    _in?.removeStatusListener(_onStatus);
+    _over?.removeStatusListener(_onStatus);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, _isMoving);
+}
+
+/// Completes once the page [context] sits on has finished sliding in (at
+/// once if it already has). Screens wait for this before showing what they
+/// loaded, so the slide-in isn't interrupted by a rebuild and a burst of
+/// thumbnail decoding.
+Future<void> routeSettled(BuildContext context) {
+  final a = ModalRoute.of(context)?.animation;
+  if (a == null || a.status != AnimationStatus.forward) return Future.value();
+  final done = Completer<void>();
+  void listener(AnimationStatus s) {
+    if (s == AnimationStatus.forward) return;
+    a.removeStatusListener(listener);
+    if (!done.isCompleted) done.complete();
+  }
+
+  a.addStatusListener(listener);
+  return done.future;
 }

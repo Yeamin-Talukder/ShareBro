@@ -35,12 +35,13 @@ class _DuplicatesScreenState extends State<DuplicatesScreen> {
 
   Future<void> _load() async {
     final sets = findDuplicates(await c.db.fingerprints());
-    if (mounted) {
-      setState(() {
-        _sets = sets;
-        _keep.clear();
-      });
-    }
+    if (!mounted) return;
+    await routeSettled(context);
+    if (!mounted) return;
+    setState(() {
+      _sets = sets;
+      _keep.clear();
+    });
   }
 
   String _keeper(int i) => _keep[i] ?? _sets![i].best;

@@ -8,6 +8,7 @@ import 'package:photo_manager/photo_manager.dart';
 import '../data/dates.dart';
 import '../scan/scan_controller.dart';
 import '../ui/widgets.dart' show AssetThumb;
+import '../update/updater.dart';
 import 'receive.dart';
 import 'send_center.dart';
 
@@ -19,7 +20,7 @@ class Notify {
   static void Function(int id, String action)? onAction;
 
   /// A notification was tapped: open this screen ('scan', 'review',
-  /// 'people', 'receive', 'transfers').
+  /// 'people', 'receive', 'transfers', 'update').
   static void Function(String target)? onOpen;
   static bool _listening = false;
 
@@ -489,6 +490,8 @@ class NotifyBridge with WidgetsBindingObserver {
         unawaited(Notify.cancel(id));
       case 'stop':
         c.cancel();
+      case 'cancel_update':
+        Updater.instance.cancel();
     }
   }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
@@ -5,6 +7,7 @@ import '../scan/scan_controller.dart';
 import '../share/receive.dart';
 import '../share/notify.dart';
 import '../share/send_center.dart';
+import '../update/updater.dart';
 import 'app_lock.dart';
 import 'aurora.dart';
 import 'explore_screen.dart';
@@ -12,13 +15,15 @@ import 'gallery_screen.dart';
 import 'launch_clink.dart';
 import 'glass_dock.dart';
 import 'home_screen.dart';
-import 'island.dart' show islandNavigator;
+import 'island.dart' show Island, islandNavigator;
 import 'receive_screen.dart';
 import 'review_screen.dart';
 import 'scan_screen.dart';
 import 'send_center_screen.dart';
 import 'share_screen.dart';
 import 'motion.dart';
+import 'update_banner.dart';
+import 'update_sheet.dart';
 
 /// Bottom navigation between People, Photos, Albums, Explore and Share. Tabs keep
 /// their scroll position and filters when you switch.
@@ -38,6 +43,9 @@ class _RootScreenState extends State<RootScreen> {
   final Set<int> _opened = {0};
   bool _launching = true;
 
+  StreamSubscription<Object>? _updates;
+  AppLifecycleListener? _life;
+
   // Transfers already celebrated with the background's warm wave.
   final Set<int> _celebrated = {};
   ReceiveSession? _celebratedSession;
@@ -53,6 +61,24 @@ class _RootScreenState extends State<RootScreen> {
     Notify.onOpen = _openFromNotification;
     // A tap on a notification may have started the app.
     WidgetsBinding.instance.addPostFrameCallback((_) => Notify.takeOpen());
+    _startUpdates();
+  }
+
+  /// The daily update check (a few seconds after opening, and when the app
+  /// comes back), its banner, and "welcome back" after an update.
+  void _startUpdates() {
+    final u = Updater.instance;
+    _updates = u.announcements.stream.listen(UpdateBanner.show);
+    _life = AppLifecycleListener(onResume: () => unawaited(u.maybeCheck()));
+    Future<void>.delayed(const Duration(seconds: 4), () {
+      if (!mounted) return;
+      final hello = u.welcome;
+      if (hello != null) {
+        u.welcome = null;
+        Island.toast('Updated to $hello · welcome back', icon: Icons.celebration_rounded);
+      }
+      unawaited(u.maybeCheck());
+    });
   }
 
   /// A notification was tapped: show the screen it's about.
@@ -74,6 +100,8 @@ class _RootScreenState extends State<RootScreen> {
         screen = ReceiveScreen(controller: c);
       case 'transfers':
         screen = SendCenterScreen(controller: c);
+      case 'update':
+        showUpdateSheet(nav.context);
     }
     if (screen != null) nav.push(MaterialPageRoute(builder: (_) => screen!));
   }
@@ -81,6 +109,8 @@ class _RootScreenState extends State<RootScreen> {
   @override
   void dispose() {
     if (Notify.onOpen == _openFromNotification) Notify.onOpen = null;
+    _updates?.cancel();
+    _life?.dispose();
     final s = widget.controller.sharing;
     s.removeListener(_checkSent);
     s.receiver.removeListener(_checkReceived);
@@ -138,21 +168,14 @@ class _RootScreenState extends State<RootScreen> {
                     offstage: _tab != i,
                     child: TickerMode(
                       enabled: _tab == i,
-                      // Fade-through: the new tab rises and sharpens into place.
-                      child: AnimatedScale(
-                        scale: i == _tab ? 1 : 0.97,
-                        duration: 320.ms,
-                        curve: Curves.easeOutCubic,
-                        child: AnimatedSlide(
-                          offset: i == _tab ? Offset.zero : Offset(i < _tab ? -0.04 : 0.04, 0),
-                          duration: 320.ms,
-                          curve: Curves.easeOutCubic,
-                          child: AnimatedOpacity(
-                            opacity: _tab == i ? 1 : 0,
-                            duration: 240.ms,
-                            child: tabs[i],
-                          ),
-                        ),
+                      // A quick fade only. Scaling and sliding the whole tab
+                      // (its photo grid and glass bars) cost a full redraw
+                      // every frame and made switching feel sluggish.
+                      child: AnimatedOpacity(
+                        opacity: _tab == i ? 1 : 0,
+                        duration: 140.ms,
+                        curve: Curves.easeOut,
+                        child: tabs[i],
                       ),
                     ),
                   ),

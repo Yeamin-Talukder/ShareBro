@@ -192,6 +192,7 @@ class CapsuleChip extends StatelessWidget {
     this.count,
     this.selected = false,
     this.outlined = false,
+    this.menu = false,
     this.onTap,
     this.onLongPress,
     this.onDeleted,
@@ -201,6 +202,9 @@ class CapsuleChip extends StatelessWidget {
   final IconData? icon;
   final int? count;
   final bool selected;
+
+  /// Opens a list to pick from: shows a small arrow.
+  final bool menu;
 
   /// An action rather than a choice ("New group").
   final bool outlined;
@@ -220,7 +224,7 @@ class CapsuleChip extends StatelessWidget {
         child: AnimatedContainer(
           duration: 220.ms,
           height: 36,
-          padding: EdgeInsets.only(left: icon == null ? 14 : 11, right: onDeleted == null ? 14 : 6),
+          padding: EdgeInsets.only(left: icon == null ? 14 : 11, right: onDeleted != null ? 6 : menu ? 9 : 14),
           decoration: BoxDecoration(
             color: selected ? scheme.primary : outlined ? Colors.transparent : capsuleFill(context),
             borderRadius: BorderRadius.circular(18),
@@ -231,6 +235,11 @@ class CapsuleChip extends StatelessWidget {
             Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: fg)),
             if (count != null)
               Text('  $count', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: fg.withAlpha(170))),
+            if (menu)
+              Padding(
+                padding: const EdgeInsets.only(left: 2),
+                child: Icon(Icons.expand_more_rounded, size: 18, color: fg.withAlpha(180)),
+              ),
             if (onDeleted != null)
               GestureDetector(
                 behavior: HitTestBehavior.opaque,

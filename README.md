@@ -847,7 +847,8 @@ from History.
 
 | Version | Highlights |
 |---|---|
-| [**v1.4.0**](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.4.0) | Search by place name (towns, spots and countries, offline); Places cards show the town |
+| [**v1.5.0**](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.5.0) | Updates from inside the app; face scanning on the GPU or NPU when it's faster; a tidier People page; quicker page changes |
+| [v1.4.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.4.0) | Search by place name (towns, spots and countries, offline); Places cards show the town |
 | [v1.3.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.3.0) | InsightFace face model: much better matching with glasses and angles; review adds sure matches automatically; "Not [name]" |
 | [v1.2.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.2.0) | Places map and Journey, male / female filters, Unmatched faces, faster scans and thumbnails, new notifications |
 | [v1.1.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.1.0) | Trip groups, Profile, Find my photos, Search, best group shots, trip days, new design and icon |

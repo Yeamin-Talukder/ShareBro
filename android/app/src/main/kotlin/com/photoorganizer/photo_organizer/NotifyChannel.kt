@@ -32,6 +32,7 @@ class NotifyChannel(private val context: Context, messenger: BinaryMessenger) {
         const val PROGRESS = "progress"
         const val DONE = "done"
         const val SCAN = "scan_progress"
+        const val UPDATES = "updates"
         const val EXTRA_ID = "notify_id"
         const val EXTRA_ACTION = "notify_action"
 
@@ -129,6 +130,7 @@ class NotifyChannel(private val context: Context, messenger: BinaryMessenger) {
             ch(PROGRESS, "Transfer progress", "Live progress while sending and receiving", NotificationManager.IMPORTANCE_LOW),
             ch(DONE, "Finished transfers", "When a send or receive is done", NotificationManager.IMPORTANCE_DEFAULT),
             ch(SCAN, "Face scanning", "Progress while photos are scanned for faces", NotificationManager.IMPORTANCE_LOW),
+            ch(UPDATES, "App updates", "A new version of ShareBro is ready", NotificationManager.IMPORTANCE_DEFAULT),
         ))
     }
 
@@ -175,6 +177,7 @@ class NotifyChannel(private val context: Context, messenger: BinaryMessenger) {
             "request" -> REQUESTS
             "progress" -> PROGRESS
             "scan" -> SCAN
+            "update" -> UPDATES
             else -> DONE
         }
         val summary = kind == "summary"

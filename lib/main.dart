@@ -11,6 +11,7 @@ import 'ui/fast_thumb.dart';
 import 'ui/island.dart';
 import 'ui/root_screen.dart';
 import 'ui/theme.dart';
+import 'update/updater.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +21,7 @@ Future<void> main() async {
   await controller.load();
   await Island.load(db);
   await Appearance.load(db);
+  await Updater.instance.load(db);
   runApp(PhotoOrganizerApp(controller: controller));
 }
 

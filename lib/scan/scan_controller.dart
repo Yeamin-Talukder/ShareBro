@@ -16,6 +16,7 @@ import '../data/db.dart';
 import '../data/gallery.dart';
 import '../data/group_match.dart';
 import '../data/profile.dart';
+import '../face/accel.dart';
 import '../face/clustering.dart';
 import '../face/face_engine.dart';
 import '../face/gender.dart';
@@ -62,6 +63,7 @@ const _suggestMin = 0.22;
 const _strictnessKey = 'strictness';
 const _autoScanKey = 'auto_scan';
 const _appLockKey = 'app_lock';
+const _faceChipKey = 'face_chip';
 
 /// People this much below the auto-merge level are offered as "same person?".
 const _mergeHintRange = 0.10;
@@ -111,6 +113,9 @@ class ScanController extends ChangeNotifier {
   final AppDb db;
   FaceEngine? _engine;
 
+  /// The chip [_engine] was opened for.
+  AccelChoice? _engineChip;
+
   bool running = false;
   bool _cancel = false;
   String? albumName;
@@ -158,6 +163,10 @@ class ScanController extends ChangeNotifier {
   /// Ask for fingerprint / face / screen lock when opening the app.
   bool appLock = false;
 
+  /// Which chip turns faces into fingerprints: the fastest that works on
+  /// this phone, or the one picked in Settings.
+  AccelChoice faceChip = AccelChoice.auto;
+
   Timer? _autoScanTimer;
   AppLifecycleListener? _lifecycle;
 
@@ -178,11 +187,46 @@ class ScanController extends ChangeNotifier {
     strictness = double.tryParse(s ?? '') ?? GroupingThresholds.defaultStrictness;
     autoScanEnabled = (await db.setting(_autoScanKey)) != '0';
     appLock = (await db.setting(_appLockKey)) == '1';
+    faceChip = AccelChoice.byName(await db.setting(_faceChipKey));
     backfillDates();
     unawaited(backfillLocations());
     unawaited(upgradeFaces());
     _watchForNewPhotos();
   }
+
+  /// What's known about this phone's chips: which work, and how fast.
+  Future<AccelState> faceChips() async => AccelState.read(await accelStatePath(), accelStateKey(faceModelId));
+
+  /// Takes effect the next time faces are scanned. Asking for one chip by
+  /// name gives it a fresh try, even if it failed before.
+  Future<void> setFaceChip(AccelChoice choice) async {
+    faceChip = choice;
+    await db.setSetting(_faceChipKey, choice.name);
+    if (choice.only case final chip? when chip != Accel.cpu) {
+      final path = await accelStatePath();
+      AccelState.read(path, accelStateKey(faceModelId))
+        ..forget(chip)
+        ..write(path);
+    }
+    notifyListeners();
+  }
+
+  /// Opens the face model, or opens it again after the chip was changed in
+  /// Settings. The old one finishes what it was handed first.
+  Future<void> _readyEngine() {
+    if (_engine != null && _engineChip == faceChip) return Future.value();
+    // One opening at a time, however many things ask at once.
+    return _engineOpening ??= () async {
+      final chip = faceChip;
+      final old = _engine;
+      _engine = await FaceEngine.load(chip: chip);
+      _engineChip = chip;
+      old?.dispose();
+    }()
+        .whenComplete(() => _engineOpening = null);
+  }
+
+  Future<void>? _engineOpening;
 
   Future<void> setAutoScan(bool on) async {
     autoScanEnabled = on;
@@ -357,7 +401,7 @@ class ScanController extends ChangeNotifier {
         return true;
       });
       if (!ok) return null;
-      _engine ??= await FaceEngine.load();
+      await _readyEngine();
       final faces = await _engine!.analyze(tmp);
       if (faces.isEmpty) return null;
       return faces.reduce((a, b) => a.width * a.height >= b.width * b.height ? a : b);
@@ -421,7 +465,7 @@ class ScanController extends ChangeNotifier {
     notifyListeners();
     await ScanNotification.start('Updating face matching…');
     try {
-      _engine ??= await FaceEngine.load();
+      await _readyEngine();
       var after = 0;
       while (true) {
         final crops = await db.faceCrops(after: after, limit: _upgradeBatch);
@@ -499,7 +543,7 @@ class ScanController extends ChangeNotifier {
     final scanned = await db.scannedAssetIds();
     final todo = [for (final id in assetIds) if (!scanned.contains(id)) id];
     if (todo.isNotEmpty) {
-      _engine ??= await FaceEngine.load();
+      await _readyEngine();
       final tmp = File(p.join((await getTemporaryDirectory()).path, 'group_${DateTime.now().microsecondsSinceEpoch}.jpg'));
       try {
         for (final (i, id) in todo.indexed) {
@@ -535,7 +579,7 @@ class ScanController extends ChangeNotifier {
   /// enough like someone here, and the photos they're in (newest first).
   Future<({int personId, String? name, List<String> photos})?> findInSelfie(
       File selfie, {int? tripId}) async {
-    _engine ??= await FaceEngine.load();
+    await _readyEngine();
     final faces = await _engine!.analyze(selfie.path);
     if (faces.isEmpty) return null;
     final face = faces.reduce((a, b) => a.width * a.height >= b.width * b.height ? a : b);
@@ -655,7 +699,7 @@ class ScanController extends ChangeNotifier {
     // One scan copy per photo in flight.
     final tmps = [for (var i = 0; i < _inFlight; i++) File(p.join(dir, 'scan_$i.jpg'))];
     try {
-      _engine ??= await FaceEngine.load();
+      await _readyEngine();
       final scanned = await db.scannedAssetIds();
       final tagged = await db.taggedAssetIds(tagVersion);
       _startedAt = DateTime.now();

@@ -10,16 +10,19 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../data/backup.dart';
 import '../data/db.dart';
+import '../face/accel.dart';
 import '../scan/scan_controller.dart';
 import '../share/native_files.dart';
 import '../share/net.dart';
 import '../share/prepare.dart';
+import '../update/updater.dart';
 import 'app_lock.dart';
 import 'island.dart';
 import 'profile_screen.dart';
 import 'sections.dart';
 import 'storage_screen.dart';
 import 'theme.dart';
+import 'update_sheet.dart';
 import 'aurora.dart';
 import 'glass.dart';
 import 'widgets.dart';
@@ -48,6 +51,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
     c.previewStrictness(c.strictness).then((n) {
       if (mounted) setState(() => _current = _preview = n);
     });
+    _loadChips();
+  }
+
+  /// What scanning has learned about this phone's chips so far.
+  AccelState? _chips;
+
+  Future<void> _loadChips() async {
+    final chips = await c.faceChips();
+    if (mounted) setState(() => _chips = chips);
+  }
+
+  /// "12 ms a face", "didn't work on this phone", or nothing yet.
+  String? _chipNote(Accel chip) {
+    final chips = _chips;
+    if (chips == null) return null;
+    if (chips.bad.contains(chip)) return "didn't work on this phone";
+    final ms = chips.ms[chip];
+    if (ms == null) return null;
+    return '${ms < 10 ? ms.toStringAsFixed(1) : ms.round()} ms a face';
+  }
+
+  String get _chipSummary {
+    final chips = _chips;
+    final only = c.faceChip.only;
+    if (only == null) {
+      final measured = chips != null && chips.ms.length > 1;
+      return measured ? 'Automatic · ${chips.best.label} is fastest on this phone' : 'Automatic · picks the fastest chip that works';
+    }
+    if (chips != null && chips.bad.contains(only)) return "${only.label} didn't work on this phone · using the CPU";
+    return 'Always the ${only.label}';
+  }
+
+  Future<void> _pickChip() async {
+    final picked = await showModalBottomSheet<AccelChoice>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          for (final (choice, title, sub) in [
+            (AccelChoice.auto, 'Automatic', 'Tries each chip once and keeps the fastest that works'),
+            (AccelChoice.cpu, 'CPU', 'The main processor. Works on every phone'),
+            (AccelChoice.gpu, 'GPU', 'The graphics chip'),
+            (AccelChoice.npu, 'NPU', 'The neural chip, on phones that have one'),
+          ])
+            ListTile(
+              title: Text(title),
+              subtitle: Text([sub, if (choice.only case final chip?) ?_chipNote(chip)].join(' · ')),
+              trailing: c.faceChip == choice ? const Icon(Icons.check) : null,
+              onTap: () => Navigator.pop(context, choice),
+            ),
+        ]),
+      ),
+    );
+    if (picked == null) return;
+    await c.setFaceChip(picked);
+    await _loadChips();
   }
 
   @override
@@ -405,6 +464,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () => setAutoScan(!c.autoScanEnabled),
                   ),
                   SectionRow(
+                    leading: const IconTile(icon: Icons.memory_rounded, color: Color(0xFFFF375F)),
+                    title: 'Face scanning chip',
+                    subtitle: _chipSummary,
+                    chevron: true,
+                    onTap: _pickChip,
+                  ),
+                  SectionRow(
                     leading: const IconTile(icon: Icons.lock_rounded, color: Color(0xFF8E8E93)),
                     title: 'App lock',
                     subtitle: 'Fingerprint, face or screen lock to open the app',
@@ -468,6 +534,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: _confirmClear,
                   ),
                 ),
+                const SectionHeader(title: 'Updates'),
+                ListenableBuilder(
+                  listenable: Updater.instance,
+                  builder: (context, _) {
+                    final u = Updater.instance;
+                    return SectionCard.rows(rows: [
+                      SectionRow(
+                        leading: const IconTile(icon: Icons.update_rounded, color: Color(0xFF34C759)),
+                        title: 'Check for updates automatically',
+                        subtitle: "Once a day, and tells you when there's a new version",
+                        trailing: Switch(value: u.autoCheck, onChanged: u.setAutoCheck),
+                        onTap: () => u.setAutoCheck(!u.autoCheck),
+                      ),
+                      SectionRow(
+                        leading: const IconTile(icon: Icons.wifi_rounded, color: Color(0xFF0A84FF)),
+                        title: 'Download on Wi-Fi only',
+                        subtitle: 'On mobile data, asks first. Updates are about 90 MB',
+                        trailing: Switch(value: u.wifiOnly, onChanged: u.setWifiOnly),
+                        onTap: () => u.setWifiOnly(!u.wifiOnly),
+                      ),
+                    ]);
+                  },
+                ),
+                const SectionFooter(
+                  "Updates come from ShareBro's releases on GitHub and are checked before they install. "
+                  'Only the version check goes online; nothing about you or your photos is sent.',
+                ),
                 const SectionHeader(title: 'About'),
                 const _AboutCard(),
               ]),
@@ -508,6 +601,8 @@ class _AboutCard extends StatelessWidget {
           ]),
         ),
         const Divider(height: 0.5, thickness: 0.5, indent: 16),
+        const _UpdateRow(),
+        const Divider(height: 0.5, thickness: 0.5, indent: 62),
         SectionRow(
           leading: const IconTile(icon: Icons.person_rounded, color: Color(0xFF636366)),
           title: 'Developer',
@@ -525,6 +620,73 @@ class _AboutCard extends StatelessWidget {
         ),
       ]),
     );
+  }
+}
+
+/// "Software update": the version, what's happening, and a NEW badge.
+class _UpdateRow extends StatelessWidget {
+  const _UpdateRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Updater.instance,
+      builder: (context, _) {
+        final u = Updater.instance;
+        final next = u.release?.version.toString();
+        final subtitle = switch (u.stage) {
+          UpdateStage.checking => 'Checking for updates…',
+          UpdateStage.available => 'Version $next is available',
+          UpdateStage.downloading => 'Downloading $next · ${(u.progress * 100).round()}%',
+          UpdateStage.verifying => 'Checking the download…',
+          UpdateStage.ready => 'Version $next is ready to install',
+          UpdateStage.failed when u.release != null && u.apk != null => 'Download paused · tap to retry',
+          _ => 'Version ${u.currentText}',
+        };
+        final Widget trailing;
+        if (u.stage == UpdateStage.available || u.stage == UpdateStage.ready) {
+          trailing = const _NewBadge();
+        } else if (u.stage == UpdateStage.downloading) {
+          trailing = SizedBox.square(
+            dimension: 22,
+            child: CircularProgressIndicator(value: u.progress, strokeWidth: 3, strokeCap: StrokeCap.round),
+          );
+        } else if (u.busy) {
+          trailing = const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2.4));
+        } else {
+          trailing = const SizedBox.shrink();
+        }
+        return SectionRow(
+          leading: const IconTile(icon: Icons.system_update_rounded, color: Brand.accentLight),
+          title: 'Software update',
+          subtitle: subtitle,
+          trailing: trailing,
+          chevron: true,
+          onTap: () => showUpdateSheet(context, check: true),
+        );
+      },
+    );
+  }
+}
+
+/// A coral "NEW" pill that gently pulses.
+class _NewBadge extends StatelessWidget {
+  const _NewBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final badge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(color: Brand.accentLight, borderRadius: BorderRadius.circular(99)),
+      child: const Text(
+        'NEW',
+        style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: 0.4),
+      ),
+    );
+    if (MediaQuery.disableAnimationsOf(context)) return badge;
+    return badge
+        .animate(onPlay: (c) => c.repeat(reverse: true))
+        .scaleXY(begin: 1, end: 1.08, duration: 900.ms, curve: Curves.easeInOut);
   }
 }
 

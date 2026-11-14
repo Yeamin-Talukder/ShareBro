@@ -35,6 +35,7 @@ class Glass extends StatelessWidget {
     this.shadow = true,
     this.shape = BoxShape.rectangle,
     this.fade = 1,
+    this.blur = true,
   });
 
   final Widget child;
@@ -52,9 +53,24 @@ class Glass extends StatelessWidget {
   /// glass invisible.
   final double fade;
 
+  /// False for wide bars: the blur behind them is redrawn on every frame
+  /// anything underneath moves, and their nearly solid fill already sets
+  /// them apart, so a slightly more solid fill does the job for free.
+  final bool blur;
+
   @override
   Widget build(BuildContext context) {
     if (fade <= 0) return Padding(padding: padding, child: child);
+    // Regular glass is mostly fill, so the blur can rest while a page
+    // slides (when it is most expensive) without anyone seeing a change.
+    // Clear glass over photos keeps it: there the blur is the look.
+    if (blur && kind == GlassKind.regular && !solidSurfaces(context)) {
+      return RouteMotion(builder: (context, moving) => _build(context, blur: !moving));
+    }
+    return _build(context, blur: blur);
+  }
+
+  Widget _build(BuildContext context, {required bool blur}) {
     final dark = Theme.of(context).brightness == Brightness.dark || kind == GlassKind.clear;
     final scheme = Theme.of(context).colorScheme;
     final solid = solidSurfaces(context);
@@ -67,8 +83,8 @@ class Glass extends StatelessWidget {
             ? scheme.surfaceContainerHighest
             : switch (kind) {
                 GlassKind.regular => Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0xE6252329)
-                    : const Color(0xEBFFFFFF),
+                    ? (this.blur ? const Color(0xE6252329) : const Color(0xF2252329))
+                    : (this.blur ? const Color(0xEBFFFFFF) : const Color(0xF5FFFFFF)),
                 // Over photos: smoky, with the 35% dim Apple suggests.
                 GlassKind.clear => const Color(0x59000000),
               };
@@ -86,7 +102,7 @@ class Glass extends StatelessWidget {
       child: Padding(padding: padding, child: child),
     );
 
-    final blurred = solid
+    final blurred = solid || !blur
         ? decorated
         : BackdropFilter(
             filter: ImageFilter.compose(
@@ -174,7 +190,7 @@ class GlassTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      Glass(radius: 0, shadow: false, fade: visible.clamp(0, 1), child: const SizedBox.expand());
+      Glass(radius: 0, shadow: false, blur: false, fade: visible.clamp(0, 1), child: const SizedBox.expand());
 }
 
 /// A top-level page: a large title that scrolls away, and a pinned bar that
@@ -262,7 +278,8 @@ class _GlassScrollViewState extends State<GlassScrollView> {
           flexibleSpace: TweenAnimationBuilder<double>(
             tween: Tween(end: _scrolled ? 1 : 0),
             duration: const Duration(milliseconds: 220),
-            builder: (context, fade, _) => Glass(radius: 0, shadow: false, fade: fade, child: const SizedBox.expand()),
+            builder: (context, fade, _) =>
+                Glass(radius: 0, shadow: false, blur: false, fade: fade, child: const SizedBox.expand()),
           ),
         ),
         SliverToBoxAdapter(

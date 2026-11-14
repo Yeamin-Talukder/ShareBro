@@ -76,6 +76,8 @@ class _PlacesScreenState extends State<PlacesScreen> {
         : await loadPlaces(c.db, tripId: widget.tripId, dates: dates, revision: c.revision);
     // A newer pick of dates may have come in meanwhile.
     if (!mounted || dates != _dates) return;
+    await routeSettled(context);
+    if (!mounted) return;
     setState(() {
       _everywhere = everywhere;
       _places = places;

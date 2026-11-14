@@ -85,6 +85,7 @@ class _PhotosTabState extends State<PhotosTab> {
         flexibleSpace: const Glass(
           radius: 0,
           shadow: false,
+          blur: false,
           child: SizedBox.expand(),
         ),
         title: _stepAside(

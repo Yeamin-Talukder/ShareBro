@@ -192,6 +192,8 @@ class _PersonScreenState extends State<PersonScreen> {
       }
     }
     if (!mounted) return;
+    await routeSettled(context);
+    if (!mounted) return;
     setState(() {
       _person = person;
       _all = photos;

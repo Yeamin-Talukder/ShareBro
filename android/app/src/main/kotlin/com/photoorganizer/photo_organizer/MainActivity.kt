@@ -29,6 +29,7 @@ class MainActivity : FlutterFragmentActivity() {
         openFromNotification(intent)
         AppsChannel(applicationContext, messenger)
         ThumbChannel(applicationContext, messenger)
+        UpdateChannel(this, messenger)
 
         // Android drops Wi-Fi multicast packets unless an app holds this lock;
         // LocalSend-style device discovery needs it while sharing is open.

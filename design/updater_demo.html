@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>In-App Updates</title>
+<style>
+:root{--page:#ECE9EF;--bg:#F6F3F1;--card:#fff;--ink:#141217;--sub:#6b6670;--line:rgba(20,18,23,.1);--coral:#E5533A;--coral2:#FF8A6B;--peach:#FDE3DA;--green:#2FA36B;--glass:rgba(255,255,255,.92)}
+:root[data-theme=dark]{--page:#050407;--bg:#0E0D12;--card:#1c1a20;--ink:#F2EFF4;--sub:#a29ca8;--line:rgba(255,255,255,.1);--peach:#3A2622;--glass:rgba(37,35,41,.94)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--page:#050407;--bg:#0E0D12;--card:#1c1a20;--ink:#F2EFF4;--sub:#a29ca8;--line:rgba(255,255,255,.1);--peach:#3A2622;--glass:rgba(37,35,41,.94)}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--page);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:20px 16px 48px}
+header{max-width:1100px;margin:0 auto 6px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+h1{font-size:20px}
+.note{max-width:1100px;margin:0 auto 16px;color:var(--sub);font-size:14px}
+button{font:inherit;color:inherit;cursor:pointer}
+.pill{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 14px}
+.layout{max-width:1100px;margin:0 auto;display:flex;gap:24px;flex-wrap:wrap;justify-content:center}
+.steps{flex:1;min-width:260px;max-width:380px;display:flex;flex-direction:column;gap:8px}
+.steps button{text-align:left;border:1px solid var(--line);background:var(--card);border-radius:16px;padding:12px 14px}
+.steps button.on{border-color:var(--coral);box-shadow:0 0 0 2px var(--peach)}
+.steps b{display:block}
+.steps span{color:var(--sub);font-size:13px}
+.phone{width:340px;height:700px;border-radius:44px;border:10px solid #000;background:var(--bg);position:relative;overflow:hidden;flex:none}
+/* the settings page behind */
+.page{position:absolute;inset:0;padding:54px 16px 16px;transition:filter .3s}
+.page h2{font-size:30px;font-weight:800;letter-spacing:-.5px;margin-bottom:14px}
+.card{background:var(--card);border-radius:18px;overflow:hidden;margin-bottom:14px}
+.row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row .tx{flex:1}
+.row .tx div{font-weight:600}
+.row .tx small{color:var(--sub);font-size:12.5px}
+.tile{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;flex:none}
+.tile svg{width:18px;height:18px}
+.badge{background:var(--coral);color:#fff;font-size:11px;font-weight:800;border-radius:999px;padding:3px 8px;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 6px rgba(229,83,58,.15)}}
+.chev{color:var(--sub)}
+.sechead{font-size:13px;font-weight:700;color:var(--sub);margin:6px 4px 6px;text-transform:none}
+/* banner on People (state 1) */
+.banner{position:absolute;left:12px;right:12px;top:44px;background:var(--glass);border:1px solid var(--line);border-radius:22px;padding:10px 12px;display:flex;gap:10px;align-items:center;
+  box-shadow:0 12px 30px rgba(0,0,0,.15);backdrop-filter:blur(16px);transform:translateY(-140%);transition:transform .55s cubic-bezier(.2,1.2,.4,1);z-index:5}
+.banner.show{transform:none}
+.banner .ic{width:40px;height:40px;border-radius:12px;overflow:hidden;flex:none;position:relative}
+.banner b{font-size:14px}.banner small{display:block;color:var(--sub);font-size:12px}
+.btn{border:0;border-radius:999px;padding:10px 16px;font-weight:800;font-size:14px}
+.btn.p{background:var(--coral);color:#fff}
+.btn.s{background:var(--line)}
+.btn.sm{padding:7px 12px;font-size:12.5px}
+/* sheet */
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .3s;z-index:8}
+.scrim.show{opacity:1}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:30px 30px 0 0;padding:10px 20px 26px;transform:translateY(105%);transition:transform .5s cubic-bezier(.2,.9,.25,1);z-index:9;min-height:470px}
+.sheet.show{transform:none}
+.grab{width:38px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 14px}
+.hero{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:12px}
+.ringwrap{position:relative;width:104px;height:104px;margin-bottom:10px}
+.ringwrap svg.ring{position:absolute;inset:0;transform:rotate(-90deg)}
+.ringwrap .icon{position:absolute;inset:14px;border-radius:22px;overflow:hidden;box-shadow:0 8px 18px rgba(0,0,0,.15)}
+.ringtrack{fill:none;stroke:var(--line);stroke-width:5}
+.ringfill{fill:none;stroke:var(--coral);stroke-width:5;stroke-linecap:round;transition:stroke-dashoffset .25s linear}
+.hero h3{font-size:21px;font-weight:800;letter-spacing:-.3px}
+.ver{display:flex;align-items:center;gap:8px;margin-top:4px;font-weight:700;color:var(--sub);font-size:14px}
+.ver .new{color:var(--coral)}
+.ver svg{width:16px;height:16px}
+.meta{color:var(--sub);font-size:12.5px;margin-top:2px}
+.notes{background:var(--bg);border-radius:16px;padding:12px 14px;margin:12px 0 14px;max-height:180px;overflow:auto}
+.notes h4{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--sub);margin-bottom:6px}
+.notes li{list-style:none;display:flex;gap:8px;font-size:13.5px;margin:6px 0;animation:fadeup .4s both}
+.notes li i{font-style:normal;flex:none}
+@keyframes fadeup{from{opacity:0;transform:translateY(8px)}}
+.actions{display:flex;flex-direction:column;gap:8px}
+.actions .btn{width:100%;padding:14px}
+.link{background:none;border:0;color:var(--sub);font-weight:600;font-size:13px;padding:6px}
+.stats{display:flex;justify-content:space-between;color:var(--sub);font-size:12.5px;font-weight:600;margin:4px 2px 14px}
+.check{position:absolute;right:-4px;bottom:-4px;width:34px;height:34px;border-radius:17px;background:var(--green);border:3px solid var(--card);display:grid;place-items:center;transform:scale(0);transition:transform .45s cubic-bezier(.2,1.6,.4,1)}
+.check.show{transform:scale(1)}
+.check svg{width:16px;height:16px}
+.shield{display:flex;gap:10px;align-items:center;background:rgba(47,163,107,.1);color:var(--green);border-radius:14px;padding:10px 12px;font-size:13px;font-weight:700;margin-bottom:12px;animation:fadeup .4s both}
+.shield svg{width:20px;height:20px;flex:none}
+.spin{animation:spin 1s linear infinite;transform-origin:center}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{display:flex;gap:10px;align-items:center;background:rgba(229,83,58,.1);color:var(--coral);border-radius:14px;padding:10px 12px;font-size:13px;font-weight:700;margin-bottom:12px}
+/* Android installer dialog mock */
+.sys{position:absolute;left:18px;right:18px;top:230px;background:#2b2a2f;color:#eee;border-radius:26px;padding:22px 20px 14px;z-index:12;transform:scale(.9);opacity:0;pointer-events:none;transition:all .3s cubic-bezier(.2,1.3,.4,1)}
+.sys.show{transform:none;opacity:1;pointer-events:auto}
+.sys .t{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.sys .t div{width:40px;height:40px;border-radius:10px;overflow:hidden}
+.sys p{font-size:14px;color:#cfcbd4;margin-bottom:16px}
+.sys .b{display:flex;justify-content:flex-end;gap:18px;color:#8fb8ff;font-weight:700;font-size:14px}
+.sys .tag{font-size:11px;color:#9a96a0;margin-top:10px;text-align:center}
+.toast{position:absolute;left:50%;bottom:30px;transform:translate(-50%,40px);background:var(--ink);color:var(--bg);font-size:13px;font-weight:700;padding:10px 16px;border-radius:999px;opacity:0;transition:all .35s cubic-bezier(.2,1.3,.4,1);z-index:13;white-space:nowrap}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.uptodate{display:flex;flex-direction:column;align-items:center;padding:20px 0 6px;text-align:center}
+.uptodate .big{width:84px;height:84px;border-radius:42px;background:rgba(47,163,107,.12);display:grid;place-items:center;margin-bottom:12px}
+.uptodate .big svg{width:42px;height:42px}
+.draw{stroke-dasharray:40;stroke-dashoffset:40;animation:draw .6s .15s ease-out forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <h1>In-app updates: demo</h1>
+  <div style="display:flex;gap:8px"><button class="pill" id="auto">▶ Play the whole flow</button><button class="pill" id="theme">Light / dark</button></div>
+</header>
+<p class="note">Updates come from ShareBro's GitHub releases, but you never leave the app: it checks quietly, shows what's new, downloads the right file for your phone, checks it's genuine, then hands it to Android's installer. Click a step, or play the whole flow.</p>
+
+<div class="layout">
+  <div class="steps" id="steps"></div>
+  <div class="phone">
+    <div class="page" id="page">
+      <h2>Settings</h2>
+      <div class="sechead">About</div>
+      <div class="card">
+        <div class="row"><div class="tile" style="background:var(--peach)"><svg viewBox="0 0 108 108" style="width:30px;height:30px"><use href="#logo"/></svg></div>
+          <div class="tx"><div>ShareBro</div><small>Made by Md Yeamin Talukder</small></div></div>
+        <div class="row" id="updRow"><div class="tile" style="background:var(--coral)"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></div>
+          <div class="tx"><div>Software update</div><small id="updSub">Version 1.4.0</small></div><span id="updRight"></span></div>
+        <div class="row"><div class="tile" style="background:#636366"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3"/></svg></div>
+          <div class="tx"><div>Source code</div><small>github.com/Yeamin-Talukder/ShareBro</small></div><span class="chev">›</span></div>
+      </div>
+      <div class="sechead">Updates</div>
+      <div class="card">
+        <div class="row"><div class="tx"><div>Check for updates automatically</div><small>Once a day, on Wi-Fi or mobile data</small></div>
+          <div style="width:44px;height:26px;border-radius:13px;background:var(--green);position:relative"><div style="position:absolute;right:3px;top:3px;width:20px;height:20px;border-radius:10px;background:#fff"></div></div></div>
+        <div class="row"><div class="tx"><div>Download on Wi-Fi only</div><small>Updates are about 90 MB</small></div>
+          <div style="width:44px;height:26px;border-radius:13px;background:var(--green);position:relative"><div style="position:absolute;right:3px;top:3px;width:20px;height:20px;border-radius:10px;background:#fff"></div></div></div>
+      </div>
+    </div>
+
+    <div class="banner" id="banner"><div class="ic"><svg viewBox="0 0 108 108" width="40" height="40"><use href="#logo"/></svg></div>
+      <div style="flex:1"><b>ShareBro 1.5.0 is here</b><small>Faster scans and a new Memories tab</small></div>
+      <button class="btn p sm">See what's new</button></div>
+
+    <div class="scrim" id="scrim"></div>
+    <div class="sheet" id="sheet"></div>
+
+    <div class="sys" id="sys"><div class="t"><div><svg viewBox="0 0 108 108" width="40" height="40"><use href="#logo"/></svg></div><b style="font-size:17px">ShareBro</b></div>
+      <p>Do you want to update this app?</p><div class="b"><span>Cancel</span><span>Update</span></div>
+      <div class="tag">Android's own installer · it checks the update comes from the same developer</div></div>
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+  <symbol id="logo" viewBox="0 0 108 108"><rect width="108" height="108" fill="#F6F3F1"/>
+    <g transform="translate(40.3 57.6) rotate(22.5)"><rect x="-9.37" y="-16.7" width="18.74" height="33.4" rx="4.37" fill="#E5533A"/><rect x="-8.1" y="-13.4" width="16.2" height="28.9" rx="3.3" fill="#FDE3DA"/><circle cx="2.6" cy="-5.2" r="2.1" fill="#FF8A6B"/><path d="M-8.1 4.5 L-2.6 -0.6 L0.2 6 L4 3.5 L8.1 9 L8.1 15.5 L-8.1 15.5Z" fill="#FFC3B2"/></g>
+    <g transform="translate(67.7 57.6) rotate(-22.5)"><rect x="-9.37" y="-16.7" width="18.74" height="33.4" rx="4.37" fill="#141217"/><rect x="-8.1" y="-13.4" width="16.2" height="28.9" rx="3.3" fill="#3A353F"/><circle cx="2.6" cy="-5.2" r="2.1" fill="#FF8A6B"/><path d="M-8.1 4.5 L-2.6 -0.6 L0.2 6 L4 3.5 L8.1 9 L8.1 15.5 L-8.1 15.5Z" fill="#5A5560"/></g>
+    <g stroke="#E5533A" stroke-width="1.4" stroke-linecap="round"><path d="M54 36.3 L54 32.8"/><path d="M55.9 37.2 L58.6 35"/><path d="M52.1 37.2 L49.4 35"/></g></symbol>
+</defs></svg>
+
+<script>
+const $=id=>document.getElementById(id);
+const ARROW='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+const CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+const SHIELD='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>';
+const C=2*Math.PI*46;
+function hero(title,{p=null,done=false,spin=false}={}){return `<div class="hero"><div class="ringwrap">
+  <svg class="ring" viewBox="0 0 104 104"><circle class="ringtrack" cx="52" cy="52" r="46"/>${p===null&&!spin?'':`<circle class="ringfill ${spin?'spin':''}" id="ringfill" cx="52" cy="52" r="46" style="stroke-dasharray:${C};stroke-dashoffset:${spin?C*.72:C*(1-(p||0))}"/>`}</svg>
+  <div class="icon"><svg viewBox="0 0 108 108" width="76" height="76"><use href="#logo"/></svg></div>
+  <div class="check ${done?'show':''}" id="check">${CHECK}</div></div>
+  <h3>${title}</h3><div class="ver">1.4.0 ${ARROW} <span class="new">1.5.0</span></div><div class="meta">89.6 MB · arm64 · released 2 days ago</div></div>`}
+const NOTES=`<div class="notes"><h4>What's new</h4><ul>
+  <li style="animation-delay:.05s"><i>✨</i>Memories: a "this day last year" card on People</li>
+  <li style="animation-delay:.12s"><i>⚡</i>Scans about 30% faster on big albums</li>
+  <li style="animation-delay:.19s"><i>🗺️</i>Places shows more beaches and landmarks by name</li>
+  <li style="animation-delay:.26s"><i>🛠️</i>Fixes for sending to LocalSend on Windows</li></ul></div>`;
+const S={
+  idle:{t:'1 · Up to date',d:'Settings shows the version; "Check now" spins, then a green tick.',run(){row('Version 1.4.0','');openSheet(`<div class="grab"></div><div class="uptodate"><div class="big"><svg viewBox="0 0 24 24" fill="none" stroke="#2FA36B" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path class="draw" d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+    <h3 style="font-size:20px;font-weight:800">You're up to date</h3><p class="meta" style="margin:6px 0 18px">ShareBro 1.4.0 is the latest version · checked just now</p></div>
+    <div class="actions"><button class="btn s">Done</button></div>`)}},
+  found:{t:'2 · New version found',d:'A quiet daily check. A banner slides in once, and Settings shows a badge.',run(){closeSheet();row('Version 1.5.0 is available','<span class="badge">NEW</span>');later(()=>$('banner').classList.add('show'),250)}},
+  sheet:{t:'3 · What\'s new',d:'Release notes from GitHub, the size, and the version jump. Update, Later, or Skip.',run(){$('banner').classList.remove('show');openSheet(`<div class="grab"></div>${hero('Update available')}${NOTES}
+    <div class="actions"><button class="btn p">Update now</button><button class="btn s">Later</button><button class="link">Skip this version</button></div>`)}},
+  download:{t:'4 · Downloading',d:'The ring fills around the icon; speed and time left. Keeps going in the background with a notification.',run(){openSheet(`<div class="grab"></div>${hero('Downloading…',{p:0})}
+    <div class="stats"><span id="mb">0 of 89.6 MB</span><span id="eta">about 30 s left · 3.1 MB/s</span></div>
+    <div class="notes" style="max-height:90px"><h4>While you wait</h4><ul><li><i>📱</i>You can leave this screen; it keeps downloading.</li></ul></div>
+    <div class="actions"><button class="btn s">Hide</button><button class="link">Cancel download</button></div>`);anim(0,1,3200,v=>{const f=$('ringfill');if(!f)return;f.style.strokeDashoffset=C*(1-v);$('mb').textContent=`${(89.6*v).toFixed(1)} of 89.6 MB`;$('eta').textContent=`about ${Math.ceil(30*(1-v))} s left · 3.1 MB/s`})}},
+  verify:{t:'5 · Checking it\'s genuine',d:'The download is checked against the release\'s SHA-256 checksum before anything installs.',run(){openSheet(`<div class="grab"></div>${hero('Checking the download…',{spin:true})}
+    <div class="shield" style="opacity:.6">${SHIELD}Comparing with the published checksum…</div>`);later(()=>{openSheet(`<div class="grab"></div>${hero('Ready to install',{p:1,done:true})}
+    <div class="shield">${SHIELD}Verified: matches ShareBro 1.5.0 on GitHub</div>
+    <div class="actions"><button class="btn p">Install update</button><button class="btn s">Install later</button></div>`)},1400)}},
+  install:{t:'6 · Install',d:'Android\'s own installer takes over (first time only: allow "Install unknown apps" for ShareBro). Your data stays.',run(){openSheet(`<div class="grab"></div>${hero('Ready to install',{p:1,done:true})}
+    <div class="shield">${SHIELD}Verified: matches ShareBro 1.5.0 on GitHub</div><div class="actions"><button class="btn p">Install update</button></div>`);later(()=>{$('sys').classList.add('show')},500);later(()=>{$('sys').classList.remove('show');closeSheet();toast('Updated to 1.5.0 · welcome back 🎉');row('Version 1.5.0','')},2600)}},
+  error:{t:'Problem · Download stopped',d:'Lost connection or a bad file: says what happened and offers Retry. A file that fails the check is deleted.',run(){openSheet(`<div class="grab"></div>${hero('Download paused',{p:.42})}
+    <div class="err">⚠️&nbsp;The connection dropped at 37.6 MB. Retry picks up where it stopped.</div>
+    <div class="actions"><button class="btn p">Retry</button><button class="btn s">Later</button></div>`)}},
+};
+function row(sub,right){$('updSub').textContent=sub;$('updRight').innerHTML=right||'<span class="chev">›</span>'}
+function openSheet(html){$('sheet').innerHTML=html;$('sheet').classList.add('show');$('scrim').classList.add('show')}
+function closeSheet(){$('sheet').classList.remove('show');$('scrim').classList.remove('show')}
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2400)}
+let timers=[];function later(f,ms){timers.push(setTimeout(f,ms))}
+let raf;function anim(a,b,ms,f){cancelAnimationFrame(raf);const t0=performance.now();const step=t=>{const k=Math.min(1,(t-t0)/ms);f(a+(b-a)*k);if(k<1)raf=requestAnimationFrame(step)};raf=requestAnimationFrame(step)}
+function go(k){timers.forEach(clearTimeout);timers=[];cancelAnimationFrame(raf);document.querySelectorAll('.steps button').forEach(b=>b.classList.toggle('on',b.dataset.k===k));$('sys').classList.remove('show');if(k!=='found')$('banner').classList.remove('show');S[k].run()}
+$('steps').innerHTML=Object.entries(S).map(([k,s])=>`<button data-k="${k}"><b>${s.t}</b><span>${s.d}</span></button>`).join('');
+document.querySelectorAll('.steps button').forEach(b=>b.onclick=()=>go(b.dataset.k));
+$('auto').onclick=()=>{const seq=[['found',2600],['sheet',3600],['download',3800],['verify',3400],['install',3600]];let t=0;seq.forEach(([k,d])=>{setTimeout(()=>go(k),t);t+=d})};
+$('theme').onclick=()=>{const r=document.documentElement;const d=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=d?'light':'dark'};
+go('found');
+</script>
+</body>
+</html>

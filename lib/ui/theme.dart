@@ -157,7 +157,19 @@ ThemeData buildTheme(ColorScheme scheme) {
     ),
     dividerTheme: DividerThemeData(color: hairline, space: 1),
     pageTransitionsTheme: const PageTransitionsTheme(builders: {
-      TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+      TargetPlatform.android: SnappyPageTransitions(),
     }),
   );
+}
+
+/// Android's own page transition (the back gesture still peeks at the page
+/// behind), but quicker: the stock 450 ms makes every tap feel slow.
+class SnappyPageTransitions extends PredictiveBackPageTransitionsBuilder {
+  const SnappyPageTransitions();
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 260);
+
+  @override
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 220);
 }

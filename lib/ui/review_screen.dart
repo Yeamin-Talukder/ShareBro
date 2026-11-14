@@ -64,6 +64,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
         if (p.name != null) p.name!,
     ];
     if (!mounted) return;
+    await routeSettled(context);
+    if (!mounted) return;
     setState(() {
       _items = items;
       _names = names;

@@ -34,7 +34,10 @@ class _UnmatchedScreenState extends State<UnmatchedScreen> {
 
   Future<void> _load() async {
     final faces = await c.db.unmatchedFaces();
-    if (mounted) setState(() => _faces = faces);
+    if (!mounted) return;
+    await routeSettled(context);
+    if (!mounted) return;
+    setState(() => _faces = faces);
   }
 
   void _toggle(FaceThumb f) {

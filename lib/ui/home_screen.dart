@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:photo_manager/photo_manager.dart';
 
+import '../data/dates.dart';
 import '../data/db.dart';
 import 'places_screen.dart';
 import 'unmatched_screen.dart';
@@ -16,6 +17,7 @@ import 'find_me_screen.dart';
 import 'glass.dart';
 import 'group_editor.dart';
 import 'motion.dart';
+import 'people_filters.dart';
 import 'people_space.dart';
 import 'person_screen.dart';
 import 'review_screen.dart';
@@ -54,10 +56,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List<PersonSummary> _byGender(List<PersonSummary> people) =>
       _gender == null ? people : [for (final p in people) if (p.gender == _gender) p];
 
-  void _setGender(Gender g) {
-    Haptics.tick();
+  void _pickGender(Gender? g) {
     setState(() {
-      _gender = _gender == g ? null : g;
+      _gender = g;
       _people = _byGender(_everyone ?? const []);
     });
   }
@@ -321,6 +322,130 @@ class _HomeScreenState extends State<HomeScreen> {
     c.changed();
   }
 
+  TripSummary? get _trip => _trips.where((t) => t.id == _tripId).firstOrNull;
+
+  /// The filter bar stays while anything is filtered, so an empty result
+  /// can always be undone.
+  bool get _showFilters =>
+      _trips.isNotEmpty || (_everyone?.isNotEmpty ?? false) || _groups.isNotEmpty || _dates != null;
+
+  /// "Everyone", or the group and gender being shown.
+  String get _whoLabel {
+    final group = _groups.where((g) => g.id == _groupId).firstOrNull?.name;
+    final gender = switch (_gender) { Gender.male => 'Men', Gender.female => 'Women', null => null };
+    final parts = [?group, ?gender];
+    return parts.isEmpty ? 'Everyone' : parts.join(' · ');
+  }
+
+  void _openTripSheet() =>
+      showTripSheet(context, trips: _trips, selected: _tripId, onPick: _pickTrip, onEdit: _editTrip);
+
+  void _openWhoSheet() {
+    final everyone = _everyone ?? const <PersonSummary>[];
+    showWhoSheet(
+      context,
+      everyone: everyone.length,
+      // Men / Women, once anyone is known to be either.
+      genders: {
+        for (final g in Gender.values)
+          if (everyone.any((p) => p.gender == g)) g: everyone.where((p) => p.gender == g).length,
+      },
+      gender: _gender,
+      groups: _groups,
+      groupId: _groupId,
+      onGender: _pickGender,
+      onGroup: (id) {
+        _groupId = id;
+        _reload();
+      },
+      onNewGroup: () async {
+        if (await showGroupEditor(context, c)) c.changed();
+      },
+      onEditGroup: (g) async {
+        if (await showGroupEditor(context, c, group: g)) c.changed();
+      },
+    );
+  }
+
+  Future<void> _openViewSheet() async {
+    final picked = await showViewSheet(context, _layout);
+    if (picked != null) _setLayout(picked);
+  }
+
+  Future<void> _pickDates() async {
+    final picked = await pickDays(context, _dates);
+    if (picked == null) return;
+    _dates = picked;
+    _reload();
+  }
+
+  void _openTimeline(TripSummary trip) => Navigator.push(
+      context, MaterialPageRoute(builder: (_) => TimelineScreen(controller: c, tripId: trip.id, tripName: trip.name)));
+
+  void _openMap(TripSummary trip) => Navigator.push(
+      context, MaterialPageRoute(builder: (_) => PlacesScreen(controller: c, tripId: trip.id, title: trip.name)));
+
+  /// One row: which trip, who, and when on the left; how it's laid out on
+  /// the right. Each opens a short list instead of spreading its choices
+  /// across the page.
+  Widget _filterBar(List<PersonSummary>? people) {
+    Widget item(Widget chip) =>
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: Center(child: chip));
+    final trip = _trip;
+    final views = people != null && people.isNotEmpty;
+    return SizedBox(
+      height: 46,
+      child: Row(children: [
+        Expanded(
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.only(left: 12, right: views ? 4 : 12),
+            children: [
+              if (_trips.isNotEmpty)
+                item(CapsuleChip(
+                  icon: Icons.luggage_rounded,
+                  label: trip == null ? 'All trips' : _short(trip.name),
+                  selected: trip != null,
+                  menu: true,
+                  onTap: _openTripSheet,
+                )),
+              if ((_everyone?.isNotEmpty ?? false) || _groups.isNotEmpty)
+                item(CapsuleChip(
+                  icon: Icons.people_alt_rounded,
+                  label: _short(_whoLabel),
+                  selected: _gender != null || _groupId != null,
+                  menu: true,
+                  onTap: _openWhoSheet,
+                )),
+              // Just a calendar until dates are picked; then it says which.
+              if (_dates == null)
+                item(IconChip(icon: Icons.calendar_month_rounded, tooltip: 'Any date', onTap: _pickDates))
+              else
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: DateChip(
+                    value: _dates,
+                    onChanged: (d) {
+                      _dates = d;
+                      _reload();
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (views)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, right: 16),
+            child: IconChip(icon: _layout.icon, tooltip: 'View: ${_layout.label}', onTap: _openViewSheet),
+          ),
+      ]),
+    );
+  }
+
+  /// Long names would push the other filters off the bar.
+  static String _short(String name) => name.length <= 22 ? name : '${name.substring(0, 21)}…';
+
   @override
   Widget build(BuildContext context) {
     final people = _people;
@@ -355,40 +480,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: () => Navigator.push(
                     context, MaterialPageRoute(builder: (_) => SearchScreen(controller: c))),
               ),
-            // Always here, so a new scan is never hard to find.
-            ListenableBuilder(
-              listenable: c,
-              builder: (context, _) => IconButton(
-                tooltip: c.running ? 'Scan progress' : 'Scan photos',
-                icon: Icon(c.running ? Icons.downloading_rounded : Icons.add_photo_alternate_outlined),
-                onPressed: c.running ? _openScan : _pickAlbumAndScan,
+            if (_reviewCount > 0)
+              _ReviewButton(
+                count: _reviewCount,
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => ReviewScreen(controller: c))),
               ),
-            ),
-            ListenableBuilder(
-              listenable: c.sharing,
-              builder: (context, _) => IconButton(
-                tooltip: 'Sending',
-                icon: Badge(
-                  isLabelVisible: c.sharing.activeCount > 0,
-                  label: Text('${c.sharing.activeCount}'),
-                  child: const Icon(Icons.send_rounded),
-                ),
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) => SendCenterScreen(controller: c, tripId: _tripId)),
-                ),
-              ),
-            ),
-            _ReviewButton(
-              count: _reviewCount,
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => ReviewScreen(controller: c))),
-            ),
             PopupMenuButton<String>(
               tooltip: 'More',
               onSelected: (v) {
                 switch (v) {
+                  case 'scan':
+                    c.running ? _openScan() : _pickAlbumAndScan();
+                  case 'sending':
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => SendCenterScreen(controller: c, tripId: _tripId)));
                   case 'together':
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => TogetherScreen(controller: c, tripId: _tripId)));
@@ -406,6 +512,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
               },
               itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'scan',
+                  child: ListTile(
+                    leading: Icon(c.running ? Icons.downloading_rounded : Icons.add_photo_alternate_outlined),
+                    title: Text(c.running ? 'Scan progress' : 'Scan photos'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'sending',
+                  child: ListTile(
+                    leading: const Icon(Icons.send_rounded),
+                    title: const Text('Sending'),
+                    trailing: c.sharing.activeCount > 0 ? Text('${c.sharing.activeCount}') : null,
+                  ),
+                ),
                 if (people != null && people.length >= 2)
                   const PopupMenuItem(
                     value: 'together',
@@ -435,209 +556,20 @@ class _HomeScreenState extends State<HomeScreen> {
           ]),
         ],
         slivers: [
-        if (_trips.isNotEmpty || (people?.isNotEmpty ?? false))
+        if (_showFilters) SliverToBoxAdapter(child: _filterBar(people)),
+        if (_trip case final trip?)
           SliverToBoxAdapter(
-            child: SizedBox(
-              height: 46,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: DateChip(
-                      value: _dates,
-                      onChanged: (d) {
-                        _dates = d;
-                        _reload();
-                      },
-                    ),
-                  ),
-                  _TripChip(
-                    label: 'All trips',
-                    selected: _tripId == null,
-                    onTap: () => _pickTrip(null),
-                  ),
-                  for (final t in _trips)
-                    _TripChip(
-                      label: t.name,
-                      count: t.photoCount,
-                      selected: _tripId == t.id,
-                      onTap: () => _pickTrip(t.id),
-                      onLongPress: () => _editTrip(t),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        if (_tripId != null && _days.length > 1)
-          // The fade goes on the row, not the sliver: effects are boxes, and
-          // a box can't hold a sliver (the whole page went blank).
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 46,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                children: [
-                  for (final d in _days)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Center(
-                        child: CapsuleChip(
-                          icon: Icons.today_rounded,
-                          label: d.label,
-                          count: d.photos.length,
-                          selected: _dates == d.span,
-                          onTap: () {
-                            Haptics.tick();
-                            _dates = _dates == d.span ? null : d.span;
-                            _reload();
-                          },
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ).animate(key: ValueKey(_tripId)).fadeIn(duration: 250.ms).moveY(begin: -6),
-          ),
-        if (_everyone != null && (_everyone!.isNotEmpty || _groups.isNotEmpty))
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 46,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                children: [
-                  // Male / Female, once anyone is known to be either.
-                  for (final g in Gender.values)
-                    if (_everyone!.any((p) => p.gender == g))
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Center(
-                          child: CapsuleChip(
-                            icon: g == Gender.male ? Icons.male_rounded : Icons.female_rounded,
-                            label: g.label,
-                            count: _everyone!.where((p) => p.gender == g).length,
-                            selected: _gender == g,
-                            onTap: () => _setGender(g),
-                          ),
-                        ),
-                      ),
-                  for (final g in _groups)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Center(
-                        child: CapsuleChip(
-                          icon: Icons.diversity_3_rounded,
-                          label: g.name,
-                          count: g.members.length,
-                          selected: _groupId == g.id,
-                          onTap: () {
-                            Haptics.tick();
-                            _groupId = _groupId == g.id ? null : g.id;
-                            _reload();
-                          },
-                          onLongPress: () async {
-                            if (await showGroupEditor(context, c, group: g)) c.changed();
-                          },
-                        ),
-                      ),
-                    ),
-                  if (_unmatched > 0)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Center(
-                        child: CapsuleChip(
-                          outlined: true,
-                          icon: Icons.person_search_rounded,
-                          label: 'Unmatched',
-                          count: _unmatched,
-                          onTap: _openUnmatched,
-                        ),
-                      ),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Center(
-                      child: CapsuleChip(
-                        outlined: true,
-                        icon: Icons.add_rounded,
-                        label: 'New group',
-                        onTap: () async {
-                          if (await showGroupEditor(context, c)) c.changed();
-                        },
-                      ),
-                    ),
-                  ),
-                  if (_tripId != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Center(
-                        child: CapsuleChip(
-                        outlined: true,
-                        icon: Icons.timeline_rounded,
-                        label: 'Trip timeline',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => TimelineScreen(
-                              controller: c,
-                              tripId: _tripId!,
-                              tripName: _trips.firstWhere((t) => t.id == _tripId).name,
-                            ),
-                          ),
-                        ),
-                        ),
-                      ),
-                    ),
-                  if (_tripId != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Center(
-                        child: CapsuleChip(
-                          outlined: true,
-                          icon: Icons.map_rounded,
-                          label: 'Trip map',
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => PlacesScreen(
-                                controller: c,
-                                tripId: _tripId,
-                                title: _trips.firstWhere((t) => t.id == _tripId).name,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        if (people != null && people.isNotEmpty)
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 46,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                children: [
-                  for (final l in PeopleLayout.values)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Center(
-                        child: CapsuleChip(
-                          icon: l.icon,
-                          label: l.label,
-                          selected: _layout == l,
-                          onTap: () => _setLayout(l),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+            child: _TripCard(
+              trip: trip,
+              days: _days,
+              dates: _dates,
+              onDay: (d) {
+                Haptics.tick();
+                _dates = d;
+                _reload();
+              },
+              onTimeline: () => _openTimeline(trip),
+              onMap: () => _openMap(trip),
             ),
           ),
         if (_tripId != null && people != null && !_layout.spatial)
@@ -1004,36 +936,81 @@ class _ScanButton extends StatelessWidget {
   }
 }
 
-class _TripChip extends StatelessWidget {
-  const _TripChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.count,
-    this.onLongPress,
+/// The picked trip: its name and size, its days to narrow down to, and the
+/// ways to look at it (timeline, map).
+class _TripCard extends StatelessWidget {
+  const _TripCard({
+    required this.trip,
+    required this.days,
+    required this.dates,
+    required this.onDay,
+    required this.onTimeline,
+    required this.onMap,
   });
 
-  final String label;
-  final int? count;
-  final bool selected;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
+  final TripSummary trip;
+  final List<TripDay> days;
+
+  /// The dates being shown, which may be one of [days].
+  final DaySpan? dates;
+  final ValueChanged<DaySpan?> onDay;
+  final VoidCallback onTimeline, onMap;
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final span = days.isEmpty ? null : formatSpan(DaySpan(days.first.date, days.last.date));
+    final aDay = days.any((d) => d.span == dates);
+    Widget chip(Widget child) =>
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: Center(child: child));
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Center(
-        child: CapsuleChip(
-          icon: count == null ? null : Icons.luggage_rounded,
-          label: label,
-          count: count,
-          selected: selected,
-          onTap: onTap,
-          onLongPress: onLongPress,
-        ),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: SectionCard(
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+            child: Row(children: [
+              const IconTile(icon: Icons.luggage_rounded, color: Color(0xFFFF9F0A)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(trip.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  Text('${trip.photoCount} photos${span == null ? '' : ' · $span'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+                ]),
+              ),
+              const SizedBox(width: 8),
+              SquareButton(icon: Icons.timeline_rounded, tooltip: 'Trip timeline', onTap: onTimeline),
+              const SizedBox(width: 8),
+              SquareButton(icon: Icons.map_rounded, tooltip: 'Trip map', onTap: onMap),
+            ]),
+          ),
+          if (days.length > 1)
+            SizedBox(
+              height: 46,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                children: [
+                  chip(CapsuleChip(label: 'All days', selected: !aDay, onTap: () => onDay(null))),
+                  for (final d in days)
+                    chip(CapsuleChip(
+                      label: d.label,
+                      count: d.photos.length,
+                      selected: dates == d.span,
+                      onTap: () => onDay(dates == d.span ? null : d.span),
+                    )),
+                ],
+              ),
+            ),
+        ]),
       ),
-    );
+    ).animate(key: ValueKey(trip.id)).fadeIn(duration: 250.ms).moveY(begin: -6);
   }
 }
 

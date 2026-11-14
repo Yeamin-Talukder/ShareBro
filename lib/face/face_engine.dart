@@ -4,12 +4,14 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 
 import '../data/db.dart';
+import 'accel.dart';
 
 /// InsightFace's MobileFaceNet trained on WebFace600K (`w600k_mbf` from the
 /// buffalo_s pack, converted to TensorFlow Lite): a 512-number fingerprint
@@ -38,19 +40,39 @@ const _maxYaw = 50.0;
 /// Scene labels less certain than this are dropped.
 const _minLabelConfidence = 0.7;
 
+/// How many faces go through the CPU before a faster chip is started: a
+/// selfie or a single photo is done sooner than a GPU or NPU can warm up.
+const _warmUpFaces = 4;
+
+/// Fingerprints from another chip must point the same way as the CPU's
+/// (1 is identical) before that chip is trusted with real faces.
+const _sameFace = 0.999;
+
 /// Finds faces with ML Kit and turns each into a 512-number fingerprint with
-/// MobileFaceNet (InsightFace, WebFace600K). Everything runs on the device.
+/// MobileFaceNet (InsightFace, WebFace600K). Everything runs on the device;
+/// the fingerprints come from the phone's NPU or GPU when one is there and
+/// quicker than the CPU (see [AccelState]).
 class FaceEngine {
-  FaceEngine._(this._detector, this._labeler, this._interpreter, this._layout);
+  FaceEngine._(this._detector, this._labeler, this._worker);
 
   final FaceDetector _detector;
 
   /// ML Kit's on-device scene labeler (beach, food, dog, …).
   final ImageLabeler _labeler;
-  final Interpreter _interpreter;
-  final _ModelLayout _layout;
 
-  static Future<FaceEngine> load() async {
+  /// One background isolate for the whole scan. It owns the model, so the
+  /// GPU and NPU are only ever touched from one place.
+  final _EmbedWorker _worker;
+
+  /// [chip] is what Settings asks for: the fastest that works, or one.
+  static Future<FaceEngine> load({AccelChoice chip = AccelChoice.auto}) async {
+    final model = await rootBundle.load(_modelAsset);
+    final worker = await _EmbedWorker.start(_WorkerSetup(
+      model: TransferableTypedData.fromList([model.buffer.asUint8List(model.offsetInBytes, model.lengthInBytes)]),
+      statePath: await accelStatePath(),
+      stateKey: accelStateKey(faceModelId),
+      chip: chip,
+    ));
     final detector = FaceDetector(
       options: FaceDetectorOptions(
         enableLandmarks: true,
@@ -60,24 +82,9 @@ class FaceEngine {
         minFaceSize: 0.03,
       ),
     );
-    final interpreter = await Interpreter.fromAsset(
-      _modelAsset,
-      options: InterpreterOptions()..threads = 4,
-    );
-    interpreter.allocateTensors();
-    final inputs = interpreter.getInputTensors();
-    final output = interpreter.getOutputTensors().first.shape;
-    final layout = _ModelLayout(
-      address: interpreter.address,
-      inputCount: inputs.length,
-      channelsFirst: inputs.first.shape[1] == 3,
-      outputIs2d: output.length > 1,
-      outputRows: output.length > 1 ? output[0] : 1,
-      embeddingSize: output.last,
-    );
     final labeler = ImageLabeler(
         options: ImageLabelerOptions(confidenceThreshold: _minLabelConfidence));
-    return FaceEngine._(detector, labeler, interpreter, layout);
+    return FaceEngine._(detector, labeler, worker);
   }
 
   /// What's in the picture, most confident first.
@@ -121,81 +128,295 @@ class FaceEngine {
     codec.dispose();
     if (data == null) return const [];
     final pixels = TransferableTypedData.fromList([data.buffer.asUint8List()]);
-    final worker = _worker ??= await (_starting ??= _EmbedWorker.start());
-    return worker.run(pixels, w, h, boxes, _layout);
+    return _worker.ask<List<NewFace>>(_EmbedJob(pixels, w, h, boxes));
   }
 
   /// Fingerprints for stored face crops (the 112x112 aligned JPEGs kept
   /// for every face), in order; null where a crop can't be read. For
   /// redoing every face after a model change without rescanning photos.
-  Future<List<Float32List?>> embedCrops(List<Uint8List> jpegs) {
-    final layout = _layout;
-    return Isolate.run(() => _embedCrops(jpegs, layout));
-  }
-
-  /// One background isolate for the whole scan, instead of starting (and
-  /// loading the model library in) a new one for every photo.
-  _EmbedWorker? _worker;
-  Future<_EmbedWorker>? _starting;
+  Future<List<Float32List?>> embedCrops(List<Uint8List> jpegs) =>
+      _worker.ask<List<Float32List?>>(_CropsJob(jpegs));
 
   void dispose() {
-    _worker?.stop();
+    _worker.stop();
     _detector.close();
     _labeler.close();
-    _interpreter.close();
   }
 }
 
-/// Long-lived background isolate that turns face boxes into fingerprints.
-class _EmbedWorker {
-  _EmbedWorker._(this._isolate, this._inbox);
+/// What the background isolate needs to open the model.
+class _WorkerSetup {
+  _WorkerSetup({required this.model, required this.statePath, required this.stateKey, required this.chip});
 
-  final Isolate _isolate;
+  final TransferableTypedData model;
+  final String statePath, stateKey;
+  final AccelChoice chip;
+}
+
+/// Faces to cut out of a photo's [pixels] (RGBA) and fingerprint.
+class _EmbedJob {
+  _EmbedJob(this.pixels, this.w, this.h, this.boxes);
+
+  final TransferableTypedData pixels;
+  final int w, h;
+  final List<_FaceBox> boxes;
+}
+
+/// Stored face crops to fingerprint again.
+class _CropsJob {
+  _CropsJob(this.jpegs);
+
+  final List<Uint8List> jpegs;
+}
+
+/// Long-lived background isolate that turns faces into fingerprints.
+class _EmbedWorker {
+  _EmbedWorker._(this._inbox);
+
   final SendPort _inbox;
 
-  static Future<_EmbedWorker> start() async {
+  static Future<_EmbedWorker> start(_WorkerSetup setup) async {
     final hello = ReceivePort();
-    final isolate = await Isolate.spawn(_workerMain, hello.sendPort, debugName: 'faces');
-    final inbox = await hello.first as SendPort;
-    return _EmbedWorker._(isolate, inbox);
+    final isolate = await Isolate.spawn(_workerMain, (hello.sendPort, setup), debugName: 'faces');
+    final first = await hello.first;
+    if (first is SendPort) return _EmbedWorker._(first);
+    isolate.kill();
+    throw StateError('The face model did not load: $first');
   }
 
-  Future<List<NewFace>> run(TransferableTypedData pixels, int w, int h,
-      List<_FaceBox> boxes, _ModelLayout layout) async {
+  Future<T> ask<T>(Object job) async {
     final reply = ReceivePort();
-    _inbox.send((pixels, w, h, boxes, layout, reply.sendPort));
+    _inbox.send((job, reply.sendPort));
     final result = await reply.first;
-    reply.close();
-    if (result is List<NewFace>) return result;
+    if (result is T) return result;
     throw StateError('Face worker failed: $result');
   }
 
-  void stop() => _isolate.kill(priority: Isolate.immediate);
+  /// Work already handed over is finished first; then the isolate frees
+  /// the model and ends.
+  void stop() => _inbox.send(null);
 }
 
-void _workerMain(SendPort hello) {
+void _workerMain((SendPort, _WorkerSetup) start) {
+  final (hello, setup) = start;
+  final _Models models;
+  try {
+    models = _Models.open(setup);
+  } catch (e) {
+    hello.send('$e');
+    return;
+  }
   final inbox = ReceivePort();
   hello.send(inbox.sendPort);
   inbox.listen((message) {
-    final (pixels, w, h, boxes, layout, reply) = message as (
-      TransferableTypedData,
-      int,
-      int,
-      List<_FaceBox>,
-      _ModelLayout,
-      SendPort,
-    );
+    if (message == null) {
+      models.close();
+      inbox.close();
+      return;
+    }
+    final (job, reply) = message as (Object, SendPort);
     try {
-      reply.send(_embed(pixels.materialize().asUint8List(), w, h, boxes, layout));
+      reply.send(switch (job) {
+        _EmbedJob() => _embed(job, models),
+        _CropsJob() => _embedCrops(job.jpegs, models),
+        _ => 'Unknown job',
+      });
     } catch (e) {
       reply.send('$e');
     }
   });
 }
 
+/// The face model inside the background isolate: on the CPU from the start,
+/// and on a faster chip once enough faces have come through to be worth
+/// starting one.
+class _Models {
+  _Models._(this._cpu, this.layout, this._model, this._statePath, this._stateKey, this._chip);
+
+  factory _Models.open(_WorkerSetup setup) {
+    final model = setup.model.materialize().asUint8List();
+    final cpu = OpenModel(model, Accel.cpu);
+    final inputs = cpu.interpreter.getInputTensors();
+    final output = cpu.interpreter.getOutputTensors().first.shape;
+    final layout = _ModelLayout(
+      inputCount: inputs.length,
+      channelsFirst: inputs.first.shape[1] == 3,
+      outputIs2d: output.length > 1,
+      outputRows: output.length > 1 ? output[0] : 1,
+      embeddingSize: output.last,
+    );
+    return _Models._(
+        cpu, layout, setup.chip == AccelChoice.cpu ? null : model, setup.statePath, setup.stateKey, setup.chip);
+  }
+
+  final OpenModel _cpu;
+  final _ModelLayout layout;
+  final String _statePath, _stateKey;
+  final AccelChoice _chip;
+
+  /// The model file, kept until the chip is settled.
+  Uint8List? _model;
+
+  /// The model on the GPU or NPU, once that's been found to work.
+  OpenModel? _fast;
+  Accel _fastChip = Accel.cpu;
+  int _faces = 0;
+
+  /// Fingerprints for [tensors], on the best chip that's ready.
+  List<Float32List> run(List<Float32List> tensors) {
+    if (tensors.isEmpty) return const [];
+    _faces += tensors.length;
+    if (_model != null && _faces > _warmUpFaces) {
+      try {
+        _settle();
+      } catch (_) {
+        // Whatever went wrong, the CPU still works.
+      }
+    }
+    final fast = _fast;
+    if (fast != null) {
+      try {
+        return _runModel(fast.interpreter, tensors, layout);
+      } catch (_) {
+        // The chip gave up mid-scan: finish on the CPU and don't go back.
+        _dropFast();
+      }
+    }
+    return _runModel(_cpu.interpreter, tensors, layout);
+  }
+
+  /// Picks the chip for the rest of this run: tries the ones not tried
+  /// before (same fingerprints as the CPU, and how fast), then starts the
+  /// quickest, or the one Settings asked for.
+  void _settle() {
+    final model = _model!;
+    _model = null;
+    final state = AccelState.read(_statePath, _stateKey);
+    if (state.settleCrash()) state.write(_statePath);
+    final probe = [for (var k = 0; k < layout.inputCount; k++) _probeFace(k, layout.channelsFirst)];
+    final truth = _runModel(_cpu.interpreter, probe, layout);
+    state.ms[Accel.cpu] = _msPerFace(_cpu.interpreter, probe, layout);
+
+    final open = <Accel, OpenModel>{};
+    void tryOut(Accel chip) {
+      if (chip == Accel.cpu || state.bad.contains(chip) || open.containsKey(chip)) return;
+      // Only a first try leaves a mark: a chip that has worked before isn't
+      // blamed when the app happens to be closed while it starts.
+      if (!state.ms.containsKey(chip)) {
+        state.trying = chip;
+        state.write(_statePath);
+      }
+      OpenModel? opened;
+      try {
+        opened = OpenModel(model, chip);
+        if (!_sameFaces(truth, _runModel(opened.interpreter, probe, layout))) {
+          throw StateError('Different fingerprints');
+        }
+        state.ms[chip] = _msPerFace(opened.interpreter, probe, layout);
+        open[chip] = opened;
+      } catch (_) {
+        try {
+          opened?.close();
+        } catch (_) {}
+        state.bad.add(chip);
+        state.ms.remove(chip);
+      }
+      state.trying = null;
+      state.write(_statePath);
+    }
+
+    final only = _chip.only;
+    if (only != null) {
+      tryOut(only);
+    } else {
+      for (final chip in const [Accel.npu, Accel.gpu]) {
+        if (!state.tried(chip)) tryOut(chip);
+      }
+    }
+    final pick = only ?? state.best;
+    tryOut(pick);
+    state.write(_statePath);
+    _fast = open.remove(pick);
+    _fastChip = pick;
+    for (final other in open.values) {
+      other.close();
+    }
+  }
+
+  void _dropFast() {
+    final chip = _fastChip;
+    try {
+      _fast?.close();
+    } catch (_) {}
+    _fast = null;
+    AccelState.read(_statePath, _stateKey)
+      ..bad.add(chip)
+      ..ms.remove(chip)
+      ..write(_statePath);
+  }
+
+  void close() {
+    try {
+      _fast?.close();
+      _cpu.close();
+    } catch (_) {}
+  }
+}
+
+/// A made-up face for trying a chip out: smooth shapes with a little grain,
+/// the same every time.
+Float32List _probeFace(int k, bool channelsFirst) {
+  final rgb = Uint8List(_crop * _crop * 3);
+  var grain = 12345 + k * 977;
+  var o = 0;
+  for (var y = 0; y < _crop; y++) {
+    for (var x = 0; x < _crop; x++) {
+      for (var c = 0; c < 3; c++) {
+        grain = (grain * 1103515245 + 12345) & 0x7fffffff;
+        final wave = math.sin(x * (0.07 + 0.02 * c) + k) * math.cos(y * 0.05 + c);
+        rgb[o++] = (127.5 + 90 * wave + (grain >> 16) % 31 - 15).round().clamp(0, 255);
+      }
+    }
+  }
+  return _toTensor(rgb, channelsFirst);
+}
+
+/// Whether [got] are the same fingerprints as [truth] (both unit length).
+bool _sameFaces(List<Float32List> truth, List<Float32List> got) {
+  if (truth.length != got.length) return false;
+  for (var i = 0; i < truth.length; i++) {
+    final a = truth[i], b = got[i];
+    if (a.length != b.length) return false;
+    var dot = 0.0;
+    for (var j = 0; j < a.length; j++) {
+      dot += a[j] * b[j];
+    }
+    // Written this way round so "not a number" fails too.
+    if (!(dot >= _sameFace)) return false;
+  }
+  return true;
+}
+
+/// Milliseconds a face: the middle of a few timed runs, after one more to
+/// let the chip finish setting up.
+double _msPerFace(Interpreter interpreter, List<Float32List> probe, _ModelLayout layout) {
+  _runModel(interpreter, probe, layout);
+  final watch = Stopwatch();
+  final times = <int>[];
+  for (var i = 0; i < 7; i++) {
+    watch
+      ..reset()
+      ..start();
+    _runModel(interpreter, probe, layout);
+    watch.stop();
+    times.add(watch.elapsedMicroseconds);
+  }
+  times.sort();
+  return times[times.length ~/ 2] / 1000 / probe.length;
+}
+
 class _ModelLayout {
   _ModelLayout({
-    required this.address,
     required this.inputCount,
     required this.channelsFirst,
     required this.outputIs2d,
@@ -203,10 +424,9 @@ class _ModelLayout {
     required this.embeddingSize,
   });
 
-  final int address;
   final bool outputIs2d;
 
-  /// The bundled MobileFaceNet takes two faces per run (img1, img2).
+  /// How many faces the model takes per run.
   final int inputCount;
   final bool channelsFirst;
   final int outputRows;
@@ -224,16 +444,17 @@ class _FaceBox {
   final (double, double)? eyeL, eyeR;
 }
 
-/// Background-isolate work: align each face from the RGBA [pixels] and run
-/// the model.
-List<NewFace> _embed(
-    Uint8List pixels, int w, int h, List<_FaceBox> boxes, _ModelLayout layout) {
+/// Background-isolate work: align each face from the photo's RGBA pixels
+/// and run the model.
+List<NewFace> _embed(_EmbedJob job, _Models models) {
+  final pixels = job.pixels.materialize().asUint8List();
+  final (w, h, boxes) = (job.w, job.h, job.boxes);
   final tensors = <Float32List>[];
   final thumbs = <Uint8List>[];
   final sharpness = <double>[];
   for (final b in boxes) {
     final crop = _alignedCrop(pixels, w, h, b);
-    tensors.add(_toTensor(crop, layout.channelsFirst));
+    tensors.add(_toTensor(crop, models.layout.channelsFirst));
     sharpness.add(_sharpness(crop));
     thumbs.add(img.encodeJpg(
       img.Image.fromBytes(
@@ -247,7 +468,7 @@ List<NewFace> _embed(
     ));
   }
 
-  final embeddings = _runModel(tensors, layout);
+  final embeddings = models.run(tensors);
 
   return [
     for (var i = 0; i < boxes.length; i++)
@@ -267,7 +488,7 @@ List<NewFace> _embed(
 }
 
 /// Fingerprints for stored face crops (already aligned 112x112 JPEGs).
-List<Float32List?> _embedCrops(List<Uint8List> jpegs, _ModelLayout layout) {
+List<Float32List?> _embedCrops(List<Uint8List> jpegs, _Models models) {
   final tensors = <Float32List>[];
   final ok = <int>[];
   for (final (i, j) in jpegs.indexed) {
@@ -283,20 +504,19 @@ List<Float32List?> _embedCrops(List<Uint8List> jpegs, _ModelLayout layout) {
       rgb[o++] = p.g.toInt();
       rgb[o++] = p.b.toInt();
     }
-    tensors.add(_toTensor(rgb, layout.channelsFirst));
+    tensors.add(_toTensor(rgb, models.layout.channelsFirst));
     ok.add(i);
   }
   final out = List<Float32List?>.filled(jpegs.length, null);
-  for (final (k, e) in _runModel(tensors, layout).indexed) {
+  for (final (k, e) in models.run(tensors).indexed) {
     out[ok[k]] = e;
   }
   return out;
 }
 
 /// Runs the model over [tensors], [_ModelLayout.inputCount] faces at a time.
-List<Float32List> _runModel(List<Float32List> tensors, _ModelLayout layout) {
+List<Float32List> _runModel(Interpreter interpreter, List<Float32List> tensors, _ModelLayout layout) {
   if (tensors.isEmpty) return const [];
-  final interpreter = Interpreter.fromAddress(layout.address, allocated: true);
   final embeddings = <Float32List>[];
   final perRun = layout.inputCount;
   for (var start = 0; start < tensors.length; start += perRun) {
