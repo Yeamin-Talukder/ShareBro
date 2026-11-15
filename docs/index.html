@@ -37,7 +37,8 @@
 <link rel="icon" href="assets/img/icon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="assets/img/icon-180.png">
 <link rel="manifest" href="site.webmanifest">
-<link rel="preload" href="screenshots/people.jpg" as="image">
+<link rel="preload" href="screenshots/people.jpg" as="image" fetchpriority="high">
+<link rel="preconnect" href="https://api.github.com" crossorigin>
 <link rel="stylesheet" href="assets/css/site.css">
 
 <script type="application/ld+json">
@@ -158,6 +159,8 @@
     <symbol id="i-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
     <symbol id="i-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
     <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3.2 2.7 5.5 6 .9-4.35 4.25 1.03 6L12 17l-5.38 2.85 1.03-6L3.3 9.6l6-.9z"/></symbol>
+    <symbol id="i-fork" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="2.2"/><circle cx="18" cy="5" r="2.2"/><circle cx="12" cy="19" r="2.2"/><path d="M6 7.2v1.3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7.2M12 11.5v5.3"/></symbol>
     <symbol id="i-github" viewBox="0 0 24 24"><path fill="currentColor" d="M12 .5C5.65.5.5 5.65.5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/></symbol>
   </defs>
 </svg>
@@ -172,14 +175,14 @@
       <a href="#privacy">Privacy</a>
       <a href="#faq">FAQ</a>
           <div class="menu-extra">
-        <a class="btn btn-ghost" href="https://github.com/Yeamin-Talukder/ShareBro" rel="noopener"><svg class="icon"><use href="#i-github"/></svg>GitHub</a>
+        <a class="btn btn-ghost" href="https://github.com/Yeamin-Talukder/ShareBro" rel="noopener"><svg class="icon"><use href="#i-star"/></svg>Star on GitHub</a>
         <a class="btn btn-primary" href="#download"><svg class="icon"><use href="#i-download"/></svg>Download</a>
       </div>
     </nav>
     <div class="nav-cta">
-      <a class="btn btn-ghost btn-sm nav-gh" href="https://github.com/Yeamin-Talukder/ShareBro" rel="noopener" aria-label="ShareBro on GitHub"><svg class="icon"><use href="#i-github"/></svg><span>GitHub</span></a>
+      <a class="btn btn-ghost btn-sm nav-gh" href="https://github.com/Yeamin-Talukder/ShareBro" rel="noopener" aria-label="Star ShareBro on GitHub"><svg class="icon"><use href="#i-github"/></svg><span>Star</span><span class="gh-count is-loading" data-gh-wrap><span data-gh="stars" aria-hidden="true"></span></span></a>
       <a class="btn btn-primary btn-sm nav-dl" href="#download"><svg class="icon"><use href="#i-download"/></svg><span>Download</span></a>
-      <button class="menu-btn" aria-controls="menu" aria-expanded="false" aria-label="Menu"><svg class="icon"><use href="#i-menu"/></svg></button>
+      <button class="menu-btn" type="button" aria-controls="menu" aria-expanded="false" aria-label="Menu"><svg class="icon"><use href="#i-menu"/></svg></button>
     </div>
   </div>
   <div class="progress" aria-hidden="true"></div>
@@ -188,7 +191,6 @@
 <main id="main">
   <!-- ============ HERO ============ -->
   <section class="hero" id="top">
-    <div class="glow a"></div><div class="glow b"></div>
     <div class="wrap">
       <div>
         <a class="eyebrow rise" href="https://github.com/Yeamin-Talukder/ShareBro/releases/latest" rel="noopener"><b>NEW</b>Search your photos by place name</a>
@@ -196,7 +198,7 @@
         <p class="lead rise" style="--d:.12s">ShareBro is a free Android app for the friend who takes all the photos. It groups thousands of trip photos by the people in them and sends each friend just their photos, at full quality. No cloud, no uploads, no account.</p>
         <div class="cta-row rise" style="--d:.18s">
           <div class="dl-split">
-            <a class="btn btn-primary dl-main" href="https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.5.0/ShareBro-v1.5.0-arm64-v8a.apk" data-apk><svg class="icon"><use href="#i-download"/></svg>Download for Android <small><span data-version>v1.5.0</span> · <span data-apk-size>95 MB</span></small></a>
+            <a class="btn btn-primary dl-main" href="https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.5.0/ShareBro-v1.5.0-arm64-v8a.apk" data-apk><svg class="icon"><use href="#i-download"/></svg>Download for Android</a>
             <button class="btn btn-primary dl-toggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="dl-menu" aria-label="Choose another version of the app"><svg class="icon"><use href="#i-chevron"/></svg></button>
             <div class="dl-menu" id="dl-menu" role="menu" aria-label="APK versions">
               <p class="head">Choose your version</p>
@@ -206,24 +208,24 @@
               <a role="menuitem" class="all" href="https://github.com/Yeamin-Talukder/ShareBro/releases/latest" rel="noopener"><svg class="icon"><use href="#i-github"/></svg>All releases and checksums</a>
             </div>
           </div>
-          <a class="btn btn-ghost" href="#video"><svg class="icon"><use href="#i-play"/></svg>Watch the 1-minute video</a>
+          <a class="btn btn-ghost btn-star" href="https://github.com/Yeamin-Talukder/ShareBro" rel="noopener"><svg class="icon"><use href="#i-star"/></svg>Star on GitHub<span class="gh-count is-loading" data-gh-wrap><span data-gh="stars" aria-hidden="true"></span><span class="sr-only"></span></span></a>
         </div>
+        <a class="watch rise" style="--d:.21s" href="#video"><span class="watch-ic"><svg class="icon"><use href="#i-play"/></svg></span>Watch the 1-minute video</a>
         <div class="facts rise" style="--d:.24s">
           <span class="dl-count" data-dl-count hidden><svg class="icon"><use href="#i-download"/></svg><b data-downloads>0</b>&nbsp;downloads</span>
           <span><svg class="icon"><use href="#i-check"/></svg>Free</span>
           <span><svg class="icon"><use href="#i-cloud-off"/></svg>Works offline</span>
-          <span><svg class="icon"><use href="#i-android"/></svg>Android 9+</span>
-          <span><svg class="icon"><use href="#i-github"/></svg>Source on GitHub</span>
+          <span><svg class="icon"><use href="#i-android"/></svg><span>Android 9+ · <span data-version>v1.5.0</span> · <span data-apk-size>95 MB</span></span></span>
         </div>
       </div>
 
-      <div class="stage reveal" style="--d:.2s" aria-label="ShareBro screens">
+      <div class="stage reveal" style="--d:.2s" role="group" aria-label="ShareBro screens">
         <div class="device back l" aria-hidden="true"><div class="screen"><img src="screenshots/person.jpg" alt="" width="540" height="1114" loading="lazy"></div></div>
         <div class="device back" aria-hidden="true"><div class="screen"><img src="screenshots/web-gallery.jpg" alt="" width="540" height="1169" loading="lazy"></div></div>
         <div class="device main">
           <div class="notch"></div>
           <div class="screen cycle">
-            <img class="on" src="screenshots/people.jpg" alt="ShareBro People screen: one circle per friend with how many photos each is in" width="540" height="1114">
+            <img class="on" fetchpriority="high" src="screenshots/people.jpg" alt="ShareBro People screen: one circle per friend with how many photos each is in" width="540" height="1114">
             <img src="screenshots/scanning.jpg" alt="Scanning a trip: faces found while the photos are checked" width="540" height="1114" loading="lazy">
             <img src="screenshots/send.jpg" alt="Send 12 photos to Ruby at original quality" width="540" height="1114" loading="lazy">
             <img src="screenshots/trip-group.jpg" alt="Trip group with a 4-digit join code" width="540" height="1114" loading="lazy">
@@ -436,6 +438,16 @@
           <a href="https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.5.0/ShareBro-v1.5.0-armeabi-v7a.apk" data-abi="armeabi-v7a"><b>armeabi-v7a</b><em>Older 32-bit phones</em><span>83 MB</span></a>
           <a href="https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.5.0/ShareBro-v1.5.0-x86_64.apk" data-abi="x86_64"><b>x86_64</b><em>Emulators and Chromebooks</em><span>100 MB</span></a>
         </div>
+        <div class="gh-band">
+          <div class="gh-text">
+            <h3>Like ShareBro? Give it a star.</h3>
+            <p>It's free, takes a second on GitHub, and helps more people find the app.</p>
+          </div>
+          <div class="gh-actions">
+            <a class="btn btn-ghost btn-star" href="https://github.com/Yeamin-Talukder/ShareBro" rel="noopener"><svg class="icon"><use href="#i-star"/></svg>Star on GitHub<span class="gh-count is-loading" data-gh-wrap><span data-gh="stars" aria-hidden="true"></span><span class="sr-only"></span></span></a>
+            <a class="gh-stat is-loading" href="https://github.com/Yeamin-Talukder/ShareBro/forks" rel="noopener" data-gh-wrap><svg class="icon"><use href="#i-fork"/></svg><b data-gh="forks"></b><span data-gh-unit data-one="fork" data-many="forks">forks</span></a>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -448,7 +460,7 @@
       <p style="margin-top:12px;max-width:26em">Your trip photos, sorted by face and sent to every friend. Made by <a class="u" href="https://github.com/Yeamin-Talukder" rel="noopener">Md Yeamin Talukder</a>.</p>
     </div>
     <div>
-      <h4>App</h4>
+      <h2 class="foot-h">App</h2>
       <ul>
         <li><a href="#how">How it works</a></li>
         <li><a href="#features">Features</a></li>
@@ -457,8 +469,9 @@
       </ul>
     </div>
     <div>
-      <h4>GitHub</h4>
+      <h2 class="foot-h">GitHub</h2>
       <ul>
+        <li><a href="https://github.com/Yeamin-Talukder/ShareBro" rel="noopener">Star on GitHub</a></li>
         <li><a href="https://github.com/Yeamin-Talukder/ShareBro" rel="noopener">Source code</a></li>
         <li><a href="https://github.com/Yeamin-Talukder/ShareBro/releases" rel="noopener">Releases</a></li>
         <li><a href="https://github.com/Yeamin-Talukder/ShareBro/issues" rel="noopener">Report a bug</a></li>

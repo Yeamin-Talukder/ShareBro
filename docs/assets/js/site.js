@@ -17,11 +17,30 @@
   window.addEventListener('scroll', onScroll, { passive: true });
   const menuBtn = $('.menu-btn'), links = $('.nav-links');
   if (menuBtn && links) {
-    menuBtn.addEventListener('click', () => {
+    const close = () => { links.classList.remove('open'); menuBtn.setAttribute('aria-expanded', 'false'); };
+    menuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       const open = links.classList.toggle('open');
       menuBtn.setAttribute('aria-expanded', open);
     });
-    $$('a', links).forEach((a) => a.addEventListener('click', () => { links.classList.remove('open'); menuBtn.setAttribute('aria-expanded', 'false'); }));
+    $$('a', links).forEach((a) => a.addEventListener('click', close));
+    document.addEventListener('click', (e) => { if (links.classList.contains('open') && !links.contains(e.target)) close(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && links.classList.contains('open')) { close(); menuBtn.focus(); }
+    });
+  }
+
+  // Nav: mark the section you're reading.
+  const navLinks = $$('.nav-links > a[href^="#"]');
+  if (navLinks.length && 'IntersectionObserver' in window) {
+    const byId = new Map(navLinks.map((a) => [a.getAttribute('href').slice(1), a]));
+    const spy = new IntersectionObserver((entries) => entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      navLinks.forEach((a) => a.removeAttribute('aria-current'));
+      const a = byId.get(e.target.id);
+      if (a) a.setAttribute('aria-current', 'true');
+    }), { rootMargin: '-45% 0px -50% 0px' });
+    $$('main section[id]').forEach((s) => spy.observe(s));
   }
 
   // Reveal sections as they scroll in.
@@ -173,38 +192,127 @@
     io.observe(el);
   };
 
-  // Releases from GitHub: the latest one's version, sizes and APK links,
-  // and how many times the app has been downloaded (APK files only, every
-  // release). The page works without this; it just stays as written, and
-  // the download count stays hidden.
+  // ---------- live numbers from the public GitHub API ----------
+  // Unauthenticated requests get 60 an hour per visitor IP, so answers are
+  // kept in localStorage for a while and reused, an old answer is shown when
+  // GitHub can't be reached, and nothing is asked again until a rate limit
+  // resets. The page works without any of this: it stays as written, and a
+  // number that never arrived is hidden rather than shown wrong.
   const REPO = 'Yeamin-Talukder/ShareBro';
-  fetch(`https://api.github.com/repos/${REPO}/releases?per_page=100`, { headers: { Accept: 'application/vnd.github+json' } })
-    .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-    .then((list) => {
-      const published = list.filter((r) => !r.draft && !r.prerelease);
-      const downloads = published.reduce((sum, r) => sum + (r.assets || [])
+  const API = `https://api.github.com/repos/${REPO}`;
+  const FRESH_MS = 30 * 60 * 1000; // reuse an answer for 30 minutes
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (_) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { /* private mode, full */ } },
+  };
+  const LIMIT_KEY = 'sb:gh-limited-until';
+
+  // Resolves with { data, stale } from the network or the cache; rejects only
+  // when there is neither. `pick` shrinks the response to what we keep.
+  const cachedJSON = (key, url, pick) => {
+    const hit = store.get(key);
+    const now = Date.now();
+    if (hit && now - hit.t < FRESH_MS) return Promise.resolve({ data: hit.d, stale: false });
+    const fallback = (why) => (hit ? { data: hit.d, stale: true } : Promise.reject(why));
+    if ((store.get(LIMIT_KEY) || 0) > now) return Promise.resolve().then(() => fallback('rate-limited'));
+    const ctrl = 'AbortController' in window ? new AbortController() : null;
+    const timer = ctrl && setTimeout(() => ctrl.abort(), 8000);
+    return fetch(url, { headers: { Accept: 'application/vnd.github+json' }, signal: ctrl && ctrl.signal })
+      .then((r) => {
+        if (r.ok) return r.json();
+        // 403/429 with no requests left: wait for the reset before asking again.
+        const left = r.headers.get('x-ratelimit-remaining');
+        if (r.status === 429 || (r.status === 403 && left === '0')) {
+          const reset = +r.headers.get('x-ratelimit-reset') * 1000 || now + 15 * 60 * 1000;
+          store.set(LIMIT_KEY, reset);
+        }
+        return Promise.reject(r.status);
+      })
+      .then((json) => {
+        const d = pick(json);
+        store.set(key, { t: Date.now(), d });
+        return { data: d, stale: false };
+      })
+      .catch(fallback)
+      .finally(() => timer && clearTimeout(timer));
+  };
+
+  // 999 → "999", 1234 → "1.2k", 12345 → "12k", 1250000 → "1.3M".
+  const compact = (n) => {
+    if (!Number.isFinite(n) || n < 0) return '';
+    if (n < 1000) return String(n);
+    const [div, unit] = n < 1e6 ? [1e3, 'k'] : [1e6, 'M'];
+    const v = n / div;
+    return (v < 10 ? Math.floor(v * 10) / 10 : Math.floor(v)).toString().replace(/\.0$/, '') + unit;
+  };
+  const plural = (n, one, many) => `${n.toLocaleString('en-US')} ${n === 1 ? one : many}`;
+
+  // Stars and forks: every [data-gh="stars|forks"] gets the short number;
+  // its nearest [data-gh-wrap] gets a full-number label and leaves the
+  // loading state. If there's no number at all, the badge is hidden and the
+  // button still links to GitHub.
+  const ghSlots = $$('[data-gh]');
+  if (ghSlots.length) {
+    cachedJSON('sb:gh-repo', API, (j) => ({ stars: j.stargazers_count, forks: j.forks_count }))
+      .then(({ data }) => {
+        ghSlots.forEach((el) => {
+          const kind = el.dataset.gh, n = data[kind];
+          const wrap = el.closest('[data-gh-wrap]') || el;
+          wrap.classList.remove('is-loading');
+          wrap.removeAttribute('aria-busy');
+          if (!Number.isFinite(n)) { wrap.hidden = true; return; }
+          el.textContent = compact(n);
+          const label = kind === 'stars' ? plural(n, 'star', 'stars') : plural(n, 'fork', 'forks');
+          el.setAttribute('title', label);
+          const sr = $('.sr-only', wrap);
+          if (sr) sr.textContent = `, ${label}`;
+          const unit = $('[data-gh-unit]', wrap);
+          if (unit) unit.textContent = n === 1 ? unit.dataset.one : unit.dataset.many;
+        });
+      })
+      .catch(() => ghSlots.forEach((el) => {
+        const wrap = el.closest('[data-gh-wrap]') || el;
+        wrap.classList.remove('is-loading');
+        wrap.removeAttribute('aria-busy');
+        wrap.hidden = true;
+      }));
+  }
+
+  // Releases: the latest one's version, sizes and APK links, and how many
+  // times the app has been downloaded (APK files only, every release).
+  const pickReleases = (list) => {
+    const published = list.filter((r) => !r.draft && !r.prerelease);
+    const rel = published[0];
+    const apks = (rel && rel.assets ? rel.assets : []).filter((a) => a.name.endsWith('.apk'))
+      .map((a) => ({ name: a.name, url: a.browser_download_url, size: a.size }));
+    return {
+      downloads: published.reduce((sum, r) => sum + (r.assets || [])
         .filter((a) => a.name.endsWith('.apk'))
-        .reduce((s, a) => s + a.download_count, 0), 0);
-      if (downloads > 0) {
-        $$('[data-downloads]').forEach((el) => countTo(el, downloads));
-        $$('[data-releases]').forEach((el) => (el.textContent = published.length));
+        .reduce((s, a) => s + a.download_count, 0), 0),
+      releases: published.length,
+      version: rel ? (rel.tag_name || '').replace(/^v/, '') : '',
+      apks,
+    };
+  };
+  cachedJSON('sb:gh-releases', `${API}/releases?per_page=100`, pickReleases)
+    .then(({ data }) => {
+      if (data.downloads > 0) {
+        $$('[data-downloads]').forEach((el) => countTo(el, data.downloads));
+        $$('[data-releases]').forEach((el) => (el.textContent = data.releases));
         $$('[data-dl-count]').forEach((el) => (el.hidden = false));
       }
-      const rel = published[0];
-      if (!rel) return;
-      const version = (rel.tag_name || '').replace(/^v/, '');
-      const assets = rel.assets || [];
-      const find = (abi) => assets.find((a) => a.name.endsWith(`${abi}.apk`));
+      if (!data.version) return;
+      const find = (abi) => data.apks.find((a) => a.name.endsWith(`${abi}.apk`));
       const mb = (a) => `${Math.round(a.size / 1048576)} MB`;
-      $$('[data-version]').forEach((e) => (e.textContent = `v${version}`));
+      $$('[data-version]').forEach((e) => (e.textContent = `v${data.version}`));
       const arm = find('arm64-v8a');
       if (arm) {
-        $$('[data-apk]').forEach((a) => (a.href = arm.browser_download_url));
+        $$('[data-apk]').forEach((a) => (a.href = arm.url));
         $$('[data-apk-size]').forEach((e) => (e.textContent = mb(arm)));
       }
       ['arm64-v8a', 'armeabi-v7a', 'x86_64'].forEach((abi) => {
         const a = find(abi);
-        if (a) $$(`[data-abi="${abi}"]`).forEach((row) => { row.href = a.browser_download_url; const s = $('span', row); if (s) s.textContent = mb(a); });
+        if (a) $$(`[data-abi="${abi}"]`).forEach((row) => { row.href = a.url; const s = $('span', row); if (s) s.textContent = mb(a); });
       });
     })
     .catch(() => {});
