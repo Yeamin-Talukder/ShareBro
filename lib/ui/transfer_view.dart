@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' show PathMetric;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 import 'package:path/path.dart' as p;
 
 import '../data/dates.dart';
@@ -20,6 +20,7 @@ import 'motion.dart';
 import 'sections.dart';
 import 'send_center_screen.dart';
 import 'share_screen.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 /// Where a transfer is, as the stage draws it.
@@ -169,7 +170,7 @@ class _TransferStageState extends State<TransferStage> with SingleTickerProvider
                               Icon(Icons.touch_app_rounded, size: 16, color: scheme.primary),
                               const SizedBox(width: 5),
                               const Text('Accept?',
-                                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white)),
+                                  style: TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w700, color: Colors.white)),
                             ]),
                           ),
                         ),
@@ -198,7 +199,7 @@ class _TransferStageState extends State<TransferStage> with SingleTickerProvider
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: TextSize.caption,
                                 fontWeight: FontWeight.w600,
                                 color: phase == TransferPhase.failed ? scheme.error : scheme.onSurfaceVariant,
                               )),
@@ -539,7 +540,7 @@ class TransferStats extends StatelessWidget {
               key: ValueKey(caption),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+              style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant),
             ),
           ),
           if (stats.isNotEmpty) ...[
@@ -566,12 +567,12 @@ class TransferStats extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                fontSize: 18,
+                                fontSize: TextSize.headline,
                                 fontWeight: FontWeight.w800,
                                 fontFeatures: [FontFeature.tabularFigures()],
                               ),
                             ),
-                            Text(label, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                            Text(label, style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
                           ]),
                         ),
                       ),
@@ -694,7 +695,7 @@ Widget _heading(BuildContext context, String title, String subtitle) => Padding(
         Text(subtitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            style: TextStyle(fontSize: TextSize.label, color: Theme.of(context).colorScheme.onSurfaceVariant)),
       ]),
     );
 
@@ -703,9 +704,9 @@ Widget _filesCard(BuildContext context, String title, int bytes, Widget mosaic) 
       padding: const EdgeInsets.all(14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          Text(title, style: const TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w700)),
           const Spacer(),
-          Text(formatBytes(bytes), style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          Text(formatBytes(bytes), style: TextStyle(fontSize: TextSize.caption, color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ]),
         const SizedBox(height: 10),
         mosaic,
@@ -896,7 +897,7 @@ class TransferScreen extends StatelessWidget {
                       child: Text(
                         'It keeps going in the background if you leave.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        style: TextStyle(fontSize: TextSize.caption, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     ),
                 ],

@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 
 import '../data/db.dart';
 import 'motion.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 /// Ways to see People: the grid and bubbles, and six spatial views you
@@ -428,11 +429,11 @@ class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStat
           TextSpan(children: [
             TextSpan(
               text: p.name ?? 'Add a name',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: p.name == null ? scheme.primary : scheme.onSurface),
+              style: TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w700, color: p.name == null ? scheme.primary : scheme.onSurface),
             ),
             TextSpan(
               text: '\n${p.photoCount} photos',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: scheme.onSurfaceVariant),
+              style: TextStyle(fontSize: TextSize.tiny, fontWeight: FontWeight.w500, color: scheme.onSurfaceVariant),
             ),
           ]),
           textAlign: TextAlign.center,
@@ -481,7 +482,7 @@ class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStat
                           child: Text(widget.hubLabel ?? 'Everyone',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: scheme.onPrimary)),
+                              style: TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w800, color: scheme.onPrimary)),
                         ),
                       ]),
                     ),
@@ -509,7 +510,7 @@ class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStat
                   bottom: 12,
                   child: IgnorePointer(
                     child: Text(_hint,
-                        textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant)),
+                        textAlign: TextAlign.center, style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
                   ),
                 ),
               ]);

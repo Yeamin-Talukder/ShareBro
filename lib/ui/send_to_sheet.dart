@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
 
@@ -10,6 +10,7 @@ import 'devices.dart';
 import 'file_icons.dart';
 import 'motion.dart';
 import 'sections.dart';
+import 'theme.dart';
 import 'transfer_view.dart';
 import 'web_share_screen.dart';
 import 'widgets.dart';
@@ -194,7 +195,7 @@ class ItemStrip extends StatelessWidget {
                 child: Text(item.text!,
                     maxLines: 4,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11, color: scheme.onSecondaryContainer)),
+                    style: TextStyle(fontSize: TextSize.tiny, color: scheme.onSecondaryContainer)),
               ),
             );
           } else {
@@ -210,7 +211,7 @@ class ItemStrip extends StatelessWidget {
                       maxLines: 2,
                       textAlign: TextAlign.center,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 10)),
+                      style: const TextStyle(fontSize: TextSize.tiny)),
                 ]),
               ),
             );

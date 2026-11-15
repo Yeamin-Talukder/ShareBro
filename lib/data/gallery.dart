@@ -21,12 +21,17 @@ class Gallery {
 
   /// Asks for photo access, including where photos were taken (for the
   /// Places map); false if the user said no.
-  static Future<bool> requestAccess() async => (await PhotoManager.requestPermissionExtend(
-        requestOption: const PermissionRequestOption(
-          androidPermission: AndroidPermission(type: RequestType.common, mediaLocation: true),
-        ),
-      ))
-          .hasAccess;
+  static Future<bool> requestAccess() async =>
+      (await PhotoManager.requestPermissionExtend(requestOption: _permission)).hasAccess;
+
+  /// Whether photo access is allowed now, without asking (for example after
+  /// the user comes back from the app's settings page).
+  static Future<bool> hasAccess() async =>
+      (await PhotoManager.getPermissionState(requestOption: _permission)).hasAccess;
+
+  static const _permission = PermissionRequestOption(
+    androidPermission: AndroidPermission(type: RequestType.common, mediaLocation: true),
+  );
 
   static Future<List<AssetPathEntity>> albums({DaySpan? dates, bool media = false}) =>
       PhotoManager.getAssetPathList(

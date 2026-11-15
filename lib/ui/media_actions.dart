@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -11,6 +11,7 @@ import 'glass.dart';
 import 'island.dart';
 import 'motion.dart';
 import 'send_to_sheet.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 /// What a normal gallery can do with photos and videos: share, send to a
@@ -321,7 +322,7 @@ class ActionButton extends StatelessWidget {
             Text(label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: fg)),
+                style: TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w600, color: fg)),
           ]),
         ),
       ),

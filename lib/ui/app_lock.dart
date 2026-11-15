@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../scan/scan_controller.dart';

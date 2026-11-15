@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/db.dart';
 import '../face/tags.dart';
@@ -17,6 +17,7 @@ import 'glass.dart';
 import 'motion.dart';
 import 'places_screen.dart';
 import 'sections.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 typedef _Meta = (String title, IconData icon);
@@ -522,8 +523,8 @@ class _CategoryCardState extends State<_CategoryCard>
                 Text(widget.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                Text('${widget.count} photos', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12)),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: TextSize.callout)),
+                Text('${widget.count} photos', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: TextSize.small)),
               ]),
             ),
           ]),
@@ -595,7 +596,7 @@ class _TagScreenState extends State<TagScreen> {
                 const SizedBox(width: 8),
                 Text(widget.title,
                     style: const TextStyle(
-                        color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+                        color: Colors.white, fontSize: TextSize.title2, fontWeight: FontWeight.w800)),
               ]).animate().fadeIn(delay: 200.ms).moveX(begin: -12),
             ),
           ]),

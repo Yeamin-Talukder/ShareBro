@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../scan/scan_controller.dart';
@@ -11,6 +11,7 @@ import 'aurora.dart';
 import 'glass.dart';
 import 'motion.dart';
 import 'sections.dart';
+import 'theme.dart';
 
 /// "Find my photos": one QR code for the whole group. Each friend scans it,
 /// takes a selfie in the browser, and gets a gallery of just the photos
@@ -123,14 +124,14 @@ class _FindMeScreenState extends State<FindMeScreen> {
                         ).animate().scaleXY(begin: 0.6, duration: 600.ms, curve: Curves.elasticOut),
                         const SizedBox(height: 14),
                         const Text('Show this to the group',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                            style: TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w700)),
                         const SizedBox(height: 4),
                         GestureDetector(
                           onLongPress: () {
                             Clipboard.setData(ClipboardData(text: url));
                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Link copied')));
                           },
-                          child: Text(url, style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant)),
+                          child: Text(url, style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
                         ),
                       ]),
                     ),

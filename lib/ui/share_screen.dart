@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/dates.dart';
 import '../data/db.dart';
@@ -22,11 +22,13 @@ import 'gallery_view.dart';
 import 'group_screen.dart';
 import 'glass.dart';
 import 'motion.dart';
+import 'permission_explainer.dart';
 import 'photo_viewer.dart';
 import 'receive_screen.dart';
 import 'send_center_screen.dart';
 import 'sections.dart';
 import 'send_to_sheet.dart';
+import 'theme.dart';
 import 'transfer_view.dart';
 import 'web_share_screen.dart';
 import 'widgets.dart';
@@ -62,7 +64,7 @@ class _ShareTabState extends State<ShareTab> {
   }
 
   Future<void> _pickMedia() async {
-    if (!await Gallery.requestAccess() || !mounted) return;
+    if (!await ensurePhotoAccess(context) || !mounted) return;
     final ids = await Navigator.push<List<String>>(
       context,
       MaterialPageRoute(
@@ -224,7 +226,7 @@ class _ShareTabState extends State<ShareTab> {
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Row(children: [
                           Text('${picked[0].toUpperCase()}${picked.substring(1)}',
-                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                              style: const TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w600)),
                           const Spacer(),
                           TextButton(
                             onPressed: () {
@@ -332,7 +334,7 @@ class _PickButton extends StatelessWidget {
             child: Icon(icon, size: 23, color: scheme.onSurface),
           ),
           const SizedBox(height: 7),
-          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: scheme.onSurfaceVariant)),
+          Text(label, style: TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w500, color: scheme.onSurfaceVariant)),
         ]),
       ),
     );
@@ -453,9 +455,10 @@ class _ReceivePanelState extends State<_ReceivePanel> {
       builder: (context, _) {
         final session = r.session;
         final on = r.enabled;
-        void toggle() {
+        Future<void> toggle() async {
           Haptics.tick();
-          s.setReceiving(!on);
+          if (!on) await ensureNearbyAccess(context, s.nearby, quiet: true);
+          await s.setReceiving(!on);
         }
 
         return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -481,12 +484,12 @@ class _ReceivePanelState extends State<_ReceivePanel> {
                 child: Row(key: ValueKey(on), mainAxisSize: MainAxisSize.min, children: [
                   if (on) ...[const _LiveDot(), const SizedBox(width: 7)],
                   Text(on ? 'Visible to nearby devices' : 'Receiving is off',
-                      style: TextStyle(fontSize: 15, color: scheme.onSurfaceVariant)),
+                      style: TextStyle(fontSize: TextSize.callout, color: scheme.onSurfaceVariant)),
                 ]),
               ),
               const SizedBox(height: 3),
               Text('${_ip ?? 'No network'} · port $lsPort',
-                  style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+                  style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
               const SizedBox(height: 16),
               on
                   ? FilledButton.tonal(
@@ -524,7 +527,7 @@ class _ReceivePanelState extends State<_ReceivePanel> {
             SectionRow(
               leading: const IconTile(icon: Icons.lock_rounded, color: Color(0xFF8E8E93)),
               title: 'PIN',
-              trailing: Text(r.pin ?? 'Off', style: TextStyle(fontSize: 16, color: scheme.onSurfaceVariant)),
+              trailing: Text(r.pin ?? 'Off', style: TextStyle(fontSize: TextSize.body, color: scheme.onSurfaceVariant)),
               chevron: true,
               onTap: () => _editPin(r),
             ),
@@ -603,7 +606,7 @@ class _LiveSession extends StatelessWidget {
           leading: CircleAvatar(
             radius: 16,
             backgroundColor: deviceColor(from),
-            child: Text(initials, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+            child: Text(initials, style: const TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w700, color: Colors.white)),
           ),
           title: session.finished ? 'Got ${session.done.length} from $from' : 'Receiving from $from',
           subtitle: '${session.done.length} of ${session.tokens.length} · ${formatBytes(session.bytes)} of ${formatBytes(total)}',

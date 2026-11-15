@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'native_files.dart';
 import 'prepare.dart';
 import 'receive.dart';
 import 'sender.dart';
@@ -17,6 +18,17 @@ const _serviceId = 'com.photoorganizer.photo_organizer.share';
 
 /// Point-to-point is the fastest Nearby mode (it upgrades to Wi-Fi Direct).
 const _strategy = Strategy.P2P_POINT_TO_POINT;
+
+/// Whether Nearby can run with the permissions in [results] on Android [sdk].
+/// The Bluetooth permissions only exist from Android 12 (31) and "nearby
+/// devices" from Android 13 (33); before that permission_handler reports them
+/// as denied, so they must not be required there.
+bool nearbyAllowed(Map<Permission, PermissionStatus> results, int sdk) {
+  bool ok(Permission p) => results[p]?.isGranted ?? false;
+  final bluetooth = sdk < 31 || (ok(Permission.bluetoothScan) && ok(Permission.bluetoothConnect));
+  final wifi = sdk >= 33 && ok(Permission.nearbyWifiDevices);
+  return bluetooth && (wifi || ok(Permission.locationWhenInUse));
+}
 
 /// Phone-to-phone sending between copies of this app with no Wi-Fi network
 /// or hotspot (Google's Nearby Connections: Bluetooth to find each other,
@@ -38,24 +50,29 @@ class NearbyLink extends ChangeNotifier {
   // Sending side.
   _Outgoing? _out;
 
-  /// Asks for Bluetooth / nearby-devices (and location on older Android).
-  Future<bool> ensurePermissions() async {
-    final results = await [
-      Permission.bluetoothScan,
-      Permission.bluetoothAdvertise,
-      Permission.bluetoothConnect,
-      Permission.nearbyWifiDevices,
-      Permission.locationWhenInUse,
-    ].request();
-    bool ok(Permission p) => results[p]?.isGranted ?? false;
-    final bluetooth = ok(Permission.bluetoothScan) && ok(Permission.bluetoothConnect);
-    // Android 13+ uses "nearby devices"; older versions need location.
-    return bluetooth && (ok(Permission.nearbyWifiDevices) || ok(Permission.locationWhenInUse));
-  }
+  static const _permissions = [
+    Permission.bluetoothScan,
+    Permission.bluetoothAdvertise,
+    Permission.bluetoothConnect,
+    Permission.nearbyWifiDevices,
+    Permission.locationWhenInUse,
+  ];
 
+  /// Asks for Bluetooth / nearby-devices (and location on older Android).
+  Future<bool> ensurePermissions() async =>
+      nearbyAllowed(await _permissions.request(), await NativeFiles.androidSdk());
+
+  /// Whether Nearby is already allowed, without asking.
+  Future<bool> hasPermissions() async => nearbyAllowed(
+        {for (final p in _permissions) p: await p.status},
+        await NativeFiles.androidSdk(),
+      );
+
+  /// Starts only once Nearby is allowed; screens ask first
+  /// (ensureNearbyAccess), so this never pops up Android's prompts by itself.
   Future<void> startDiscovery() async {
     if (discovering) return;
-    if (!await ensurePermissions()) return;
+    if (!await hasPermissions()) return;
     try {
       discovering = await Nearby().startDiscovery(
         alias,
@@ -87,7 +104,7 @@ class NearbyLink extends ChangeNotifier {
   /// Lets other phones with this app send to us (while receiving is on).
   Future<void> startAdvertising() async {
     if (advertising) return;
-    if (!await ensurePermissions()) return;
+    if (!await hasPermissions()) return;
     try {
       advertising = await Nearby().startAdvertising(
         alias,

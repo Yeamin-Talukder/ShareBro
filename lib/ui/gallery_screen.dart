@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
@@ -11,9 +11,11 @@ import 'face_refresh.dart';
 import 'gallery_view.dart';
 import 'glass.dart';
 import 'motion.dart';
+import 'permission_explainer.dart';
 import 'scan_screen.dart';
 import 'search_screen.dart';
 import 'sections.dart';
+import 'theme.dart';
 import 'trash_screen.dart';
 import 'widgets.dart';
 
@@ -27,8 +29,35 @@ class _AccessGate extends StatefulWidget {
   State<_AccessGate> createState() => _AccessGateState();
 }
 
-class _AccessGateState extends State<_AccessGate> {
-  late Future<bool> _access = Gallery.requestAccess();
+class _AccessGateState extends State<_AccessGate> with WidgetsBindingObserver {
+  // Check without asking: the gate explains first and asks on Continue.
+  late Future<bool> _access = Gallery.hasAccess();
+
+  /// Asked and refused, so Android may not ask again: point to settings.
+  bool _refused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Back from the settings page (or access allowed elsewhere in the app):
+  /// check again without asking, so the gallery opens by itself.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    _access.then((allowed) async {
+      if (allowed || !mounted || !await Gallery.hasAccess() || !mounted) return;
+      setState(() => _access = Future.value(true));
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,14 +68,42 @@ class _AccessGateState extends State<_AccessGate> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snap.data!) return widget.child;
-        return EmptyIllustration(
-          message: 'Allow photo access to browse your gallery.',
-          action: FilledButton(
-            onPressed: () async {
-              await PhotoManager.openSetting();
-              setState(() => _access = Gallery.requestAccess());
-            },
-            child: const Text('Allow access'),
+        if (_refused) {
+          // Coming back from the settings page re-checks by itself.
+          return EmptyIllustration(
+            message: 'Photo access is off. In ShareBro\'s settings, open Permissions '
+                'and allow Photos and videos.',
+            action: FilledButton(
+              onPressed: () async {
+                if (await Gallery.requestAccess()) {
+                  if (mounted) setState(() => _access = Future.value(true));
+                } else {
+                  await PhotoManager.openSetting();
+                }
+              },
+              child: const Text('Open settings'),
+            ),
+          );
+        }
+        // The explanation, then one button that opens Android's prompt.
+        return Center(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: PermissionExplainer(
+                icon: Icons.photo_library_rounded,
+                title: photoTitle,
+                body: photoBody,
+                onContinue: () async {
+                  final allowed = await Gallery.requestAccess();
+                  if (!mounted) return;
+                  setState(() {
+                    _access = Future.value(allowed);
+                    _refused = !allowed;
+                  });
+                },
+              ),
+            ),
           ),
         );
       },
@@ -89,7 +146,7 @@ class _PhotosTabState extends State<PhotosTab> {
           child: SizedBox.expand(),
         ),
         title: _stepAside(
-            const Text('Photos', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.6))),
+            const Text('Photos', style: TextStyle(fontSize: TextSize.title1, fontWeight: FontWeight.w800, letterSpacing: -0.6))),
         actions: [
           _stepAside(Row(children: [
             IconButton(
@@ -252,7 +309,7 @@ class _AlbumsTabState extends State<AlbumsTab> {
                     child: SectionHeader(
                       title: 'My albums',
                       badge: Text('${albums.length}',
-                          style: TextStyle(fontSize: 15, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                          style: TextStyle(fontSize: TextSize.callout, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                     ),
                   ),
                 ),
@@ -361,9 +418,9 @@ class _AlbumCardState extends State<_AlbumCard> {
                 album.isAll ? 'All photos' : album.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: text.titleSmall?.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
+                style: text.titleSmall?.copyWith(fontSize: TextSize.callout, fontWeight: FontWeight.w700),
               ),
-              Text(snap.hasData ? '$count' : '…', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+              Text(snap.hasData ? '$count' : '…', style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
             ],
           );
         },
@@ -502,7 +559,7 @@ class _SmartCard extends StatelessWidget {
                 title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: TextSize.callout),
               ),
             ],
           ),

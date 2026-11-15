@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/dates.dart';
 import '../data/gazetteer.dart';
@@ -15,6 +15,7 @@ import 'motion.dart';
 import 'photo_viewer.dart';
 import 'real_map.dart';
 import 'sections.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 enum _View { map, journey, places }
@@ -611,8 +612,7 @@ class PhotoPin extends StatelessWidget {
                   top: -8,
                   right: -10,
                   child: Container(
-                    constraints: const BoxConstraints(minWidth: 24),
-                    height: 24,
+                    constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                     padding: const EdgeInsets.symmetric(horizontal: 6),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
@@ -622,7 +622,7 @@ class PhotoPin extends StatelessWidget {
                     ),
                     child: Text(
                       '$count',
-                      style: TextStyle(color: scheme.onPrimary, fontSize: 12, fontWeight: FontWeight.w700),
+                      style: TextStyle(color: scheme.onPrimary, fontSize: TextSize.small, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),
@@ -632,7 +632,7 @@ class PhotoPin extends StatelessWidget {
                     child: Text(
                       label!,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: TextSize.tiny,
                         fontWeight: FontWeight.w700,
                         color: scheme.onSurface,
                         shadows: [Shadow(color: scheme.surface, blurRadius: 4)],
@@ -1069,7 +1069,7 @@ class StopCard extends StatelessWidget {
                     day.toUpperCase(),
                     style: TextStyle(
                       color: scheme.primary,
-                      fontSize: 11.5,
+                      fontSize: TextSize.small,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.6,
                     ),
@@ -1078,9 +1078,9 @@ class StopCard extends StatelessWidget {
                     place.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                    style: const TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w800),
                   ),
-                  Text('${place.photos.length} photos', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+                  Text('${place.photos.length} photos', style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
                 ],
               ),
             ),
@@ -1157,10 +1157,10 @@ class _PlaceList extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(p.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                        Text(p.name, style: const TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w800)),
                         Text(
                           '${p.photos.length} photos · ${_when(p)}',
-                          style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+                          style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant),
                         ),
                         const SizedBox(height: 6),
                         Row(

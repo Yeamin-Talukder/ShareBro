@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coral Contrast Demo</title>
+<style>
+  :root {
+    --surface: #F6F5F8;
+    --card: #FFFFFF;
+    --ink: #1A1820;
+    --muted: #5E5A66;
+    --hair: #E4E1E8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 16px 48px;
+    background: #E9E7EC;
+    color: var(--ink);
+    font-family: Roboto, "Segoe UI", system-ui, sans-serif;
+  }
+  h1 { font-size: 22px; margin: 0 auto 6px; max-width: 760px; }
+  .lead { max-width: 760px; margin: 0 auto 28px; color: var(--muted); font-size: 15px; line-height: 1.5; }
+  .pair { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
+  .col { width: 340px; max-width: 100%; }
+  .tag { font-size: 13px; font-weight: 700; margin: 0 0 10px 4px; }
+  .phone {
+    background: var(--surface);
+    border-radius: 36px;
+    padding: 22px 18px 18px;
+    border: 1px solid var(--hair);
+  }
+  .title { font-size: 22px; font-weight: 700; letter-spacing: -0.2px; margin: 4px 4px 14px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--hair);
+    border-radius: 24px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .name { font-size: 16px; font-weight: 600; }
+  .sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .link { font-size: 14px; font-weight: 500; background: none; border: 0; padding: 10px 12px; border-radius: 99px; font-family: inherit; }
+  .filled {
+    display: block; width: 100%; border: 0; border-radius: 99px; height: 48px;
+    color: #fff; font-size: 14px; font-weight: 700; font-family: inherit; margin-top: 4px;
+  }
+  .danger {
+    display: block; width: 100%; border: 0; border-radius: 99px; height: 44px;
+    color: #fff; font-size: 14px; font-weight: 700; font-family: inherit; margin-top: 10px;
+  }
+  .dock {
+    margin-top: 16px; background: var(--card); border: 1px solid var(--hair); border-radius: 34px;
+    height: 64px; display: flex; align-items: center; padding: 6px;
+  }
+  .tab { flex: 1; text-align: center; font-size: 12px; font-weight: 500; color: #4A4752; }
+  .tab.on { font-weight: 700; border-radius: 28px; height: 100%; display: flex; align-items: center; justify-content: center; }
+  .ratio { font-size: 12px; margin-top: 12px; line-height: 1.7; color: var(--muted); }
+  .ok { color: #13784F; font-weight: 700; }
+  .bad { color: #B42318; font-weight: 700; }
+  .before .accent { color: #D9432B; }
+  .before .filled { background: #D9432B; }
+  .before .danger { background: #E5484D; }
+  .before .tab.on { color: #D9432B; background: rgba(217, 67, 43, .18); }
+  .after .accent { color: #BF3A22; }
+  .after .filled { background: #BF3A22; }
+  .after .danger { background: #D13438; }
+  .after .tab.on { color: #BF3A22; background: rgba(191, 58, 34, .18); }
+  .note { max-width: 760px; margin: 28px auto 0; font-size: 14px; color: var(--muted); line-height: 1.5; }
+</style>
+</head>
+<body>
+  <h1>Light mode coral: before and after</h1>
+  <p class="lead">Same screen, two corals. The new one is a touch deeper so plain coral text (links, text buttons) reaches the 4.5:1 contrast that small text needs. Dark mode doesn't change.</p>
+
+  <div class="pair">
+    <div class="col before">
+      <p class="tag">Before · #D9432B</p>
+      <div class="phone">
+        <div class="title">Trips</div>
+        <div class="card">
+          <div class="row">
+            <div><div class="name">Cox's Bazar</div><div class="sub">412 photos · 9 people</div></div>
+            <button class="link accent">See all</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row">
+            <div><div class="name">Receive files</div><div class="sub">Off · tap to change</div></div>
+            <button class="link accent">Turn on</button>
+          </div>
+          <button class="filled">Send 24 photos</button>
+          <button class="danger">Empty trash</button>
+        </div>
+        <div class="dock">
+          <div class="tab">People</div><div class="tab">Photos</div><div class="tab on accent">Albums</div><div class="tab">Share</div>
+        </div>
+      </div>
+      <div class="ratio">
+        Coral text on background: <span class="bad">4.04:1 · fails</span><br>
+        White on coral button: <span class="ok">4.39:1 · passes (bold)</span><br>
+        White on red button: <span class="ok">3.91:1 · passes (bold)</span>
+      </div>
+    </div>
+
+    <div class="col after">
+      <p class="tag">After · #BF3A22</p>
+      <div class="phone">
+        <div class="title">Trips</div>
+        <div class="card">
+          <div class="row">
+            <div><div class="name">Cox's Bazar</div><div class="sub">412 photos · 9 people</div></div>
+            <button class="link accent">See all</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row">
+            <div><div class="name">Receive files</div><div class="sub">Off · tap to change</div></div>
+            <button class="link accent">Turn on</button>
+          </div>
+          <button class="filled">Send 24 photos</button>
+          <button class="danger">Empty trash</button>
+        </div>
+        <div class="dock">
+          <div class="tab">People</div><div class="tab">Photos</div><div class="tab on accent">Albums</div><div class="tab">Share</div>
+        </div>
+      </div>
+      <div class="ratio">
+        Coral text on background: <span class="ok">5.03:1 · passes</span><br>
+        White on coral button: <span class="ok">5.46:1 · passes</span><br>
+        White on red button: <span class="ok">4.93:1 · passes</span>
+      </div>
+    </div>
+  </div>
+
+  <p class="note">The minimum is 4.5:1 for normal text and 3:1 for bold text. The animated background, the dock design and dark mode stay exactly as they are.</p>
+</body>
+</html>

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/db.dart';
 import '../scan/scan_controller.dart';

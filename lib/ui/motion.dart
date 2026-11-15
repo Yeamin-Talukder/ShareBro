@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 /// One place for vibration patterns, so each kind of action always feels
 /// the same.

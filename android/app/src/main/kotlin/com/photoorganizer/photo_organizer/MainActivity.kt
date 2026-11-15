@@ -84,6 +84,8 @@ class MainActivity : FlutterFragmentActivity() {
                         startActivity(Intent.createChooser(intent, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                         result.success(true)
                     }
+                    // Which runtime permissions exist depends on the Android version.
+                    "sdk" -> result.success(Build.VERSION.SDK_INT)
                     else -> result.notImplemented()
                 }
             } catch (e: Exception) {

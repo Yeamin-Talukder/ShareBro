@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' show ImageFilter, lerpDouble;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:video_player/video_player.dart';
@@ -15,6 +15,7 @@ import 'media_actions.dart';
 import 'motion.dart';
 import 'person_screen.dart';
 import 'photo_info.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 /// Screen-sized photo step: sharp at 1x, without decoding the original.
@@ -946,7 +947,7 @@ class _SelectPill extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               selected ? 'Selected' : 'Select',
-              style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 16),
+              style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: TextSize.body),
             ),
           ],
         ),
@@ -1083,7 +1084,7 @@ class _VideoPageState extends State<_VideoPage> {
                       onPressed: _play,
                       icon: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white),
                     ),
-                    Text(_time(v.value.position), style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    Text(_time(v.value.position), style: const TextStyle(color: Colors.white, fontSize: TextSize.small)),
                     Expanded(
                       child: Slider(
                         value: v.value.position.inMilliseconds.clamp(0, v.value.duration.inMilliseconds).toDouble(),
@@ -1091,7 +1092,7 @@ class _VideoPageState extends State<_VideoPage> {
                         onChanged: (x) => v.seekTo(Duration(milliseconds: x.round())),
                       ),
                     ),
-                    Text(_time(v.value.duration), style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    Text(_time(v.value.duration), style: const TextStyle(color: Colors.white, fontSize: TextSize.small)),
                     IconButton(
                       onPressed: () => v.setVolume(v.value.volume > 0 ? 0 : 1),
                       icon: Icon(

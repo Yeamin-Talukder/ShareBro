@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
 import '../data/db.dart';
 import 'motion.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 /// How long each photo stays on screen.
@@ -138,7 +139,7 @@ class _ReelScreenState extends State<ReelScreen> with SingleTickerProviderStateM
                             style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w700,
-                                fontSize: 16)),
+                                fontSize: TextSize.body)),
                       ),
                       Text('${_i + 1} / ${photos.length}',
                           style: const TextStyle(color: Colors.white70)),

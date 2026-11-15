@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/dates.dart';
 import '../scan/scan_controller.dart';
@@ -14,6 +14,7 @@ import 'motion.dart';
 import 'receive_screen.dart';
 import 'sections.dart';
 import 'share_screen.dart';
+import 'theme.dart';
 import 'transfer_view.dart';
 import 'web_share_screen.dart';
 
@@ -136,12 +137,12 @@ class _SendCenterScreenState extends State<SendCenterScreen> {
                           const SizedBox(width: 14),
                           Expanded(
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              const Text('Send to everyone', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700)),
+                              const Text('Send to everyone', style: TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w700)),
                               const SizedBox(height: 2),
                               Text(
                                 'Every named friend whose phone you\'ve paired gets the photos they don\'t have yet. '
                                 'Friends who aren\'t nearby wait in the queue and start automatically.',
-                                style: TextStyle(fontSize: 13, height: 1.4, color: scheme.onSurfaceVariant),
+                                style: TextStyle(fontSize: TextSize.caption, height: 1.4, color: scheme.onSurfaceVariant),
                               ),
                             ]),
                           ),
@@ -326,7 +327,7 @@ class _JobRow extends StatelessWidget {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                 Text('${job.personName} → ${job.deviceAlias}',
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16)),
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: TextSize.body)),
                 AnimatedSwitcher(
                   duration: 200.ms,
                   child: Text(
@@ -335,7 +336,7 @@ class _JobRow extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: TextSize.caption,
                       fontWeight: job.status == JobStatus.sending || bad ? FontWeight.w600 : FontWeight.w400,
                       color: job.status == JobStatus.sending
                           ? scheme.primary
@@ -450,7 +451,7 @@ class _NothingSendingState extends State<_NothingSending> with SingleTickerProvi
           }),
         ),
         const SizedBox(height: 8),
-        const Text('Nothing sending right now', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+        const Text('Nothing sending right now', style: TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w700)),
         const SectionFooter('Pick something in the Share tab, or open a person and tap Send.', align: TextAlign.center),
       ]),
     );

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/dates.dart';
 import '../data/duplicates.dart';
 import '../scan/scan_controller.dart';
 import 'photo_viewer.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 /// How much space scanned photos take: per trip, the biggest photos, and
@@ -156,7 +157,7 @@ class _StorageScreenState extends State<StorageScreen> {
                                   padding: const EdgeInsets.all(4),
                                   child: Text(formatBytes(bytes),
                                       textAlign: TextAlign.center,
-                                      style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                      style: const TextStyle(color: Colors.white, fontSize: TextSize.small)),
                                 ),
                               ),
                             ]),

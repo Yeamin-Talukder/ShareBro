@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/dates.dart';
 import '../data/db.dart';
@@ -11,6 +11,7 @@ import '../share/receive.dart';
 import '../share/send_center.dart';
 import 'file_icons.dart';
 import 'motion.dart';
+import 'theme.dart';
 import 'transfer_view.dart';
 import 'widgets.dart';
 
@@ -300,7 +301,7 @@ class _IslandState extends State<Island> {
                           child: Material(
                             type: MaterialType.transparency,
                             child: DefaultTextStyle(
-                              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                              style: const TextStyle(color: Colors.white, fontSize: TextSize.caption, fontWeight: FontWeight.w600),
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 260),
                                 switchInCurve: const Interval(0.35, 1, curve: Curves.easeOut),
@@ -487,14 +488,14 @@ class _IslandState extends State<Island> {
                       '${req.from} wants to send you',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 15),
+                      style: const TextStyle(fontSize: TextSize.callout),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '${req.summary} · ${formatBytes(req.totalBytes)} · ${req.via}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Color(0xFFB9B4C8), fontSize: 12, fontWeight: FontWeight.w500),
+                      style: const TextStyle(color: Color(0xFFB9B4C8), fontSize: TextSize.small, fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -508,7 +509,7 @@ class _IslandState extends State<Island> {
               if (req.files.length > shown.length)
                 Text(
                   '+${req.files.length - shown.length}',
-                  style: const TextStyle(color: Color(0xFFB9B4C8), fontSize: 12),
+                  style: const TextStyle(color: Color(0xFFB9B4C8), fontSize: TextSize.small),
                 ),
             ],
           ),
@@ -553,12 +554,12 @@ class _IslandState extends State<Island> {
                       'Sending to ${j.deviceAlias}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 15),
+                      style: const TextStyle(fontSize: TextSize.callout),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       '${j.filesDone} of ${j.count} ${j.noun}',
-                      style: const TextStyle(color: Color(0xFFB9B4C8), fontSize: 12, fontWeight: FontWeight.w500),
+                      style: const TextStyle(color: Color(0xFFB9B4C8), fontSize: TextSize.small, fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -583,7 +584,7 @@ class _IslandState extends State<Island> {
           DefaultTextStyle(
             style: const TextStyle(
               color: Color(0xFFB9B4C8),
-              fontSize: 11.5,
+              fontSize: TextSize.small,
               fontFeatures: [FontFeature.tabularFigures()],
             ),
             child: Row(
@@ -618,7 +619,8 @@ class _IslandState extends State<Island> {
   Widget _pillButton(String label, VoidCallback onTap, {bool main = false}) => Pressable(
     onTap: onTap,
     child: Container(
-      height: 38,
+      constraints: const BoxConstraints(minHeight: 38),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: main ? const Color(0xFFFF8A6B) : Colors.white.withValues(alpha: 0.13),
@@ -660,7 +662,7 @@ class _PulsingAvatar extends StatelessWidget {
             height: 46,
             alignment: Alignment.center,
             decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFFF8A6B)),
-            child: Text(initial, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            child: Text(initial, style: const TextStyle(fontSize: TextSize.title3, fontWeight: FontWeight.w800)),
           ),
         ],
       ),

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import '../data/dates.dart';
@@ -13,6 +13,7 @@ import 'glass_dock.dart';
 import 'media_actions.dart';
 import 'motion.dart';
 import 'photo_viewer.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 const _pageSize = 120;
@@ -639,7 +640,7 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
                     padding: const EdgeInsets.fromLTRB(16, 16, 8, 6),
                     child: Row(children: [
                       Text(_byMonth ? formatMonth(day) : formatSectionDay(day),
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
+                          style: const TextStyle(fontSize: TextSize.headline, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
                       const Spacer(),
                       if (_selecting)
                         _DayCheck(
@@ -953,7 +954,7 @@ class _Tile extends StatelessWidget {
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 Text(_duration(asset.videoDuration),
                     style: const TextStyle(
-                        color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700, shadows: shadow)),
+                        color: Colors.white, fontSize: TextSize.small, fontWeight: FontWeight.w700, shadows: shadow)),
                 const SizedBox(width: 2),
                 const Icon(Icons.play_circle_fill_rounded, size: 16, color: Colors.white, shadows: shadow),
               ]),

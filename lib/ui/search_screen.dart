@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/db.dart';
 import '../data/gazetteer.dart';
@@ -14,6 +14,7 @@ import 'gallery_view.dart';
 import 'motion.dart';
 import 'person_screen.dart';
 import 'sections.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 /// One search box for everything the app knows: "Maya and Leo at the
@@ -161,7 +162,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 const BackButton(),
                 Expanded(
                   child: Container(
-                    height: 44,
+                    height: textHeight(context, 44),
                     decoration: BoxDecoration(color: capsuleFill(context), borderRadius: BorderRadius.circular(14)),
                     child: TextField(
                       controller: _text,
@@ -234,7 +235,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 2, 20, 6),
                 child: Text(
                   'Not sure what "${_unknown.join(' ')}" is. Try a name, a place like beach, a trip or a month.',
-                  style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+                  style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant),
                 ),
               ),
             Expanded(
@@ -286,7 +287,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       Text(p.name!.split(' ').first,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12.5, color: scheme.onSurface)),
+                          style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurface)),
                     ]),
                   ),
                 ),

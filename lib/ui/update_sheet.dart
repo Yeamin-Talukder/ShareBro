@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/dates.dart';
 import '../update/release.dart';
@@ -235,7 +235,7 @@ class _Flow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final left = u.remaining;
     final small = TextStyle(
-      fontSize: 13,
+      fontSize: TextSize.caption,
       fontWeight: FontWeight.w600,
       color: scheme.onSurfaceVariant,
       fontFeatures: const [FontFeature.tabularFigures()],
@@ -359,7 +359,7 @@ class _Hero extends StatelessWidget {
         ]),
       ),
       const SizedBox(height: 2),
-      Text(meta, style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant)),
+      Text(meta, style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
     ]);
   }
 }
@@ -553,7 +553,7 @@ class _Notes extends StatelessWidget {
           Text(
             "WHAT'S NEW",
             style: TextStyle(
-              fontSize: 12,
+              fontSize: TextSize.small,
               letterSpacing: 0.9,
               fontWeight: FontWeight.w700,
               color: scheme.onSurfaceVariant,
@@ -563,7 +563,7 @@ class _Notes extends StatelessWidget {
           if (notes.isEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: Text(release.summary, style: const TextStyle(fontSize: 14.5, height: 1.35)),
+              child: Text(release.summary, style: const TextStyle(fontSize: TextSize.callout, height: 1.35)),
             ),
           for (final (i, n) in notes.indexed)
             _note(context, n, _icons[i % _icons.length])
@@ -598,7 +598,7 @@ class _Notes extends StatelessWidget {
                 ),
               TextSpan(text: n.text, style: TextStyle(color: scheme.onSurfaceVariant)),
             ]),
-            style: const TextStyle(fontSize: 14.5, height: 1.35),
+            style: const TextStyle(fontSize: TextSize.callout, height: 1.35),
           ),
         ),
       ]),
@@ -637,7 +637,7 @@ class _Shield extends StatelessWidget {
             text,
             style: TextStyle(
               fontWeight: FontWeight.w700,
-              fontSize: 14,
+              fontSize: TextSize.label,
               color: busy ? scheme.onSurfaceVariant : Theme.of(context).brightness == Brightness.dark ? const Color(0xFF5BD69E) : const Color(0xFF137A50),
             ),
           ),
@@ -669,7 +669,7 @@ class _Permission extends StatelessWidget {
                     'Turn on "Allow from this source", then come back.',
               ),
             ]),
-            style: TextStyle(fontSize: 14, height: 1.35),
+            style: TextStyle(fontSize: TextSize.label, height: 1.35),
           ),
         ),
       ]),
@@ -694,7 +694,7 @@ class _ErrorBox extends StatelessWidget {
         Icon(icon, color: scheme.error, size: 22),
         const SizedBox(width: 12),
         Expanded(
-          child: Text(text, style: TextStyle(fontSize: 14, height: 1.35, fontWeight: FontWeight.w600, color: scheme.onSurface)),
+          child: Text(text, style: TextStyle(fontSize: TextSize.label, height: 1.35, fontWeight: FontWeight.w600, color: scheme.onSurface)),
         ),
       ]),
     );
@@ -713,7 +713,7 @@ class _InfoLine extends StatelessWidget {
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Icon(icon, size: 18, color: scheme.onSurfaceVariant),
       const SizedBox(width: 10),
-      Expanded(child: Text(text, style: TextStyle(fontSize: 13.5, height: 1.35, color: scheme.onSurfaceVariant))),
+      Expanded(child: Text(text, style: TextStyle(fontSize: TextSize.label, height: 1.35, color: scheme.onSurfaceVariant))),
     ]);
   }
 }
@@ -726,13 +726,12 @@ class _MainButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: double.infinity,
-        height: 52,
+  Widget build(BuildContext context) => ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: double.infinity, minHeight: 52),
         child: FilledButton.icon(
           onPressed: onTap,
           icon: Icon(icon),
-          label: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          label: Text(label, style: const TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w700)),
         ),
       );
 }
@@ -744,12 +743,11 @@ class _SecondButton extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-        width: double.infinity,
-        height: 48,
+  Widget build(BuildContext context) => ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: double.infinity, minHeight: 48),
         child: FilledButton.tonal(
           onPressed: onTap,
-          child: Text(label, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w600)),
+          child: Text(label, style: const TextStyle(fontSize: TextSize.callout, fontWeight: FontWeight.w600)),
         ),
       );
 }

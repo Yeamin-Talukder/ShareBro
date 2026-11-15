@@ -26,8 +26,9 @@ class Appearance {
 /// actions that matter, with violet and teal kept for the drifting aurora in
 /// the content layer. Contrast figures are against the matching surface.
 class Brand {
-  /// Primary actions and the selected tab. White text on it: 5.7:1.
-  static const accentLight = Color(0xFFD9432B);
+  /// Primary actions and the selected tab. White text on it: 5.5:1; as
+  /// text on [surfaceLight]: 5.0:1 (plain text needs 4.5:1).
+  static const accentLight = Color(0xFFBF3A22);
 
   /// Accent on dark surfaces: 8.0:1 against [surfaceDark].
   static const accentDark = Color(0xFFFF8A6B);
@@ -44,7 +45,25 @@ class Brand {
   static const inkDark = Color(0xFFF2EFF5);
 
   static const success = Color(0xFF1FA971);
-  static const danger = Color(0xFFE5484D);
+  /// White text on it: 4.9:1.
+  static const danger = Color(0xFFD13438);
+}
+
+/// The app's text sizes. Hand-set sizes pick from these, never a loose
+/// number, so the steps stay even and nothing drops below 11.
+abstract final class TextSize {
+  /// Badges and labels on photos; the smallest allowed.
+  static const tiny = 11.0;
+  static const small = 12.0;
+  static const caption = 13.0;
+  static const label = 14.0;
+  static const callout = 15.0;
+  static const body = 16.0;
+  static const headline = 18.0;
+  static const title3 = 20.0;
+  static const title2 = 22.0;
+  static const title1 = 28.0;
+  static const display = 34.0;
 }
 
 /// Kept for code that still asks for "the seed".

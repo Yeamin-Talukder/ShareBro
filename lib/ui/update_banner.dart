@@ -6,6 +6,7 @@ import '../update/release.dart';
 import 'glass.dart';
 import 'island.dart' show islandNavigator;
 import 'motion.dart';
+import 'theme.dart';
 import 'update_sheet.dart';
 
 /// "ShareBro 1.5.0 is here": slides down from the top once when the daily
@@ -127,13 +128,13 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
                           'ShareBro ${r.version} is here',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                          style: const TextStyle(fontSize: TextSize.callout, fontWeight: FontWeight.w700),
                         ),
                         Text(
                           line,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12.5, height: 1.3, color: scheme.onSurfaceVariant),
+                          style: TextStyle(fontSize: TextSize.caption, height: 1.3, color: scheme.onSurfaceVariant),
                         ),
                       ]),
                     ),

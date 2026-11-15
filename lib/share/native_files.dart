@@ -10,6 +10,12 @@ class NativeFiles {
   static Future<String?> saveToDownloads(String path, String name, String mime, {String? dir}) =>
       _channel.invokeMethod<String>('saveToDownloads', {'path': path, 'name': name, 'mime': mime, 'dir': dir});
 
+  static int? _sdk;
+
+  /// The Android API level (28 = Android 9, 33 = Android 13).
+  static Future<int> androidSdk() async =>
+      _sdk ??= await _channel.invokeMethod<int>('sdk') ?? 0;
+
   /// Opens a content:// URI or file path with whatever app handles [mime].
   static Future<bool> open(String uri, {String? mime}) async {
     try {

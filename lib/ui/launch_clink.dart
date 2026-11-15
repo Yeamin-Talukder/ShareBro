@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'theme.dart';
+
 /// Opening animation, "Cheers": the logo's two phones fall in and clink at
 /// the top like glasses in a toast. They squash and bounce on contact, their
 /// screens light up, rings and sparkles fly out of the clink, the spark
@@ -122,7 +124,7 @@ class _LaunchClinkState extends State<LaunchClink> with TickerProviderStateMixin
         child: Transform.scale(
           scale: 0.8 + 0.2 * pop,
           child: Text(ch,
-              style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.4, fontSize: 28)),
+              style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.4, fontSize: TextSize.title1)),
         ),
       ),
     );

@@ -6,7 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/backup.dart';
 import '../data/db.dart';
@@ -340,7 +340,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Text(
                         'Loose puts more faces together (may mix people up). '
                         'Strict keeps groups clean (may split one person into several).',
-                        style: text.bodySmall?.copyWith(fontSize: 13.5, color: scheme.onSurfaceVariant),
+                        style: text.bodySmall?.copyWith(fontSize: TextSize.label, color: scheme.onSurfaceVariant),
                       ),
                       const SizedBox(height: 16),
                       Slider(
@@ -680,7 +680,7 @@ class _NewBadge extends StatelessWidget {
       decoration: BoxDecoration(color: Brand.accentLight, borderRadius: BorderRadius.circular(99)),
       child: const Text(
         'NEW',
-        style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w800, letterSpacing: 0.4),
+        style: TextStyle(color: Colors.white, fontSize: TextSize.small, fontWeight: FontWeight.w800, letterSpacing: 0.4),
       ),
     );
     if (MediaQuery.disableAnimationsOf(context)) return badge;

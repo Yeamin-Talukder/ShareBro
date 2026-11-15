@@ -4,6 +4,7 @@ import '../data/db.dart';
 import 'motion.dart';
 import 'people_space.dart';
 import 'sections.dart';
+import 'theme.dart';
 
 /// The People page's filter bar keeps one button per question (which trip,
 /// who, when, which view); these are the short lists those buttons open.
@@ -115,7 +116,7 @@ Widget _pickRow(
 
 Widget _sheetNote(BuildContext context, String text) => Padding(
       padding: const EdgeInsets.fromLTRB(22, 8, 22, 4),
-      child: Text(text, style: TextStyle(fontSize: 12.5, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+      child: Text(text, style: TextStyle(fontSize: TextSize.caption, color: Theme.of(context).colorScheme.onSurfaceVariant)),
     );
 
 /// Which trip to show. [onPick] gets the trip's id, or null for all of
@@ -193,7 +194,7 @@ Future<void> showWhoSheet(
           padding: const EdgeInsets.fromLTRB(22, 10, 22, 0),
           child: Text('Groups',
               style: TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w700, color: Theme.of(sheet).colorScheme.onSurfaceVariant)),
+                  fontSize: TextSize.caption, fontWeight: FontWeight.w700, color: Theme.of(sheet).colorScheme.onSurfaceVariant)),
         ),
         for (final g in groups)
           _pickRow(
@@ -259,7 +260,7 @@ Future<PeopleLayout?> showViewSheet(BuildContext context, PeopleLayout current) 
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontSize: TextSize.small,
                             fontWeight: FontWeight.w600,
                             color: l == current ? scheme.onPrimary : scheme.onSurface,
                           )),

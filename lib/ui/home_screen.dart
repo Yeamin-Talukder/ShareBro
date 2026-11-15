@@ -3,12 +3,13 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:photo_manager/photo_manager.dart';
+import 'anim.dart';
 
 import '../data/dates.dart';
 import '../data/db.dart';
+import 'permission_explainer.dart';
 import 'places_screen.dart';
+import 'theme.dart';
 import 'unmatched_screen.dart';
 import '../data/trip_days.dart';
 import '../scan/scan_controller.dart';
@@ -234,17 +235,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _pickAlbumAndScan() async {
-    final ps = await PhotoManager.requestPermissionExtend();
-    if (!ps.hasAccess) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Photo access is needed to find faces.'),
-        action: SnackBarAction(
-            label: 'Settings', onPressed: PhotoManager.openSetting),
-      ));
-      return;
-    }
-    if (!mounted) return;
+    if (!await ensurePhotoAccess(context) || !mounted) return;
     final choice = await showScanSheet(context);
     if (choice == null || !mounted) return;
     final folder = choice.folder;
@@ -853,7 +844,7 @@ class _PersonTileState extends State<_PersonTile> with AutomaticKeepAliveClientM
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          fontSize: 14.5,
+          fontSize: TextSize.callout,
           fontWeight: person.name == null ? FontWeight.w600 : FontWeight.w700,
           color: person.name == null ? scheme.primary : null,
         ),
@@ -864,7 +855,7 @@ class _PersonTileState extends State<_PersonTile> with AutomaticKeepAliveClientM
         duration: 900.ms,
         curve: Curves.easeOutCubic,
         builder: (context, v, _) => Text('${v.round()} photos',
-            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+            style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
       ),
     ]);
   }
@@ -977,11 +968,11 @@ class _TripCard extends StatelessWidget {
                   Text(trip.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      style: const TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w600)),
                   Text('${trip.photoCount} photos${span == null ? '' : ' · $span'}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+                      style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
                 ]),
               ),
               const SizedBox(width: 8),
@@ -992,7 +983,7 @@ class _TripCard extends StatelessWidget {
           ),
           if (days.length > 1)
             SizedBox(
-              height: 46,
+              height: textHeight(context, 46),
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
@@ -1046,9 +1037,9 @@ class _MiniProgress extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Scanning ${c.albumName ?? ''}',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                        style: const TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w600)),
                     Text('${c.done} of ${c.total} · ${c.facesFound} faces',
-                        style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                        style: TextStyle(fontSize: TextSize.caption, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -1112,7 +1103,7 @@ class _MissingCard extends StatelessWidget {
             const Row(children: [
               IconTile(icon: Icons.person_search_rounded, color: Color(0xFFFF9F0A)),
               SizedBox(width: 12),
-              Text('Needs more photos', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              Text('Needs more photos', style: TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w600)),
             ]),
             const SizedBox(height: 10),
             SizedBox(
@@ -1131,7 +1122,7 @@ class _MissingCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text('${p.displayName.split(' ').first} · ${p.photoCount}',
-                            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                            style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
                       ]),
                     ),
                   ),

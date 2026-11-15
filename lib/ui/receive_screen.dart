@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/dates.dart';
 import '../scan/scan_controller.dart';
@@ -12,6 +12,7 @@ import 'aurora.dart';
 import 'glass.dart';
 import 'island.dart';
 import 'motion.dart';
+import 'permission_explainer.dart';
 
 /// Receive mode: friends send you their photos from LocalSend (same Wi-Fi
 /// or hotspot) or from this app over Nearby (no network). They're saved to
@@ -38,7 +39,9 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
 
   Future<void> _toggle(bool on) async {
     Haptics.tick();
-    await widget.controller.sharing.setReceiving(on);
+    final s = widget.controller.sharing;
+    if (on) await ensureNearbyAccess(context, s.nearby, quiet: true);
+    await s.setReceiving(on);
   }
 
   Future<void> _setPin(Receiver r) async {

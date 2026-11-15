@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../data/db.dart';
@@ -13,6 +13,7 @@ import 'aurora.dart';
 import 'glass.dart';
 import 'motion.dart';
 import 'sections.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 /// Your profile: your name on other phones and your face, set up once and
@@ -88,7 +89,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), children: [
             const Padding(
               padding: EdgeInsets.fromLTRB(4, 0, 4, 12),
-              child: Text('Which one is you?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+              child: Text('Which one is you?', style: TextStyle(fontSize: TextSize.title3, fontWeight: FontWeight.w700)),
             ),
             SectionCard.rows(rows: [
               for (final p in people)
@@ -203,11 +204,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         AnimatedSwitcher(
                           duration: const Duration(milliseconds: 250),
                           child: Column(key: ValueKey(title), children: [
-                            Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
+                            Text(title, style: const TextStyle(fontSize: TextSize.title2, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
                             const SizedBox(height: 4),
                             Text(sub,
                                 textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant)),
+                                style: TextStyle(fontSize: TextSize.label, color: scheme.onSurfaceVariant)),
                           ]),
                         ),
                         const SizedBox(height: 20),

@@ -13,8 +13,8 @@ const webSharePage = r'''<!doctype html>
 <meta name="theme-color" content="#0F0E12">
 <title>Your photos · ShareBro</title>
 <style>
-:root{--accent:#D9432B;--on-accent:#fff;--bg:#F6F5F8;--ink:#1A1820;--muted:#5E5A66;--card:#fff;
---glass:rgba(255,255,255,.7);--rim:rgba(255,255,255,.8);--line:rgba(26,24,32,.1);--sel:#D9432B;
+:root{--accent:#BF3A22;--on-accent:#fff;--bg:#F6F5F8;--ink:#1A1820;--muted:#5E5A66;--card:#fff;
+--glass:rgba(255,255,255,.7);--rim:rgba(255,255,255,.8);--line:rgba(26,24,32,.1);--sel:#BF3A22;
 --ease:cubic-bezier(.2,.8,.2,1);--cols:4}
 @media (prefers-color-scheme:dark){:root{--accent:#FF8A6B;--on-accent:#2A0D06;--bg:#0F0E12;--ink:#F2EFF5;
 --muted:#A9A3B3;--card:#1A1820;--glass:rgba(28,26,34,.66);--rim:rgba(255,255,255,.12);--line:rgba(255,255,255,.1);--sel:#FF8A6B}}
@@ -65,7 +65,7 @@ display:flex;gap:8px;align-items:center;padding:8px;border-radius:999px;transiti
 .card{border-radius:28px;padding:28px;max-width:380px;width:100%}
 input{width:100%;font:inherit;font-size:24px;letter-spacing:8px;text-align:center;padding:12px;border-radius:16px;
 border:1px solid var(--line);background:var(--card);color:var(--ink);margin:16px 0}
-.err{color:#E5484D;min-height:1.4em}
+.err{color:#D13438;min-height:1.4em}
 .toast{position:fixed;left:50%;top:max(16px,env(safe-area-inset-top));transform:translate(-50%,-160%);z-index:20;
 padding:10px 18px;border-radius:999px;transition:transform .35s var(--ease);font-weight:600}
 .toast.show{transform:translate(-50%,0)}

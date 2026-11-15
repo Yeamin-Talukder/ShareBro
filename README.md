@@ -847,7 +847,8 @@ from History.
 
 | Version | Highlights |
 |---|---|
-| [**v1.5.0**](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.5.0) | Updates from inside the app; face scanning on the GPU or NPU when it's faster; a tidier People page; quicker page changes |
+| [**v1.6.0**](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.6.0) | Photos show on Xiaomi/Redmi and other Android 13 phones; Nearby works on Android 9–11; clear permission screens; easier to read with large text, "Remove animations" and a deeper coral |
+| [v1.5.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.5.0) | Updates from inside the app; face scanning on the GPU or NPU when it's faster; a tidier People page; quicker page changes |
 | [v1.4.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.4.0) | Search by place name (towns, spots and countries, offline); Places cards show the town |
 | [v1.3.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.3.0) | InsightFace face model: much better matching with glasses and angles; review adds sure matches automatically; "Not [name]" |
 | [v1.2.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.2.0) | Places map and Journey, male / female filters, Unmatched faces, faster scans and thumbnails, new notifications |

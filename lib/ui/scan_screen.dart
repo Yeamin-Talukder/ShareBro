@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/db.dart';
 import '../scan/scan_controller.dart';
@@ -10,6 +10,7 @@ import 'review_screen.dart';
 import 'aurora.dart';
 import 'glass.dart';
 import 'sections.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 /// Full-screen scan progress: a rolling photo count and a live stream of
@@ -141,7 +142,7 @@ class _ScanScreenState extends State<ScanScreen> {
                     child: Text(c.albumName!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant)),
+                        style: TextStyle(fontSize: TextSize.label, color: scheme.onSurfaceVariant)),
                   ),
                 ]),
               const SizedBox(height: 16),
@@ -176,7 +177,7 @@ class _ScanScreenState extends State<ScanScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text('of ${c.total} photos', style: TextStyle(fontSize: 16, color: scheme.onSurfaceVariant)),
+                  Text('of ${c.total} photos', style: TextStyle(fontSize: TextSize.body, color: scheme.onSurfaceVariant)),
                 ],
               ),
               Padding(
@@ -220,9 +221,9 @@ class _ScanScreenState extends State<ScanScreen> {
                   Padding(
                     padding: const EdgeInsets.only(right: 14),
                     child: Row(children: [
-                      const Text('Faces found', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      const Text('Faces found', style: TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w700)),
                       const Spacer(),
-                      Text('${c.facesFound}', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+                      Text('${c.facesFound}', style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
                     ]),
                   ),
                   const SizedBox(height: 10),
@@ -582,10 +583,10 @@ class _Stat extends StatelessWidget {
           Text(value,
                   maxLines: 1,
                   style: const TextStyle(
-                      fontSize: 20, fontWeight: FontWeight.w800, fontFeatures: [FontFeature.tabularFigures()]))
+                      fontSize: TextSize.title3, fontWeight: FontWeight.w800, fontFeatures: [FontFeature.tabularFigures()]))
               .animate(key: ValueKey(value))
               .scaleXY(begin: 1.25, alignment: Alignment.centerLeft, duration: 450.ms, curve: Curves.elasticOut),
-          Text(label, maxLines: 1, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          Text(label, maxLines: 1, style: TextStyle(fontSize: TextSize.small, color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ]),
       ),
     );
@@ -625,7 +626,7 @@ class _MilestonePill extends StatelessWidget {
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
-                        fontSize: 16,
+                        fontSize: TextSize.body,
                       ),
                     ),
                   ],

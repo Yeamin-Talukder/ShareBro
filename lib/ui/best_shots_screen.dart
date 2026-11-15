@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/dates.dart';
 import '../data/group_shots.dart';
@@ -11,6 +11,7 @@ import 'motion.dart';
 import 'photo_viewer.dart';
 import 'sections.dart';
 import 'send_to_sheet.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 /// Group photos taken seconds apart, with the shot where everyone's eyes
@@ -128,7 +129,7 @@ class _BestShotsScreenState extends State<BestShotsScreen> {
                             'For each moment, the shot with open eyes, smiles and sharp faces is picked. '
                             'Tap another shot to keep that one instead; press and hold to look closer.',
                             style: TextStyle(
-                                fontSize: 13.5, height: 1.4, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                fontSize: TextSize.label, height: 1.4, color: Theme.of(context).colorScheme.onSurfaceVariant),
                           ),
                         ),
                       ]),
@@ -213,7 +214,7 @@ class _BurstCard extends StatelessWidget {
                     const SizedBox(width: 5),
                     Text(picked ? 'Best' : 'Your pick',
                         style: TextStyle(
-                            fontSize: 13,
+                            fontSize: TextSize.caption,
                             fontWeight: FontWeight.w700,
                             color: picked ? scheme.onPrimary : Colors.white)),
                   ]),
@@ -226,10 +227,10 @@ class _BurstCard extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(picked ? burst.reason : _issues(shot),
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                style: const TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w700)),
             const SizedBox(height: 2),
             Text('${burst.shots.length} shots · ${shot.faceCount} people · ${formatDay(at)}, ${formatTime(at)}',
-                style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+                style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
           ]),
         ),
         SizedBox(
@@ -273,7 +274,7 @@ class _BurstCard extends StatelessWidget {
                                     const SizedBox(width: 2),
                                     Text('${s.blinks}',
                                         style: const TextStyle(
-                                            fontSize: 10.5, color: Colors.white, fontWeight: FontWeight.w700)),
+                                            fontSize: TextSize.tiny, color: Colors.white, fontWeight: FontWeight.w700)),
                                   ]),
                                 ),
                               ),

@@ -4,14 +4,16 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/db.dart';
 import '../share/protocol.dart';
 import '../share/send_center.dart';
 import 'island.dart';
 import 'motion.dart';
+import 'permission_explainer.dart';
 import 'sections.dart';
+import 'theme.dart';
 
 /// A device you can send to: found on Wi-Fi (LocalSend), remembered from
 /// before, or found over Nearby (no network).
@@ -352,7 +354,7 @@ class _OrbitState extends State<Orbit> with SingleTickerProviderStateMixin {
               top: c.dy + half + 6,
               child: Text(widget.centreLabel!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant)),
+                  style: TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant)),
             ),
           for (final s in spots)
             AnimatedPositioned(
@@ -377,7 +379,7 @@ class _OrbitState extends State<Orbit> with SingleTickerProviderStateMixin {
               right: 16,
               bottom: 16,
               child: Text(widget.emptyText!,
-                  textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+                  textAlign: TextAlign.center, style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
             ),
         ]);
       }),
@@ -589,7 +591,7 @@ class _NodeViewState extends State<_NodeView> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: TextSize.small,
               fontWeight: FontWeight.w600,
               color: n.online ? scheme.onSurface : scheme.onSurfaceVariant,
             )),
@@ -597,7 +599,7 @@ class _NodeViewState extends State<_NodeView> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 11,
+              fontSize: TextSize.tiny,
               fontWeight: n.status ? FontWeight.w600 : FontWeight.w400,
               color: n.status ? scheme.primary : scheme.onSurfaceVariant,
               fontFeatures: const [FontFeature.tabularFigures()],
@@ -872,7 +874,7 @@ class _OrbitTankState extends State<OrbitTank> with SingleTickerProviderStateMix
             child: DefaultTextStyle(
               style: TextStyle(
                 color: dark ? Colors.white : Colors.black,
-                fontSize: 21,
+                fontSize: TextSize.title3,
                 fontWeight: FontWeight.w800,
                 fontFeatures: const [FontFeature.tabularFigures()],
                 shadows: [Shadow(color: (dark ? Colors.black : Colors.white).withAlpha(110), blurRadius: 6)],
@@ -1056,7 +1058,7 @@ Future<void> _showDeviceMenu(
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
                     child: Text(caption,
-                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
                   ),
                   for (final m in actions) ...[
                     const Divider(height: 0.5, thickness: 0.5),
@@ -1067,15 +1069,15 @@ Future<void> _showDeviceMenu(
                               Navigator.pop(context);
                               m.onTap!();
                             },
-                      child: SizedBox(
-                        height: 46,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 46),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Row(children: [
                             Expanded(
                               child: Text(m.label,
                                   style: TextStyle(
-                                    fontSize: 16,
+                                    fontSize: TextSize.body,
                                     color: m.onTap == null ? scheme.onSurfaceVariant.withAlpha(130) : scheme.onSurface,
                                   )),
                             ),
@@ -1390,7 +1392,13 @@ class _DevicePickerState extends State<DevicePicker> {
         if (v == 0) {
           s.discovery.scanSubnet();
         } else if (v == 1) {
-          s.nearby.discovering ? s.nearby.stopDiscovery() : s.nearby.startDiscovery();
+          if (s.nearby.discovering) {
+            s.nearby.stopDiscovery();
+          } else {
+            ensureNearbyAccess(context, s.nearby).then((ok) {
+              if (ok) s.nearby.startDiscovery();
+            });
+          }
         } else {
           _enterAddress();
         }
@@ -1446,7 +1454,7 @@ class _DevicePickerState extends State<DevicePicker> {
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
                           Icon(Icons.bluetooth_searching_rounded, size: 14, color: scheme.primary),
                           const SizedBox(width: 4),
-                          Text('Nearby on', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: scheme.primary)),
+                          Text('Nearby on', style: TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w600, color: scheme.primary)),
                         ]),
                       )
                     : null,

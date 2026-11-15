@@ -1,12 +1,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/dates.dart';
 import '../data/trip_days.dart';
 import '../scan/scan_controller.dart';
 import 'photo_viewer.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 /// Photos further apart than this (km), or this many hours, start a new stop.
@@ -209,7 +210,7 @@ class _StopTile extends StatelessWidget {
                 radius: 13,
                 backgroundColor: scheme.primary,
                 child: Text('${stop.number}',
-                    style: TextStyle(color: scheme.onPrimary, fontSize: 12, fontWeight: FontWeight.w700)),
+                    style: TextStyle(color: scheme.onPrimary, fontSize: TextSize.small, fontWeight: FontWeight.w700)),
               ),
             ),
           ]),

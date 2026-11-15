@@ -1,12 +1,14 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/db.dart';
 import '../scan/scan_controller.dart';
 import 'motion.dart';
 import 'aurora.dart';
+import 'sections.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 /// Swipe through faces nobody has confirmed yet: right = yes / save name,
@@ -180,8 +182,8 @@ class _ReviewScreenState extends State<ReviewScreen> {
     final after = _index + 2 < items.length ? items[_index + 2] : null;
     return Column(
       children: [
-        SizedBox(
-          height: 36,
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 36),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -546,7 +548,7 @@ class _CardBody extends StatelessWidget {
                           return Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: SizedBox(
-                              height: 36,
+                              height: textHeight(context, 36),
                               child: ListView(
                                 scrollDirection: Axis.horizontal,
                                 children: [
@@ -749,7 +751,7 @@ class _Stamp extends StatelessWidget {
           text,
           style: TextStyle(
             color: color,
-            fontSize: 30,
+            fontSize: TextSize.title1,
             fontWeight: FontWeight.w900,
             letterSpacing: 2,
           ),

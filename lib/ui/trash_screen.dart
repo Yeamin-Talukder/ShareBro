@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/dates.dart';
 import '../data/trash.dart';
@@ -9,6 +9,7 @@ import '../scan/scan_controller.dart';
 import 'glass.dart';
 import 'island.dart';
 import 'motion.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 /// Recently deleted: everything in the phone's trash, with how long it has
@@ -279,7 +280,7 @@ class _TrashTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(days <= 0 ? 'today' : '$days d',
-                    style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700)),
+                    style: const TextStyle(color: Colors.white, fontSize: TextSize.tiny, fontWeight: FontWeight.w700)),
               ),
               const Spacer(),
               if (item.isVideo) const Icon(Icons.play_circle_fill_rounded, size: 16, color: Colors.white, shadows: shadow),

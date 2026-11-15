@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/gallery.dart';
 import '../data/group_match.dart';
@@ -15,8 +15,10 @@ import 'devices.dart' show deviceColor;
 import 'gallery_view.dart';
 import 'glass.dart';
 import 'motion.dart';
+import 'permission_explainer.dart';
 import 'profile_screen.dart';
 import 'sections.dart';
+import 'theme.dart';
 import 'widgets.dart';
 
 /// Trip groups: everyone's phone in one group, so each photo goes only to
@@ -103,7 +105,7 @@ class _TripGroupScreenState extends State<TripGroupScreen> {
             maxLength: 4,
             textAlign: TextAlign.center,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            style: const TextStyle(fontSize: 28, letterSpacing: 12, fontWeight: FontWeight.w700),
+            style: const TextStyle(fontSize: TextSize.title1, letterSpacing: 12, fontWeight: FontWeight.w700),
             decoration: const InputDecoration(counterText: '', hintText: '••••'),
             onSubmitted: (v) => Navigator.pop(context, v),
           ),
@@ -146,7 +148,7 @@ class _TripGroupScreenState extends State<TripGroupScreen> {
   }
 
   Future<void> _share(TripGroup g) async {
-    if (!await Gallery.requestAccess() || !mounted) return;
+    if (!await ensurePhotoAccess(context) || !mounted) return;
     final ids = await Navigator.push<List<String>>(
       context,
       MaterialPageRoute(
@@ -217,7 +219,7 @@ class _TripGroupScreenState extends State<TripGroupScreen> {
                 const Row(children: [
                   IconTile(icon: Icons.diversity_3_rounded, color: Color(0xFF30D158)),
                   SizedBox(width: 14),
-                  Text('Start a group', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700)),
+                  Text('Start a group', style: TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w700)),
                 ]),
                 const SizedBox(height: 14),
                 Container(
@@ -259,10 +261,10 @@ class _TripGroupScreenState extends State<TripGroupScreen> {
                       .scaleXY(end: 1.12, duration: 900.ms, curve: Curves.easeInOut),
                   const SizedBox(height: 10),
                   Text(hub.searching ? 'Looking for groups…' : 'No groups nearby yet',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      style: const TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
                   Text('Be on the same Wi‑Fi or hotspot as the phone that started it.',
-                      textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+                      textAlign: TextAlign.center, style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
                 ]),
               )
             else
@@ -311,7 +313,7 @@ class _TripGroupScreenState extends State<TripGroupScreen> {
               SectionCard(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
                 child: Column(children: [
-                  Text('Join code', style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant)),
+                  Text('Join code', style: TextStyle(fontSize: TextSize.label, color: scheme.onSurfaceVariant)),
                   const SizedBox(height: 8),
                   Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                     for (final (i, d) in g.code.split('').indexed)
@@ -321,12 +323,12 @@ class _TripGroupScreenState extends State<TripGroupScreen> {
                         margin: const EdgeInsets.symmetric(horizontal: 5),
                         alignment: Alignment.center,
                         decoration: BoxDecoration(color: capsuleFill(context), borderRadius: BorderRadius.circular(16)),
-                        child: Text(d, style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800)),
+                        child: Text(d, style: const TextStyle(fontSize: TextSize.display, fontWeight: FontWeight.w800)),
                       ).animate().fadeIn(delay: (80 * i).ms).moveY(begin: 10, curve: Curves.easeOutBack),
                   ]),
                   const SizedBox(height: 12),
                   Text('Friends open ShareBro › Share › Trip group, pick "${g.name}" and type this code.',
-                      textAlign: TextAlign.center, style: TextStyle(fontSize: 13, height: 1.4, color: scheme.onSurfaceVariant)),
+                      textAlign: TextAlign.center, style: TextStyle(fontSize: TextSize.caption, height: 1.4, color: scheme.onSurfaceVariant)),
                 ]),
               ),
             SectionHeader(
@@ -335,7 +337,7 @@ class _TripGroupScreenState extends State<TripGroupScreen> {
               badge: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                 decoration: BoxDecoration(color: capsuleFill(context), borderRadius: BorderRadius.circular(99)),
-                child: Text('${members.length}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: scheme.onSurfaceVariant)),
+                child: Text('${members.length}', style: TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w700, color: scheme.onSurfaceVariant)),
               ),
             ),
             SectionCard(
@@ -368,9 +370,9 @@ class _TripGroupScreenState extends State<TripGroupScreen> {
                         ]),
                         const SizedBox(height: 6),
                         Text(m.fingerprint == me ? 'You' : _short(m.alias),
-                            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w600)),
                         Text(m.faces.isEmpty ? 'No face yet' : 'Ready',
-                            style: TextStyle(fontSize: 11, color: m.faces.isEmpty ? scheme.onSurfaceVariant : scheme.primary)),
+                            style: TextStyle(fontSize: TextSize.tiny, color: m.faces.isEmpty ? scheme.onSurfaceVariant : scheme.primary)),
                       ]),
                     ).animate(key: ValueKey(m.fingerprint)).scale(curve: Curves.easeOutBack, duration: 420.ms),
                 ],
@@ -761,8 +763,7 @@ class _Orbit extends StatelessWidget {
                     right: -6,
                     top: -4,
                     child: Container(
-                      constraints: const BoxConstraints(minWidth: 22),
-                      height: 22,
+                      constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
                       padding: const EdgeInsets.symmetric(horizontal: 6),
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
@@ -771,13 +772,13 @@ class _Orbit extends StatelessWidget {
                         border: Border.all(color: scheme.surfaceContainer, width: 2),
                       ),
                       child: Text('${landed[m.fingerprint]}',
-                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: scheme.onPrimary)),
+                          style: TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w800, color: scheme.onPrimary)),
                     ).animate().scale(curve: Curves.easeOutBack),
                   ),
               ]),
               const SizedBox(height: 4),
               Text(m.alias.split("'s ").first,
-                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600)),
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w600)),
             ]),
           ),
         Positioned(
@@ -873,8 +874,8 @@ class _Stat extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 14),
         child: Column(children: [
-          RollingCount(value: value, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
-          Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          RollingCount(value: value, style: const TextStyle(fontSize: TextSize.title2, fontWeight: FontWeight.w800)),
+          Text(label, style: TextStyle(fontSize: TextSize.small, color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ]),
       ),
     );
@@ -917,10 +918,10 @@ class _ReviewCard extends StatelessWidget {
           MemberAvatar(member: member, size: 112),
         ]),
         const SizedBox(height: 20),
-        Text('Is this $name?', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+        Text('Is this $name?', style: const TextStyle(fontSize: TextSize.title1, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
         const SizedBox(height: 6),
         Text('The face is a little hard to tell. Say yes and $name gets this photo too.',
-            textAlign: TextAlign.center, style: TextStyle(fontSize: 14, height: 1.4, color: scheme.onSurfaceVariant)),
+            textAlign: TextAlign.center, style: TextStyle(fontSize: TextSize.label, height: 1.4, color: scheme.onSurfaceVariant)),
         const SizedBox(height: 22),
         Row(children: [
           Expanded(
@@ -944,7 +945,7 @@ class _ReviewCard extends StatelessWidget {
           ),
         ]),
         const SizedBox(height: 12),
-        Text(left == 1 ? 'Last one' : '$left left', style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
+        Text(left == 1 ? 'Last one' : '$left left', style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
       ]),
     ).animate().fadeIn(duration: 250.ms).slideX(begin: 0.15, curve: Curves.easeOutCubic);
   }

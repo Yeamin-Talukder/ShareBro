@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import '../data/db.dart';
 import '../scan/scan_controller.dart';
@@ -7,6 +7,7 @@ import '../share/prepare.dart';
 import '../share/protocol.dart';
 import '../share/send_center.dart';
 import 'motion.dart';
+import 'permission_explainer.dart';
 import 'transfer_view.dart';
 import 'web_share_screen.dart';
 
@@ -278,7 +279,9 @@ class _SendSheetState extends State<_SendSheet> {
                 title: 'Find phones nearby',
                 subtitle: 'Uses Bluetooth and Wi-Fi Direct. ${widget.personName} opens Receive in this app.',
                 color: scheme.primaryContainer,
-                onTap: () => s.nearby.startDiscovery(),
+                onTap: () async {
+                  if (await ensureNearbyAccess(context, s.nearby)) await s.nearby.startDiscovery();
+                },
               )
             else if (s.nearby.endpoints.isEmpty)
               Padding(

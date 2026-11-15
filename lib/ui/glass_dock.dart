@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import 'glass.dart';
+import 'theme.dart';
 
 /// Height of the floating dock plus its margin, for content to clear it.
 const dockClearance = 96.0;
@@ -158,12 +159,19 @@ class _Tab extends StatelessWidget {
               .scaleXY(begin: 0.7, duration: 450.ms, curve: Curves.elasticOut)
           : icon,
       const SizedBox(height: 2),
-      Text(item.label,
-          style: TextStyle(
-            color: color,
-            fontSize: 12,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          )),
+      // The dock keeps its height, so its labels grow only a little with
+      // large text (like the system's own tab bars); the screens above
+      // take the full size.
+      MediaQuery.withClampedTextScaling(
+        maxScaleFactor: 1.3,
+        child: Text(item.label,
+            maxLines: 1,
+            style: TextStyle(
+              color: color,
+              fontSize: TextSize.small,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            )),
+      ),
     ]);
   }
 }

@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 
 import 'glass.dart';
 import 'motion.dart';
+import 'theme.dart';
 
 /// The app's look, in pieces: rounded cards of Settings-style rows, a bold
 /// header above and a small note below, capsule chips and switches, and
 /// the top-bar buttons grouped in one glass capsule. Colours are flat: the
 /// accent marks what's selected or primary, everything else is neutral.
+
+/// [height] grown as much as the phone's font size setting grows body text.
+/// For boxes that must keep a set height (rows that scroll sideways, bars)
+/// but hold text, so large text doesn't spill out of them.
+double textHeight(BuildContext context, double height) =>
+    height * MediaQuery.textScalerOf(context).scale(14) / 14;
 
 /// The quiet fill behind chips, switches and square buttons.
 Color capsuleFill(BuildContext context) =>
@@ -57,8 +64,8 @@ class SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.fromLTRB(4, top, 0, 8),
-      child: SizedBox(
-        height: 36,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 36),
         child: Row(children: [
           Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
           if (badge != null) ...[const SizedBox(width: 8), badge!],
@@ -84,7 +91,7 @@ class SectionFooter extends StatelessWidget {
       child: Text(text,
           textAlign: align,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontSize: 13,
+                fontSize: TextSize.caption,
                 height: 1.4,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               )),
@@ -145,9 +152,9 @@ class SectionRow extends StatelessWidget {
               Text(title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 16.5, color: destructive ? scheme.error : null)),
+                  style: TextStyle(fontSize: TextSize.body, color: destructive ? scheme.error : null)),
               if (subtitle != null)
-                Text(subtitle!, style: TextStyle(fontSize: 13, height: 1.3, color: scheme.onSurfaceVariant)),
+                Text(subtitle!, style: TextStyle(fontSize: TextSize.caption, height: 1.3, color: scheme.onSurfaceVariant)),
             ]),
           ),
           if (trailing != null) ...[const SizedBox(width: 10), trailing!],
@@ -223,7 +230,7 @@ class CapsuleChip extends StatelessWidget {
         scale: 0.94,
         child: AnimatedContainer(
           duration: 220.ms,
-          height: 36,
+          height: textHeight(context, 36),
           padding: EdgeInsets.only(left: icon == null ? 14 : 11, right: onDeleted != null ? 6 : menu ? 9 : 14),
           decoration: BoxDecoration(
             color: selected ? scheme.primary : outlined ? Colors.transparent : capsuleFill(context),
@@ -232,9 +239,9 @@ class CapsuleChip extends StatelessWidget {
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             if (icon != null) ...[Icon(icon, size: 17, color: fg), const SizedBox(width: 6)],
-            Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: fg)),
+            Text(label, style: TextStyle(fontSize: TextSize.label, fontWeight: FontWeight.w600, color: fg)),
             if (count != null)
-              Text('  $count', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: fg.withAlpha(170))),
+              Text('  $count', style: TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w500, color: fg.withAlpha(170))),
             if (menu)
               Padding(
                 padding: const EdgeInsets.only(left: 2),
@@ -313,7 +320,7 @@ class CapsuleSwitch<T> extends StatelessWidget {
                     child: AnimatedDefaultTextStyle(
                       duration: 200.ms,
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: TextSize.callout,
                         fontWeight: v == value ? FontWeight.w600 : FontWeight.w500,
                         color: scheme.onSurface,
                       ),
@@ -322,7 +329,7 @@ class CapsuleSwitch<T> extends StatelessWidget {
                         if (count != null)
                           TextSpan(
                             text: '  $count',
-                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: scheme.onSurfaceVariant),
+                            style: TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w500, color: scheme.onSurfaceVariant),
                           ),
                       ])),
                     ),

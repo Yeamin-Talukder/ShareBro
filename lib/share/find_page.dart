@@ -11,7 +11,7 @@ const findMePage = r'''<!doctype html>
 <meta name="theme-color" content="#0F0E12">
 <title>Find your photos · ShareBro</title>
 <style>
-:root{--accent:#D9432B;--on-accent:#fff;--bg:#F6F5F8;--ink:#1A1820;--muted:#5E5A66;--card:#fff;--line:rgba(26,24,32,.1);
+:root{--accent:#BF3A22;--on-accent:#fff;--bg:#F6F5F8;--ink:#1A1820;--muted:#5E5A66;--card:#fff;--line:rgba(26,24,32,.1);
 --ease:cubic-bezier(.2,.8,.2,1)}
 @media (prefers-color-scheme:dark){:root{--accent:#FF8A6B;--on-accent:#2A0D06;--bg:#0F0E12;--ink:#F2EFF5;--muted:#A9A3B3;
 --card:#1A1820;--line:rgba(255,255,255,.1)}}

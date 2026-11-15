@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../data/dates.dart';
@@ -15,6 +15,7 @@ import 'photo_viewer.dart';
 import 'reel_screen.dart';
 import 'sections.dart';
 import 'send_sheet.dart';
+import 'theme.dart';
 import 'together_screen.dart';
 import 'widgets.dart';
 
@@ -786,7 +787,7 @@ class _PersonScreenState extends State<PersonScreen> {
                 padding: const EdgeInsets.all(6),
                 // A fixed height so nothing inside can stretch the bar.
                 child: SizedBox(
-                  height: 56,
+                  height: textHeight(context, 56),
                   child: Row(children: [
                 AnimatedSwitcher(
                   duration: 200.ms,
@@ -1375,7 +1376,7 @@ class _SendButtonState extends State<_SendButton> {
                               style: TextStyle(
                                   color: scheme.onPrimary,
                                   fontWeight: FontWeight.w600,
-                                  fontSize: 16)),
+                                  fontSize: TextSize.body)),
                         ]),
                       ),
                     _SendState.working => SizedBox.square(

@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'anim.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -9,6 +9,7 @@ import '../data/places.dart';
 import 'journey_camera.dart';
 import 'motion.dart';
 import 'places_screen.dart';
+import 'theme.dart';
 
 // The Places views on a real map: OpenStreetMap tiles, toned down to the
 // app's flat look (grey in light mode, inverted in dark). Needs internet for
@@ -89,7 +90,7 @@ class _MapCreditState extends State<_MapCredit> {
               curve: Curves.easeOutCubic,
               child: _open
                   ? Text('© OpenStreetMap contributors',
-                      style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant))
+                      style: TextStyle(fontSize: TextSize.tiny, color: scheme.onSurfaceVariant))
                   : Icon(Icons.info_outline_rounded, size: 15, color: scheme.onSurfaceVariant),
             ),
           ),
