@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShareBro · Desktop layout</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,300..600,0..1,0&display=block">
+<style>
+  /* ---------- Tokens (the app's own colours) ---------- */
+  .win {
+    --bg:#0F0E12; --side:#141219; --card:#1C1A22; --card2:#26232E; --hover:rgba(255,255,255,.05); --line:rgba(255,255,255,.07);
+    --ink:#F2EFF5; --dim:rgba(242,239,245,.64); --faint:rgba(242,239,245,.40);
+    --accent:#FF8A6B; --onAccent:#2A0D06; --accentSoft:rgba(255,138,107,.14); --contour:rgba(255,138,107,.07);
+    --violet:#6E5BFF; --teal:#2BB5A6; --green:#30D158; --orange:#FF9F0A; --blue:#0A84FF; --pink:#E8457A;
+    --shadow:0 18px 50px rgba(0,0,0,.45);
+  }
+  .win.light {
+    --bg:#F6F5F8; --side:#EDEBF1; --card:#FFFFFF; --card2:#F1EFF5; --hover:rgba(26,24,32,.05); --line:rgba(26,24,32,.08);
+    --ink:#1A1820; --dim:rgba(26,24,32,.66); --faint:rgba(26,24,32,.44);
+    --accent:#BF3A22; --onAccent:#FFFFFF; --accentSoft:rgba(191,58,34,.10); --contour:rgba(191,58,34,.07);
+    --shadow:0 18px 50px rgba(26,24,32,.14);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { background:#050407; }
+  body { color:#F2EFF5; font-family:"Segoe UI Variable Text","Segoe UI",Roboto,system-ui,sans-serif; -webkit-font-smoothing:antialiased;
+         display:flex; flex-direction:column; align-items:center; gap:16px; padding:22px 16px 44px; min-height:100vh; }
+  button, input { font:inherit; color:inherit; background:none; border:0; }
+  button { cursor:pointer; }
+  .i { font-family:'Material Symbols Rounded'; font-weight:400; font-style:normal; line-height:1; display:inline-block; width:1em; height:1em; overflow:hidden;
+       font-feature-settings:'liga'; font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24; flex:none; }
+  .fill { font-variation-settings:'FILL' 1,'wght' 500,'GRAD' 0,'opsz' 24; }
+  kbd { font-family:inherit; font-size:11px; padding:1px 6px; border-radius:5px; background:var(--card2,#26232E); border:1px solid var(--line,rgba(255,255,255,.08)); color:var(--dim,#aaa); }
+
+  /* ---------- Demo controls (outside the window) ---------- */
+  .intro { width:min(1320px,100%); display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; }
+  .intro h1 { font-size:22px; font-weight:800; letter-spacing:-.4px; }
+  .intro p { color:rgba(242,239,245,.62); font-size:13.5px; margin-top:4px; max-width:720px; line-height:1.55; }
+  .ctrls { display:flex; gap:10px; flex-wrap:wrap; }
+  .dseg { display:flex; padding:3px; border-radius:999px; background:#1C1A22; border:1px solid rgba(255,255,255,.08); }
+  .dseg button { padding:6px 13px; border-radius:999px; font-size:12.5px; color:rgba(242,239,245,.6); display:flex; align-items:center; gap:5px; }
+  .dseg button .i { font-size:16px; }
+  .dseg button.on { background:#FF8A6B; color:#2A0D06; font-weight:700; }
+
+  /* ---------- Window ---------- */
+  .win { width:min(1320px,100%); height:820px; flex:none; border-radius:10px; overflow:hidden; background:var(--bg); color:var(--ink);
+         border:1px solid rgba(255,255,255,.10); box-shadow:0 30px 90px rgba(0,0,0,.65); display:flex; position:relative; transition:width .35s ease; }
+  .win.narrow { width:min(820px,100%); }
+  .caps { position:absolute; top:0; right:0; display:flex; z-index:9; }
+  .caps span { width:46px; height:32px; display:grid; place-items:center; color:var(--dim); font-size:16px; }
+  .caps span:hover { background:var(--hover); }
+  .caps span:last-child:hover { background:#C42B1C; color:#fff; }
+
+  /* ---------- Sidebar (runs up into the title bar) ---------- */
+  .side { width:252px; flex:none; background:var(--side); border-right:1px solid var(--line); display:flex; flex-direction:column; padding:10px 10px 10px; overflow:hidden auto; transition:width .35s ease; }
+  .brand { display:flex; align-items:center; gap:10px; height:44px; padding:0 8px; margin-bottom:6px; }
+  .brand img { width:28px; height:28px; border-radius:8px; }
+  .brand b { font-size:16px; font-weight:800; letter-spacing:-.3px; white-space:nowrap; }
+  .search { display:flex; align-items:center; gap:8px; margin:0 2px 8px; padding:8px 10px; border-radius:10px; background:var(--card); border:1px solid var(--line); color:var(--faint); font-size:13px; white-space:nowrap; }
+  .search .i { font-size:18px; }
+  .search kbd { margin-left:auto; }
+  .group { font-size:11px; font-weight:650; letter-spacing:.9px; text-transform:uppercase; color:var(--faint); padding:14px 12px 6px; white-space:nowrap; }
+  .nav { position:relative; display:flex; align-items:center; gap:11px; padding:8px 11px; border-radius:10px; font-size:13.5px; font-weight:500; color:var(--dim); width:100%; text-align:left; white-space:nowrap; transition:background .15s, color .15s; }
+  .nav .i { font-size:20px; }
+  .nav .n { margin-left:auto; font-size:12px; color:var(--faint); font-variant-numeric:tabular-nums; }
+  .nav:hover { background:var(--hover); color:var(--ink); }
+  .nav.on { background:var(--accentSoft); color:var(--accent); font-weight:600; }
+  .nav.on::before { content:''; position:absolute; left:0; top:9px; bottom:9px; width:3px; border-radius:3px; background:var(--accent); }
+  .nav.on .i { font-variation-settings:'FILL' 1,'wght' 500,'GRAD' 0,'opsz' 24; }
+  .nav.on .n { color:var(--accent); }
+  .nav .live { margin-left:auto; display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--green); font-weight:600; }
+  .nav .live::before { content:''; width:7px; height:7px; border-radius:50%; background:var(--green); animation:ping 1.8s infinite; }
+  .nav .cover { width:22px; height:22px; border-radius:6px; object-fit:cover; flex:none; }
+  .nav.add { color:var(--faint); }
+  .side .grow { flex:1; min-height:10px; }
+  .scancard { margin:4px 2px 8px; padding:12px; border-radius:14px; background:var(--card); border:1px solid var(--line); }
+  .scancard .top { display:flex; align-items:center; gap:8px; font-size:12.8px; font-weight:650; }
+  .scancard .top .i { color:var(--accent); font-size:18px; }
+  .scancard .top button { margin-left:auto; color:var(--faint); font-size:12px; font-weight:500; }
+  .newfaces { display:flex; margin-top:10px; height:28px; }
+  .newfaces img { width:28px; height:28px; border-radius:50%; object-fit:cover; border:2px solid var(--card); margin-left:-7px; animation:pop .5s cubic-bezier(.3,1.6,.5,1) both; }
+  .newfaces img:first-child { margin-left:0; }
+  .newfaces span { align-self:center; font-size:11.5px; color:var(--dim); margin-left:8px; }
+  @keyframes pop { from { transform:scale(.2); opacity:0; } }
+  .scancard .sub { font-size:11.5px; color:var(--faint); margin-top:8px; }
+  .bar { height:5px; border-radius:3px; background:var(--card2); margin-top:7px; overflow:hidden; }
+  .bar i { display:block; height:100%; width:62%; background:var(--accent); border-radius:3px; transition:width .6s ease; }
+  .me { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px; white-space:nowrap; }
+  .me:hover { background:var(--hover); }
+  .me img { width:28px; height:28px; border-radius:50%; object-fit:cover; }
+  .me span { font-size:13px; font-weight:600; }
+  .me small { display:block; font-size:11.5px; color:var(--faint); font-weight:400; }
+  .me .i { margin-left:auto; color:var(--faint); font-size:20px; }
+
+  /* Narrow window: the sidebar becomes an icon rail. */
+  .win.narrow .side { width:68px; padding:10px 8px; }
+  .win.narrow .brand b, .win.narrow .search, .win.narrow .group, .win.narrow .nav .label, .win.narrow .nav .n, .win.narrow .nav .live,
+  .win.narrow .scancard, .win.narrow .me div, .win.narrow .me .i { display:none; }
+  .win.narrow .brand { justify-content:center; padding:0; }
+  .win.narrow .nav { justify-content:center; padding:10px 0; }
+  .win.narrow .nav.on::before { display:none; }
+  .win.narrow .group + .nav { margin-top:10px; }
+  .win.narrow .me { justify-content:center; padding:8px 0; }
+  .rail-scan { display:none; }
+  .win.narrow .rail-scan { display:grid; place-items:center; margin:0 auto 8px; width:40px; height:40px; border-radius:50%; position:relative; }
+  .rail-scan svg { position:absolute; inset:0; transform:rotate(-90deg); }
+  .rail-scan .i { font-size:18px; color:var(--accent); }
+
+  /* ---------- Main ---------- */
+  .main { flex:1; min-width:0; display:flex; flex-direction:column; position:relative; isolation:isolate; }
+  .contour { position:absolute; inset:0; z-index:-1; pointer-events:none; overflow:hidden; }
+  .contour svg { position:absolute; right:-260px; top:-220px; width:1100px; height:1100px; }
+  .contour ellipse { fill:none; stroke:var(--contour); stroke-width:1.2; }
+  .toolbar { height:96px; flex:none; display:flex; align-items:flex-end; gap:12px; padding:0 24px 12px; padding-right:24px; }
+  .toolbar .title { display:flex; align-items:baseline; gap:10px; min-width:0; }
+  .toolbar h2 { font-size:26px; font-weight:800; letter-spacing:-.6px; white-space:nowrap; }
+  .toolbar .meta { font-size:13px; color:var(--faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .toolbar .sp { flex:1; }
+  .chip { display:flex; align-items:center; gap:6px; padding:7px 12px; border-radius:999px; background:var(--card); border:1px solid var(--line); font-size:13px; color:var(--dim); white-space:nowrap; transition:color .15s, border-color .15s; }
+  .chip .i { font-size:17px; }
+  .chip:hover { color:var(--ink); border-color:rgba(127,127,127,.3); }
+  .chip.on { background:var(--accentSoft); color:var(--accent); border-color:transparent; }
+  .seg { display:flex; padding:3px; border-radius:999px; background:var(--card); border:1px solid var(--line); }
+  .seg button { padding:5px 12px; border-radius:999px; font-size:12.5px; color:var(--dim); display:flex; gap:5px; align-items:center; white-space:nowrap; }
+  .seg button .i { font-size:16px; }
+  .seg button.on { background:var(--card2); color:var(--ink); font-weight:600; }
+  .primary { display:flex; align-items:center; gap:7px; padding:9px 16px; border-radius:999px; background:var(--accent); color:var(--onAccent); font-weight:700; font-size:13.5px; white-space:nowrap; transition:transform .12s, filter .15s; }
+  .primary:hover { filter:brightness(1.07); }
+  .primary:active { transform:scale(.97); }
+  .primary .i { font-size:19px; }
+  .iconbtn { position:relative; width:36px; height:36px; display:grid; place-items:center; border-radius:50%; color:var(--dim); flex:none; }
+  .iconbtn:hover { background:var(--hover); color:var(--ink); }
+  .iconbtn .i { font-size:20px; }
+  .badge { position:absolute; top:2px; right:0; min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:var(--accent); color:var(--onAccent); font-size:10.5px; font-weight:700; display:grid; place-items:center; }
+  .content { flex:1; overflow:auto; padding:6px 24px 28px; scrollbar-width:thin; scrollbar-color:var(--card2) transparent; }
+  .page { display:none; }
+  .page.on { display:block; animation:in .28s ease; }
+  @keyframes in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+  .h3 { font-size:15px; font-weight:700; margin:18px 0 12px; display:flex; align-items:baseline; gap:8px; }
+  .h3 small { font-size:12.5px; color:var(--faint); font-weight:500; }
+  .h3 .more { margin-left:auto; font-size:12.5px; color:var(--accent); font-weight:600; }
+  .row-chips { display:flex; gap:8px; flex-wrap:wrap; }
+
+  /* People */
+  .suggest { display:flex; align-items:center; gap:14px; padding:12px 14px; border-radius:16px; background:var(--card); border:1px solid var(--line); margin-top:16px; }
+  .suggest .faces { display:flex; }
+  .suggest .faces img { width:40px; height:40px; border-radius:50%; object-fit:cover; border:2px solid var(--card); margin-left:-10px; }
+  .suggest .faces img:first-child { margin-left:0; }
+  .suggest b { font-size:13.5px; display:block; }
+  .suggest small { font-size:12.5px; color:var(--faint); }
+  .suggest .sp { flex:1; }
+  .ghost { padding:8px 14px; border-radius:999px; font-size:13px; font-weight:600; color:var(--accent); background:var(--accentSoft); white-space:nowrap; }
+  .people { display:grid; grid-template-columns:repeat(auto-fill,minmax(232px,1fr)); gap:14px; }
+  .pcard { position:relative; padding:14px; border-radius:18px; background:var(--card); border:1px solid var(--line); cursor:pointer; transition:transform .18s, box-shadow .18s, border-color .18s; }
+  .pcard:hover { transform:translateY(-2px); box-shadow:var(--shadow); border-color:rgba(127,127,127,.18); }
+  .pcard .who { display:flex; align-items:center; gap:12px; }
+  .pcard .who img { width:54px; height:54px; border-radius:50%; object-fit:cover; }
+  .pcard .who b { font-size:15px; font-weight:700; display:block; }
+  .pcard .who small { font-size:12.5px; color:var(--faint); }
+  .pcard .strip { display:grid; grid-template-columns:repeat(4,1fr); gap:3px; margin-top:12px; border-radius:10px; overflow:hidden; }
+  .pcard .strip img { width:100%; aspect-ratio:1; object-fit:cover; display:block; }
+  .pcard .send { position:absolute; top:12px; right:12px; display:flex; align-items:center; gap:5px; padding:6px 11px; border-radius:999px; background:var(--accent); color:var(--onAccent); font-size:12px; font-weight:700; opacity:0; transform:translateY(-3px); transition:all .18s; }
+  .pcard .send .i { font-size:16px; }
+  .pcard:hover .send { opacity:1; transform:none; }
+
+  /* Photos */
+  .photos-wrap { position:relative; }
+  .day { position:sticky; top:-6px; z-index:2; display:flex; gap:8px; align-items:baseline; padding:10px 0 8px; margin:0 -24px 0; padding-left:24px; background:color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter:blur(14px); font-size:14px; font-weight:700; }
+  .day small { color:var(--faint); font-weight:500; font-size:12.5px; }
+  .day .pick { margin-left:auto; margin-right:58px; font-size:12.5px; color:var(--accent); font-weight:600; opacity:0; transition:opacity .15s; }
+  .day:hover .pick { opacity:1; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--tile,150px),1fr)); gap:3px; margin-bottom:14px; padding-right:44px; }
+  .ph { position:relative; aspect-ratio:1; overflow:hidden; border-radius:3px; background:var(--card); cursor:zoom-in; }
+  .ph img { width:100%; height:100%; object-fit:cover; display:block; transition:transform .25s, border-radius .2s; }
+  .ph:hover img { transform:scale(1.035); }
+  .ph::after { content:''; position:absolute; inset:0; background:rgba(0,0,0,.18); opacity:0; transition:opacity .15s; pointer-events:none; }
+  .ph:hover::after { opacity:1; }
+  .ph .tick { position:absolute; z-index:1; top:7px; left:7px; width:22px; height:22px; border-radius:50%; border:2px solid rgba(255,255,255,.9); background:rgba(0,0,0,.2); opacity:0; transition:opacity .15s; display:grid; place-items:center; cursor:pointer; }
+  .ph .faces { position:absolute; z-index:1; right:6px; bottom:6px; display:flex; opacity:0; transition:opacity .15s; }
+  .ph .faces img { width:20px; height:20px; border-radius:50%; border:1.5px solid #fff; margin-left:-6px; transform:none !important; }
+  .ph:hover .tick, .ph:hover .faces, .selecting .ph .tick, .ph.sel .tick { opacity:1; }
+  .ph.sel { background:var(--accentSoft); }
+  .ph.sel .tick { background:var(--accent); border-color:var(--accent); }
+  .ph.sel .tick::after { content:'check'; font-family:'Material Symbols Rounded'; font-size:15px; color:var(--onAccent); }
+  .ph.sel > img { transform:scale(.88); border-radius:8px; }
+  .scrub { position:absolute; right:18px; top:112px; bottom:20px; width:44px; display:flex; flex-direction:column; align-items:flex-end; gap:0; z-index:3; }
+  .scrub .m { font-size:11px; color:var(--faint); padding:3px 0; cursor:pointer; white-space:nowrap; }
+  .scrub .m.y { color:var(--dim); font-weight:700; font-size:11.5px; margin-top:6px; }
+  .scrub .m:hover { color:var(--ink); }
+  .scrub .m.on { color:var(--accent); font-weight:700; }
+  .scrub .line { flex:1; width:2px; background:var(--line); border-radius:2px; margin:6px 6px 0 0; position:relative; }
+  .scrub .line i { position:absolute; left:-3px; top:0; width:8px; height:34px; border-radius:4px; background:var(--accent); }
+  .zoom { display:flex; align-items:center; gap:8px; color:var(--faint); }
+  .zoom .i { font-size:18px; }
+  .zoom input { -webkit-appearance:none; appearance:none; width:110px; height:4px; border-radius:2px; background:var(--card2); }
+  .zoom input::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--accent); cursor:pointer; }
+  .selbar { position:absolute; left:50%; bottom:22px; transform:translate(-50%,24px); opacity:0; pointer-events:none; transition:all .22s cubic-bezier(.2,.9,.3,1.2);
+            display:flex; align-items:center; gap:2px; padding:6px; border-radius:999px; background:color-mix(in srgb, var(--card2) 92%, transparent); border:1px solid var(--line); box-shadow:var(--shadow); backdrop-filter:blur(20px); z-index:6; }
+  .selbar.show { transform:translate(-50%,0); opacity:1; pointer-events:auto; }
+  .selbar .count { padding:0 12px 0 10px; font-size:13px; font-weight:700; white-space:nowrap; }
+  .selbar button { display:flex; align-items:center; gap:6px; padding:8px 13px; border-radius:999px; font-size:13px; color:var(--dim); white-space:nowrap; }
+  .selbar button:hover { background:var(--hover); color:var(--ink); }
+  .selbar button .i { font-size:18px; }
+  .selbar button.go { background:var(--accent); color:var(--onAccent); font-weight:700; }
+
+  /* Explore */
+  .tiles { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+  .ex { border-radius:18px; background:var(--card); border:1px solid var(--line); padding:14px; cursor:pointer; transition:transform .18s, box-shadow .18s; display:flex; flex-direction:column; gap:10px; min-height:190px; }
+  .ex:hover { transform:translateY(-2px); box-shadow:var(--shadow); }
+  .ex.wide { grid-column:span 2; }
+  .ex.full { grid-column:1 / -1; min-height:0; }
+  .ex.full .vis { min-height:0; flex:none; }
+  .ex.full .stor { flex-direction:row; align-items:center; gap:24px; }
+  .ex.full .stor .bigbar { flex:1; }
+  .ex.full .stor .legend { grid-template-columns:repeat(4,auto); gap:6px 18px; }
+  .ex .hd { display:flex; align-items:center; gap:10px; }
+  .ex .hd .tile { width:30px; height:30px; border-radius:9px; display:grid; place-items:center; color:#fff; }
+  .ex .hd .tile .i { font-size:18px; }
+  .ex .hd b { font-size:14.5px; font-weight:700; }
+  .ex .hd small { margin-left:auto; font-size:12px; color:var(--faint); }
+  .ex .vis { flex:1; border-radius:12px; overflow:hidden; position:relative; min-height:110px; }
+  .map { background:var(--card2); }
+  .map svg { position:absolute; inset:0; width:100%; height:100%; }
+  .map .land { fill:color-mix(in srgb, var(--ink) 7%, transparent); }
+  .map .pin { fill:var(--accent); }
+  .map .pin-ring { fill:none; stroke:var(--accent); stroke-opacity:.35; }
+  .map .lbl { font-size:11px; fill:var(--dim); font-family:inherit; }
+  .mosaic { display:grid; grid-template-columns:repeat(5,1fr); gap:3px; }
+  .mosaic img { width:100%; height:100%; object-fit:cover; display:block; aspect-ratio:1; }
+  .pair { display:flex; align-items:center; justify-content:center; gap:18px; background:var(--card2); }
+  .pair .duo { display:flex; flex-direction:column; align-items:center; gap:6px; font-size:11.5px; color:var(--dim); }
+  .pair .duo div { display:flex; }
+  .pair .duo img { width:44px; height:44px; border-radius:50%; object-fit:cover; border:2px solid var(--card2); }
+  .pair .duo img + img { margin-left:-12px; }
+  .dupes { display:grid; grid-template-columns:1fr 1fr; gap:3px; }
+  .dupes img { width:100%; height:100%; object-fit:cover; display:block; }
+  .dupes .keep { position:absolute; left:8px; bottom:8px; padding:3px 8px; border-radius:999px; background:var(--green); color:#04210E; font-size:11px; font-weight:700; }
+  .stor { display:flex; flex-direction:column; justify-content:center; gap:12px; padding:4px 2px; }
+  .stor .bigbar { display:flex; height:12px; border-radius:6px; overflow:hidden; gap:2px; }
+  .stor .bigbar i { display:block; height:100%; }
+  .stor .legend { display:grid; grid-template-columns:1fr 1fr; gap:6px 10px; font-size:12px; color:var(--dim); }
+  .stor .legend span { display:flex; align-items:center; gap:6px; }
+  .stor .legend span::before { content:''; width:9px; height:9px; border-radius:3px; background:var(--c); }
+  .best { display:grid; grid-template-columns:1.4fr 1fr; gap:3px; }
+  .best img { width:100%; height:100%; object-fit:cover; display:block; }
+  .best .star { position:absolute; left:8px; top:8px; display:flex; align-items:center; gap:4px; padding:3px 8px; border-radius:999px; background:rgba(0,0,0,.55); color:#FFD60A; font-size:11px; font-weight:700; }
+  .best .star .i { font-size:14px; }
+
+  /* Share */
+  .cols { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.1fr); gap:16px; align-items:start; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:16px; }
+  .card + .card { margin-top:16px; }
+  .card h4 { font-size:14.5px; font-weight:700; display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .card h4 .sp { flex:1; }
+  .card h4 small { font-weight:500; color:var(--faint); font-size:12px; }
+  .picks { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+  .pick { display:flex; flex-direction:column; align-items:center; gap:7px; padding:10px 4px; border-radius:14px; font-size:12.5px; color:var(--dim); transition:background .15s, color .15s; }
+  .pick:hover { background:var(--hover); color:var(--ink); }
+  .pick .ic { width:44px; height:44px; border-radius:13px; background:var(--card2); display:grid; place-items:center; color:var(--ink); transition:transform .15s; }
+  .pick:hover .ic { transform:translateY(-2px); }
+  .pick .ic .i { font-size:22px; }
+  .drop { margin-top:12px; border:1.5px dashed color-mix(in srgb, var(--ink) 16%, transparent); border-radius:14px; padding:14px; display:flex; align-items:center; gap:12px; font-size:12.5px; color:var(--faint); transition:border-color .2s, background .2s; }
+  .drop:hover { border-color:var(--accent); background:var(--accentSoft); color:var(--accent); }
+  .drop .i { font-size:24px; }
+  .drop .thumbs { display:flex; margin-left:auto; }
+  .drop .thumbs img { width:38px; height:38px; border-radius:9px; object-fit:cover; border:2px solid var(--card); margin-left:-10px; }
+  .drop b { color:var(--ink); font-weight:600; display:block; }
+  .opt { display:flex; align-items:center; gap:12px; padding:11px 4px; border-radius:12px; }
+  .opt + .opt { border-top:1px solid var(--line); border-radius:0; }
+  .opt .tile { width:32px; height:32px; border-radius:9px; display:grid; place-items:center; color:#fff; flex:none; }
+  .opt .tile .i { font-size:19px; }
+  .opt b { font-size:13.5px; font-weight:600; display:block; }
+  .opt small { font-size:12px; color:var(--faint); }
+  .opt .go { margin-left:auto; color:var(--faint); font-size:20px; }
+  .opt .btn { margin-left:auto; padding:7px 14px; border-radius:999px; background:var(--accent); color:var(--onAccent); font-weight:700; font-size:12.5px; white-space:nowrap; }
+  .opt .dev { width:36px; height:36px; border-radius:50%; background:var(--card2); display:grid; place-items:center; flex:none; position:relative; }
+  .opt .dev .i { font-size:19px; }
+  .opt .dev::after { content:''; position:absolute; right:0; bottom:0; width:9px; height:9px; border-radius:50%; background:var(--green); border:2px solid var(--card); }
+  .opt .dev.off::after { background:var(--faint); }
+  .opt.off b, .opt.off small { opacity:.6; }
+  .radar { height:150px; position:relative; border-radius:14px; background:var(--card2); overflow:hidden; margin-bottom:4px; }
+  .radar .ring { position:absolute; left:50%; top:50%; border:1px solid color-mix(in srgb, var(--accent) 25%, transparent); border-radius:50%; transform:translate(-50%,-50%); }
+  .radar .you { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:50px; height:50px; border-radius:50%; background:var(--accent); display:grid; place-items:center; color:var(--onAccent); }
+  .radar .you .i { font-size:24px; }
+  .radar .pulse { position:absolute; left:50%; top:50%; width:50px; height:50px; border-radius:50%; border:2px solid var(--accent); transform:translate(-50%,-50%); animation:pulse 2.6s ease-out infinite; }
+  @keyframes pulse { from { width:50px; height:50px; opacity:.8; } to { width:340px; height:340px; opacity:0; } }
+  .radar .d { position:absolute; transform:translate(-50%,-50%); width:34px; height:34px; border-radius:50%; background:var(--card); border:1px solid var(--line); display:grid; place-items:center; }
+  .radar .d .i { font-size:17px; }
+  .recv { display:flex; align-items:center; gap:7px; padding:6px 11px; border-radius:999px; background:color-mix(in srgb, var(--green) 14%, transparent); color:var(--green); font-size:12px; font-weight:650; }
+  .recv::before { content:''; width:7px; height:7px; border-radius:50%; background:var(--green); animation:ping 1.8s infinite; }
+  @keyframes ping { 0% { box-shadow:0 0 0 0 color-mix(in srgb, var(--green) 60%, transparent); } 100% { box-shadow:0 0 0 7px transparent; } }
+  .xfer { display:flex; gap:12px; align-items:center; padding:10px 2px; }
+  .xfer + .xfer { border-top:1px solid var(--line); }
+  .xfer .stack { position:relative; width:44px; height:44px; flex:none; }
+  .xfer .stack img { position:absolute; width:38px; height:38px; border-radius:9px; object-fit:cover; border:2px solid var(--card); }
+  .xfer .stack img:nth-child(1) { left:0; top:0; transform:rotate(-6deg); }
+  .xfer .stack img:nth-child(2) { left:6px; top:6px; }
+  .xfer .txt { flex:1; min-width:0; }
+  .xfer b { font-size:13.5px; font-weight:600; display:block; }
+  .xfer small { font-size:12px; color:var(--faint); }
+  .xfer .bar { margin-top:7px; }
+  .xfer .bar i { width:43%; animation:recv 9s linear infinite; }
+  @keyframes recv { from { width:20%; } to { width:96%; } }
+  .xfer .done { color:var(--green); font-size:22px; }
+  .xfer .stop { color:var(--faint); font-size:20px; }
+  .foot { font-size:12px; color:var(--faint); margin-top:10px; line-height:1.5; }
+
+  /* Viewer */
+  .viewer { position:absolute; inset:0; background:#08070A; color:#F2EFF5; display:none; z-index:8; }
+  .viewer.on { display:flex; animation:fade .2s ease; }
+  @keyframes fade { from { opacity:0; } }
+  .stage { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .vtop { height:56px; display:flex; align-items:center; gap:6px; padding:0 14px; padding-right:150px; }
+  .vtop .t { font-size:13.5px; font-weight:600; margin-left:4px; }
+  .vtop .t small { display:block; font-size:12px; color:rgba(242,239,245,.45); font-weight:400; }
+  .vtop .sp { flex:1; }
+  .vtop .iconbtn { color:rgba(242,239,245,.7); }
+  .vtop .iconbtn:hover { background:rgba(255,255,255,.08); color:#fff; }
+  .vtop .iconbtn.on { color:#FF8A6B; }
+  .pic { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; position:relative; padding:4px 70px; }
+  .frame { position:relative; height:100%; max-width:100%; }
+  .frame img { height:100%; width:auto; max-width:100%; display:block; object-fit:contain; }
+  .box { position:absolute; border:2px solid rgba(255,255,255,.9); border-radius:10px; box-shadow:0 0 0 1px rgba(0,0,0,.25); transition:opacity .2s; }
+  .box span { position:absolute; left:50%; top:calc(100% + 6px); transform:translateX(-50%); padding:3px 9px; border-radius:999px; background:rgba(20,18,25,.82); font-size:11.5px; font-weight:600; white-space:nowrap; backdrop-filter:blur(8px); }
+  .box.new { border-style:dashed; border-color:#FF8A6B; }
+  .box.new span { color:#FF8A6B; }
+  .noboxes .box { opacity:0; }
+  .arrow { position:absolute; top:50%; transform:translateY(-50%); width:44px; height:44px; border-radius:50%; background:rgba(255,255,255,.08); display:grid; place-items:center; color:#fff; opacity:.75; transition:opacity .15s, background .15s; }
+  .arrow:hover { opacity:1; background:rgba(255,255,255,.15); }
+  .arrow.l { left:14px; } .arrow.r { right:14px; }
+  .film { height:76px; display:flex; gap:4px; justify-content:center; align-items:center; padding:8px; }
+  .film img { height:50px; width:50px; object-fit:cover; border-radius:7px; opacity:.45; cursor:pointer; transition:opacity .15s, transform .15s; }
+  .film img.on { opacity:1; outline:2px solid #FF8A6B; outline-offset:2px; }
+  .film img:hover { opacity:.9; transform:translateY(-2px); }
+  .info { width:310px; flex:none; background:#121016; border-left:1px solid rgba(255,255,255,.07); padding:56px 16px 16px; overflow:auto; }
+  .info h4 { font-size:11.5px; letter-spacing:.8px; text-transform:uppercase; color:rgba(242,239,245,.42); font-weight:650; margin:18px 0 8px; }
+  .info h4:first-child { margin-top:0; }
+  .inphoto { display:flex; align-items:center; gap:10px; padding:7px 0; }
+  .inphoto img, .inphoto .q { width:38px; height:38px; border-radius:50%; object-fit:cover; flex:none; }
+  .inphoto .q { border:1.5px dashed #FF8A6B; display:grid; place-items:center; color:#FF8A6B; }
+  .inphoto .q .i { font-size:20px; }
+  .inphoto b { font-size:13.5px; font-weight:600; display:block; }
+  .inphoto small { font-size:12px; color:rgba(242,239,245,.45); }
+  .inphoto .name { margin-left:auto; padding:5px 11px; border-radius:999px; background:rgba(255,138,107,.14); color:#FF8A6B; font-size:12px; font-weight:650; }
+  .sendall { width:100%; margin-top:10px; display:flex; align-items:center; justify-content:center; gap:8px; padding:11px; border-radius:12px; background:#FF8A6B; color:#2A0D06; font-weight:700; font-size:13.5px; }
+  .sendall .i { font-size:19px; }
+  .kv { display:flex; gap:10px; align-items:flex-start; padding:6px 0; font-size:13px; }
+  .kv .i { color:rgba(242,239,245,.42); font-size:19px; margin-top:1px; }
+  .kv small { display:block; font-size:12px; color:rgba(242,239,245,.45); word-break:break-all; }
+  .vact { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .vact button { display:flex; align-items:center; justify-content:center; gap:7px; padding:9px 10px; border-radius:10px; background:#1C1A22; border:1px solid rgba(255,255,255,.07); font-size:12.5px; color:rgba(242,239,245,.75); }
+  .vact button:hover { color:#fff; background:#26232E; }
+  .vact .i { font-size:18px; }
+  .keys { font-size:11.5px; color:rgba(242,239,245,.42); margin-top:16px; line-height:2.1; }
+  .keys kbd { background:#1C1A22; border-color:rgba(255,255,255,.08); color:rgba(242,239,245,.7); }
+
+  /* Narrow window */
+  .win.narrow .cols { grid-template-columns:1fr; }
+  .win.narrow .tiles { grid-template-columns:1fr 1fr; }
+  .win.narrow .ex.wide { grid-column:span 2; }
+  .win.narrow .toolbar .meta, .win.narrow .hide-narrow { display:none; }
+  .win.narrow .info { display:none; }
+  .win.narrow .grid { padding-right:0; }
+  .win.narrow .day .pick { margin-right:0; }
+  .win.narrow .ex.full .stor { flex-direction:column; align-items:stretch; }
+  .win.narrow .ex.full .stor .legend { grid-template-columns:1fr 1fr; }
+  .win.narrow .vtop { padding-right:150px; }
+
+  /* Notes */
+  .notes { width:min(1320px,100%); display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; }
+  .note { background:#100E14; border:1px solid rgba(255,255,255,.07); border-radius:14px; padding:14px; font-size:12.8px; color:rgba(242,239,245,.64); line-height:1.55; }
+  .note b { color:#F2EFF5; display:flex; align-items:center; gap:7px; font-size:13.5px; margin-bottom:5px; }
+  .note b .i { color:#FF8A6B; font-size:18px; }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <div>
+    <h1>ShareBro on Windows · desktop layout</h1>
+    <p>The phone's look, laid out for a wide screen. Click around: the sidebar, a person, a photo (or its tick to select), Explore and Share. In the viewer, <kbd>←</kbd> <kbd>→</kbd> move and <kbd>Esc</kbd> closes.</p>
+  </div>
+  <div class="ctrls">
+    <div class="dseg" id="theme"><button class="on" data-v="dark"><span class="i">dark_mode</span>Dark</button><button data-v="light"><span class="i">light_mode</span>Light</button></div>
+    <div class="dseg" id="size"><button class="on" data-v="wide"><span class="i">desktop_windows</span>Wide</button><button data-v="narrow"><span class="i">tablet</span>Narrow window</button></div>
+  </div>
+</div>
+
+<div class="win" id="win">
+  <div class="caps"><span class="i">remove</span><span class="i">crop_square</span><span class="i">close</span></div>
+
+  <!-- Sidebar -->
+  <aside class="side">
+    <div class="brand"><img src="sharebro-reel/src/img/app_icon_1024.png" alt=""><b>ShareBro</b></div>
+    <div class="search"><span class="i">search</span>Search people, places<kbd>Ctrl+K</kbd></div>
+
+    <div class="group">Library</div>
+    <button class="nav on" data-page="people" title="People"><span class="i">group</span><span class="label">People</span><span class="n">8</span></button>
+    <button class="nav" data-page="photos" title="Photos"><span class="i">photo</span><span class="label">Photos</span><span class="n">1,248</span></button>
+    <button class="nav" data-page="explore" title="Explore"><span class="i">explore</span><span class="label">Explore</span></button>
+
+    <div class="group">Sharing</div>
+    <button class="nav" data-page="share" title="Send & receive"><span class="i">swap_horiz</span><span class="label">Send &amp; receive</span><span class="live">1</span></button>
+    <button class="nav" data-page="share" title="Trip group"><span class="i">diversity_3</span><span class="label">Trip group</span></button>
+
+    <div class="group">Folders</div>
+    <button class="nav" data-page="photos" title="Cox's Bazar 2026"><img class="cover" src="sharebro-reel/src/img/thumbs/cb_5080823.jpg" alt=""><span class="label">Cox's Bazar 2026</span><span class="n">812</span></button>
+    <button class="nav" data-page="photos" title="Sajek trip"><img class="cover" src="sharebro-reel/src/img/thumbs/pn_7624931.jpg" alt=""><span class="label">Sajek trip</span><span class="n">436</span></button>
+    <button class="nav add" title="Add a folder"><span class="i">create_new_folder</span><span class="label">Add a folder</span></button>
+
+    <div class="grow"></div>
+    <div class="rail-scan" title="Scanning Sajek trip · 62%">
+      <svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17" fill="none" stroke="var(--card2)" stroke-width="3"/><circle cx="20" cy="20" r="17" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-dasharray="107" stroke-dashoffset="40"/></svg>
+      <span class="i">face</span>
+    </div>
+    <div class="scancard">
+      <div class="top"><span class="i">face</span>Scanning Sajek trip<button>Stop</button></div>
+      <div class="newfaces" id="newfaces"></div>
+      <div class="sub" id="scansub">271 of 436 photos · about 2 min left</div>
+      <div class="bar"><i id="scanbar"></i></div>
+    </div>
+    <div class="me"><img src="sharebro-reel/src/img/avatars/Jordan.png" alt=""><div><span>Jordan</span><small>Profile &amp; settings</small></div><span class="i">settings</span></div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="contour"><svg id="contour" viewBox="-550 -550 1100 1100"></svg></div>
+    <div class="toolbar" id="tb"></div>
+    <div class="content" id="content">
+
+      <!-- People -->
+      <div class="page on" data-id="people">
+        <div class="row-chips">
+          <button class="chip on"><span class="i">landscape</span>All trips</button>
+          <button class="chip"><span class="i">event</span>Any date</button>
+          <button class="chip"><span class="i">wc</span>Everyone</button>
+          <button class="chip"><span class="i">sort</span>Most photos</button>
+        </div>
+        <div class="suggest">
+          <div class="faces"><img src="sharebro-reel/src/img/avatars/Sam.png" alt=""><img src="sharebro-reel/src/img/avatars/Andre.png" alt=""></div>
+          <div><b>2 people don't have a name yet</b><small>Name them so you can send them their photos</small></div>
+          <span class="sp"></span>
+          <button class="ghost">Name them</button>
+        </div>
+        <div class="h3">Everyone <small>6 people</small></div>
+        <div class="people" id="people"></div>
+      </div>
+
+      <!-- Photos -->
+      <div class="page" data-id="photos">
+        <div class="photos-wrap" id="days"></div>
+      </div>
+
+      <!-- Explore -->
+      <div class="page" data-id="explore">
+        <div class="tiles" style="margin-top:12px">
+          <div class="ex wide">
+            <div class="hd"><span class="tile" style="background:var(--teal)"><span class="i">map</span></span><b>Places</b><small>3 places · 1,031 photos</small></div>
+            <div class="vis map"><svg viewBox="0 0 600 180" preserveAspectRatio="xMidYMid slice">
+              <path class="land" d="M0 120 C60 100 90 60 150 70 S250 30 300 50 S380 110 430 90 S520 40 600 60 L600 180 L0 180 Z"/>
+              <path class="land" d="M380 0 C400 30 440 20 470 10 L470 0 Z"/>
+              <circle class="pin-ring" cx="190" cy="104" r="22"/><circle class="pin" cx="190" cy="104" r="7"/><text class="lbl" x="214" y="108">Cox's Bazar · 812</text>
+              <circle class="pin-ring" cx="402" cy="78" r="16"/><circle class="pin" cx="402" cy="78" r="6"/><text class="lbl" x="422" y="82">Sajek · 219</text>
+              <circle class="pin" cx="300" cy="140" r="4"/><text class="lbl" x="310" y="144">Inani Beach</text>
+            </svg></div>
+          </div>
+          <div class="ex">
+            <div class="hd"><span class="tile" style="background:var(--orange)"><span class="i">auto_awesome</span></span><b>Best group shots</b><small>18</small></div>
+            <div class="vis best"><img src="sharebro-reel/src/img/thumbs/cb_5080833.jpg" alt=""><img src="sharebro-reel/src/img/thumbs/cb_5080839.jpg" alt=""><span class="star"><span class="i fill">star</span>Everyone smiling</span></div>
+          </div>
+          <div class="ex">
+            <div class="hd"><span class="tile" style="background:var(--violet)"><span class="i">calendar_month</span></span><b>Timeline</b><small>Nov 12 – 14</small></div>
+            <div class="vis mosaic" id="mosaic"></div>
+          </div>
+          <div class="ex">
+            <div class="hd"><span class="tile" style="background:var(--pink)"><span class="i">favorite</span></span><b>Together</b><small>Who's often in photos together</small></div>
+            <div class="vis pair">
+              <div class="duo"><div><img src="sharebro-reel/src/img/avatars/Ruby.png" alt=""><img src="sharebro-reel/src/img/avatars/Leo.png" alt=""></div>Ruby &amp; Leo · 86</div>
+              <div class="duo"><div><img src="sharebro-reel/src/img/avatars/Maya.png" alt=""><img src="sharebro-reel/src/img/avatars/Nia.png" alt=""></div>Maya &amp; Nia · 54</div>
+            </div>
+          </div>
+          <div class="ex">
+            <div class="hd"><span class="tile" style="background:var(--blue)"><span class="i">filter_none</span></span><b>Duplicates</b><small>12 sets · 340 MB</small></div>
+            <div class="vis dupes"><img src="sharebro-reel/src/img/thumbs/pn_7624927.jpg" alt=""><img src="sharebro-reel/src/img/thumbs/pn_7624928.jpg" alt="" style="opacity:.55"><span class="keep">Keep the sharper one</span></div>
+          </div>
+          <div class="ex full">
+            <div class="hd"><span class="tile" style="background:#636366"><span class="i">hard_drive</span></span><b>Storage</b><small>9.4 GB</small></div>
+            <div class="vis stor">
+              <div class="bigbar"><i style="width:46%;background:var(--accent)"></i><i style="width:22%;background:var(--violet)"></i><i style="width:12%;background:var(--teal)"></i><i style="width:8%;background:var(--orange)"></i><i style="flex:1;background:var(--card2)"></i></div>
+              <div class="legend"><span style="--c:var(--accent)">Photos · 4.3 GB</span><span style="--c:var(--violet)">Screenshots · 2.1 GB</span><span style="--c:var(--teal)">Received · 1.1 GB</span><span style="--c:var(--orange)">Duplicates · 0.8 GB</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Share -->
+      <div class="page" data-id="share">
+        <div class="cols" style="margin-top:12px">
+          <div>
+            <div class="card">
+              <h4>Send <span class="sp"></span><small>3 photos · 9.8 MB</small></h4>
+              <div class="picks">
+                <button class="pick"><span class="ic"><span class="i">photo_library</span></span>Photos</button>
+                <button class="pick"><span class="ic"><span class="i">draft</span></span>Files</button>
+                <button class="pick"><span class="ic"><span class="i">folder</span></span>Folder</button>
+                <button class="pick"><span class="ic"><span class="i">notes</span></span>Text</button>
+                <button class="pick"><span class="ic"><span class="i">content_paste</span></span>Paste</button>
+              </div>
+              <div class="drop"><span class="i">file_upload</span><div><b>Drop files or folders here</b>or pick them above</div><div class="thumbs" id="dropthumbs"></div></div>
+            </div>
+            <div class="card">
+              <div class="opt"><span class="tile" style="background:var(--blue)"><span class="i">link</span></span><div><b>Web link</b><small>Anyone on this Wi-Fi opens it in a browser</small></div><span class="i go">chevron_right</span></div>
+              <div class="opt"><span class="tile" style="background:var(--green)"><span class="i">diversity_3</span></span><div><b>Trip group</b><small>Everyone gets the photos they're in</small></div><span class="i go">chevron_right</span></div>
+              <div class="opt"><span class="tile" style="background:var(--orange)"><span class="i">face_retouching_natural</span></span><div><b>Find my photos</b><small>Friends take a selfie and get their photos</small></div><span class="i go">chevron_right</span></div>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <h4>Nearby <span class="sp"></span><span class="recv">Ready to receive</span></h4>
+              <div class="radar">
+                <span class="ring" style="width:130px;height:130px"></span><span class="ring" style="width:240px;height:240px"></span><span class="ring" style="width:360px;height:360px"></span>
+                <span class="pulse"></span><span class="you"><span class="i fill">wifi_tethering</span></span>
+                <span class="d" style="left:28%;top:36%"><span class="i">smartphone</span></span>
+                <span class="d" style="left:72%;top:64%"><span class="i">smartphone</span></span>
+              </div>
+              <div class="opt"><span class="dev"><span class="i">smartphone</span></span><div><b>Maya's Pixel</b><small>ShareBro · Android</small></div><button class="btn">Send 3</button></div>
+              <div class="opt"><span class="dev"><span class="i">smartphone</span></span><div><b>Leo's iPhone</b><small>LocalSend · iOS</small></div><button class="btn">Send 3</button></div>
+              <div class="opt off"><span class="dev off"><span class="i">laptop_windows</span></span><div><b>Office PC</b><small>LocalSend · seen 2 days ago</small></div><span class="i go">more_horiz</span></div>
+            </div>
+            <div class="card">
+              <h4>Activity <span class="sp"></span><small class="more">All transfers</small></h4>
+              <div class="xfer"><div class="stack"><img src="sharebro-reel/src/img/thumbs/pn_7624913.jpg" alt=""><img src="sharebro-reel/src/img/thumbs/pn_7624920.jpg" alt=""></div>
+                <div class="txt"><b>Receiving from Maya's Pixel</b><small>18 of 42 photos · saving to Downloads\ShareBro</small><div class="bar"><i></i></div></div><span class="i stop">close</span></div>
+              <div class="xfer"><div class="stack"><img src="sharebro-reel/src/img/thumbs/cb_5080812.jpg" alt=""><img src="sharebro-reel/src/img/thumbs/cb_5080815.jpg" alt=""></div>
+                <div class="txt"><b>Sent 3 photos to Leo's iPhone</b><small>2 minutes ago · 9.8 MB</small></div><span class="i done fill">check_circle</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="selbar" id="selbar">
+      <span class="count" id="selcount">0 selected</span>
+      <button class="go"><span class="i">send</span>Send</button>
+      <button><span class="i">folder_open</span>Show in folder</button>
+      <button><span class="i">delete</span>Delete</button>
+      <button id="clearsel" title="Clear (Esc)"><span class="i">close</span></button>
+    </div>
+
+    <!-- Viewer -->
+    <div class="viewer" id="viewer">
+      <div class="stage">
+        <div class="vtop">
+          <button class="iconbtn" id="vclose" title="Back (Esc)"><span class="i">arrow_back</span></button>
+          <div class="t" id="vtitle">cb_5080823.jpg<small>Saturday 14 Nov 2026 · 10:42 AM</small></div>
+          <span class="sp"></span>
+          <button class="iconbtn on" id="vboxes" title="Face outlines (F)"><span class="i">center_focus_strong</span></button>
+          <button class="iconbtn" title="Zoom (scroll)"><span class="i">zoom_in</span></button>
+          <button class="iconbtn" title="Info (I)"><span class="i">info</span></button>
+        </div>
+        <div class="pic" id="pic">
+          <button class="arrow l" id="prev" title="Previous (←)"><span class="i">chevron_left</span></button>
+          <div class="frame" id="frame"><img id="vimg" alt=""></div>
+          <button class="arrow r" id="next" title="Next (→)"><span class="i">chevron_right</span></button>
+        </div>
+        <div class="film" id="film"></div>
+      </div>
+      <aside class="info" id="info"></aside>
+    </div>
+  </main>
+</div>
+
+<div class="notes">
+  <div class="note"><b><span class="i">view_sidebar</span>Sidebar, not tabs</b>Everything is one click away, and your folders sit in it with a cover photo. The sidebar runs up into the title bar like Windows 11 apps, and a running scan shows at its foot with faces popping in.</div>
+  <div class="note"><b><span class="i">group</span>People with their photos</b>Each person shows a strip of their latest photos, and hovering offers "Send". People without a name are gathered into one prompt at the top.</div>
+  <div class="note"><b><span class="i">photo_library</span>Photos for a mouse</b>Day headers stay pinned while you scroll, a month scrubber jumps through the year, a slider sets the tile size, and hovering shows who's in a photo.</div>
+  <div class="note"><b><span class="i">center_focus_strong</span>Viewer with faces</b>Face outlines with names on the photo (real detections from the app's face model), the people in it beside it, and one button to send it to all of them.</div>
+  <div class="note"><b><span class="i">tablet</span>Any window size</b>Narrow the window and the sidebar folds into an icon rail, Share stacks into one column and the viewer hides its panel. Light mode follows Windows. Phones keep their layout.</div>
+</div>
+
+<script>
+const IMG = 'sharebro-reel/src/img/';
+const T = 'cb_5080809 cb_5080811 cb_5080812 cb_5080813 cb_5080815 cb_5080817 cb_5080818 cb_5080822 cb_5080823 cb_5080824 cb_5080825 cb_5080826 cb_5080827 cb_5080828 cb_5080829 cb_5080830 cb_5080831 cb_5080832 cb_5080833 cb_5080834 cb_5080835 cb_5080836 cb_5080837 cb_5080838 cb_5080839 cb_5080840 cb_5080841 cb_5080842 cb_5080852 cb_5080853 cb_5080854 cb_5080855 cb_5080856 cb_5080857 cb_5080858 cb_5080859 cb_5080860 cb_5080861 cb_5080862 cb_5080863 cb_5080864 cb_5080865 cb_5080866 cb_5080867 cb_5080868 pn_7624836 pn_7624837 pn_7624838 pn_7624839 pn_7624840 pn_7624841 pn_7624842 pn_7624843 pn_7624844 pn_7624845 pn_7624846 pn_7624847 pn_7624848 pn_7624849 pn_7624850 pn_7624851 pn_7624852 pn_7624853 pn_7624854 pn_7624855 pn_7624874 pn_7624875 pn_7624876 pn_7624911 pn_7624912 pn_7624913 pn_7624914 pn_7624915 pn_7624916 pn_7624920 pn_7624923 pn_7624924 pn_7624925 pn_7624926 pn_7624927 pn_7624928 pn_7624929 pn_7624930 pn_7624931'.split(' ');
+const thumb = n => `${IMG}thumbs/${n}.jpg`;
+const avatar = n => `${IMG}avatars/${n}.png`;
+const $ = id => document.getElementById(id);
+const win = $('win');
+const sel = new Set();
+
+// Background: the app's contour lines.
+$('contour').innerHTML = Array.from({ length: 14 }, (_, k) =>
+  `<ellipse cx="${-30 + k * 6}" cy="${k * 4}" rx="${70 + k * 34}" ry="${46 + k * 26}" transform="rotate(${-24 + k * 2.5})"/>`).join('');
+
+// People
+const people = [['Ruby', 214, 0], ['Leo', 188, 8], ['Maya', 171, 45], ['Nia', 143, 60], ['Zara', 96, 20], ['Jordan', 58, 70]];
+$('people').innerHTML = people.map(([n, c, s]) =>
+  `<div class="pcard"><button class="send"><span class="i">send</span>Send ${c}</button>
+     <div class="who"><img src="${avatar(n)}" alt=""><div><b>${n}</b><small>${c} photos · 2 trips</small></div></div>
+     <div class="strip">${T.slice(s, s + 4).map(t => `<img loading="lazy" src="${thumb(t)}" alt="">`).join('')}</div></div>`).join('');
+$('mosaic').innerHTML = T.slice(30, 40).map(t => `<img src="${thumb(t)}" alt="">`).join('');
+$('dropthumbs').innerHTML = ['cb_5080812', 'cb_5080815', 'cb_5080818'].map(t => `<img src="${thumb(t)}" alt="">`).join('');
+
+// Photos, by day, with who's in each on hover.
+const faceSets = [['Ruby', 'Leo'], ['Maya'], ['Nia', 'Zara', 'Maya'], ['Leo'], ['Jordan', 'Ruby']];
+const days = [['Saturday 14 November', 0, 15, "Cox's Bazar 2026"], ['Friday 13 November', 15, 14, "Cox's Bazar 2026"], ['Thursday 12 November', 29, 16, "Cox's Bazar 2026"], ['Monday 2 November', 45, 20, 'Sajek trip'], ['Sunday 1 November', 65, 19, 'Sajek trip']];
+$('days').innerHTML = days.map(([d, s, n, f]) =>
+  `<div class="day">${d}<small>${n} photos · ${f}</small><button class="pick">Select all</button></div><div class="grid">` +
+  T.slice(s, s + n).map((t, k) => {
+    const fs = faceSets[(s + k) % faceSets.length];
+    return `<div class="ph" data-i="${s + k}"><img loading="lazy" src="${thumb(t)}" alt=""><span class="tick"></span>` +
+      `<span class="faces">${fs.map(p => `<img src="${avatar(p)}" alt="">`).join('')}</span></div>`;
+  }).join('') + `</div>`).join('') +
+  `<div class="scrub hide-narrow"><span class="m y">2026</span><span class="m on">Nov</span><span class="m">Oct</span><span class="m">Aug</span><span class="m">Jun</span><span class="m">Mar</span><span class="m y">2025</span><span class="m">Dec</span><span class="m">Jul</span><div class="line"><i></i></div></div>`;
+// The scrubber sits beside the scrolling grid, not inside it.
+const scrub = document.querySelector('.scrub');
+document.querySelector('.main').appendChild(scrub);
+
+// Toolbars
+const tb = {
+  people: `<div class="title"><h2>People</h2><span class="meta">8 people · 1,248 photos</span></div><span class="sp"></span>
+    <div class="seg hide-narrow"><button class="on"><span class="i">grid_view</span>Cards</button><button><span class="i">bubble_chart</span>Space</button></div>
+    <button class="iconbtn" title="Review faces"><span class="i">rule</span><span class="badge">14</span></button>
+    <button class="primary"><span class="i">add_photo_alternate</span>Scan folder</button>`,
+  photos: `<div class="title"><h2>Photos</h2><span class="meta">1,248 photos from 2 folders</span></div><span class="sp"></span>
+    <button class="chip"><span class="i">event</span>Any date</button>
+    <label class="zoom hide-narrow"><span class="i">photo_size_select_small</span><input id="zoom" type="range" min="100" max="240" value="150"><span class="i">photo_size_select_large</span></label>
+    <button class="primary"><span class="i">create_new_folder</span>Add folder</button>`,
+  explore: `<div class="title"><h2>Explore</h2><span class="meta">Places, best shots and more from your trips</span></div><span class="sp"></span>
+    <button class="chip"><span class="i">landscape</span>All trips</button>`,
+  share: `<div class="title"><h2>Share</h2><span class="meta">With phones and computers nearby</span></div><span class="sp"></span>
+    <div class="seg"><button class="on"><span class="i">north_east</span>Send</button><button><span class="i">south_west</span>Receive</button></div>
+    <button class="iconbtn" title="Transfers"><span class="i">history</span></button>`,
+};
+let page = 'people';
+function show(id) {
+  page = id;
+  document.querySelectorAll('.content .page').forEach(p => p.classList.toggle('on', p.dataset.id === id));
+  $('tb').innerHTML = tb[id];
+  scrub.style.display = id === 'photos' ? '' : 'none';
+  const z = $('zoom');
+  if (z) z.oninput = () => $('days').style.setProperty('--tile', z.value + 'px');
+  if (id !== 'photos') clearSel();
+}
+document.querySelectorAll('.nav[data-page]').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.nav').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  show(b.dataset.page);
+}));
+show('people');
+
+// Demo controls
+function seg(id, f) {
+  $(id).addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $(id).querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    f(b.dataset.v);
+  });
+}
+seg('theme', v => win.classList.toggle('light', v === 'light'));
+seg('size', v => win.classList.toggle('narrow', v === 'narrow'));
+
+// Scan card: faces popping in as they're found.
+const found = ['Ruby', 'Leo', 'Maya', 'Nia', 'Zara', 'Sam'];
+let tick = 0;
+function scanStep() {
+  tick++;
+  const shown = found.slice(0, 1 + (tick % found.length));
+  $('newfaces').innerHTML = shown.slice(-5).map(n => `<img src="${avatar(n)}" alt="">`).join('') + `<span>${264 + tick * 7} faces</span>`;
+  const done = Math.min(436, 271 + tick * 9);
+  $('scansub').textContent = `${done} of 436 photos · about ${Math.max(1, 2 - Math.floor(tick / 6))} min left`;
+  $('scanbar').style.width = (done / 436 * 100) + '%';
+}
+scanStep(); setInterval(scanStep, 1600);
+
+// Selection
+function updateSel() {
+  $('selcount').textContent = `${sel.size} selected`;
+  $('selbar').classList.toggle('show', sel.size > 0);
+  $('days').classList.toggle('selecting', sel.size > 0);
+}
+function clearSel() { sel.clear(); document.querySelectorAll('.ph.sel').forEach(p => p.classList.remove('sel')); updateSel(); }
+$('clearsel').onclick = clearSel;
+function toggle(ph) { const i = +ph.dataset.i; ph.classList.toggle('sel'); sel.has(i) ? sel.delete(i) : sel.add(i); updateSel(); }
+$('days').addEventListener('click', e => {
+  if (e.target.classList.contains('pick')) {
+    let g = e.target.closest('.day').nextElementSibling;
+    g.querySelectorAll('.ph:not(.sel)').forEach(toggle); return;
+  }
+  const ph = e.target.closest('.ph'); if (!ph) return;
+  if (e.target.classList.contains('tick') || sel.size) { toggle(ph); return; }
+  open(+ph.dataset.i);
+});
+
+// Viewer. Face boxes for cb_5080823 come from the app's own detector
+// (SCRFD-10G) run on the photo: left, top, width, height as fractions.
+const boxes = { cb_5080823: [[0.518, 0.282, 0.138, 0.116, 'Leo'], [0.302, 0.337, 0.142, 0.108, null]],
+                cb_5080833: [[0.433, 0.355, 0.086, 0.064, 'Leo'], [0.347, 0.306, 0.061, 0.066, 'Ruby']] };
+const big = ['cb_5080823', 'cb_5080832', 'cb_5080833', 'cb_5080839', 'cb_5080841'];
+let cur = 0;
+const viewer = $('viewer');
+function info(name) {
+  const bx = boxes[name] || [[0, 0, 0, 0, 'Ruby'], [0, 0, 0, 0, 'Leo']];
+  const named = bx.filter(b => b[4]);
+  return `<h4>In this photo</h4>` +
+    bx.map(b => b[4]
+      ? `<div class="inphoto"><img src="${avatar(b[4])}" alt=""><div><b>${b[4]}</b><small>${b[4] === 'Leo' ? 188 : 214} photos</small></div></div>`
+      : `<div class="inphoto"><span class="q"><span class="i">person_add</span></span><div><b>Someone new</b><small>In 12 photos</small></div><button class="name">Name</button></div>`).join('') +
+    `<button class="sendall"><span class="i">send</span>Send to ${named.length === 1 ? named[0][4] : 'everyone in it'}</button>
+     <h4>Details</h4>
+     <div class="kv"><span class="i">calendar_today</span><div>Saturday 14 Nov 2026<small>10:42 AM</small></div></div>
+     <div class="kv"><span class="i">image</span><div>${name}.jpg<small>4032 × 6048 · 24.4 MP · 6.1 MB</small></div></div>
+     <div class="kv"><span class="i">folder</span><div>Cox's Bazar 2026<small>D:\\Photos\\Cox's Bazar 2026</small></div></div>
+     <div class="kv"><span class="i">place</span><div>Inani Beach<small>21.2177, 92.0450</small></div></div>
+     <h4>More</h4>
+     <div class="vact"><button><span class="i">folder_open</span>Show in folder</button><button><span class="i">delete</span>Delete</button></div>
+     <div class="keys"><kbd>←</kbd> <kbd>→</kbd> next · <kbd>F</kbd> faces · <kbd>Space</kbd> select · <kbd>Esc</kbd> back · scroll to zoom</div>`;
+}
+function open(i) {
+  cur = (i + T.length) % T.length;
+  const name = T[cur];
+  const img = $('vimg');
+  img.src = `${IMG}${big.includes(name) ? 'trip' : 'thumbs'}/${name}.jpg`;
+  $('frame').querySelectorAll('.box').forEach(b => b.remove());
+  img.onload = () => {
+    (boxes[name] || []).forEach(([l, t, w, h, who]) => {
+      const b = document.createElement('div');
+      b.className = 'box' + (who ? '' : ' new');
+      Object.assign(b.style, { left: l * 100 + '%', top: t * 100 + '%', width: w * 100 + '%', height: h * 100 + '%' });
+      b.innerHTML = `<span>${who || 'Add a name'}</span>`;
+      $('frame').appendChild(b);
+    });
+  };
+  $('vtitle').firstChild.textContent = `${name}.jpg`;
+  $('info').innerHTML = info(name);
+  const from = Math.max(0, Math.min(T.length - 13, cur - 6));
+  $('film').innerHTML = T.slice(from, from + 13).map((t, k) =>
+    `<img src="${thumb(t)}" class="${from + k === cur ? 'on' : ''}" data-i="${from + k}" alt="">`).join('');
+  viewer.classList.add('on');
+}
+$('film').addEventListener('click', e => { if (e.target.dataset.i) open(+e.target.dataset.i); });
+$('prev').onclick = () => open(cur - 1);
+$('next').onclick = () => open(cur + 1);
+$('vclose').onclick = () => viewer.classList.remove('on');
+$('vboxes').onclick = () => { $('vboxes').classList.toggle('on'); $('pic').classList.toggle('noboxes'); };
+document.querySelectorAll('.pcard').forEach(c => c.addEventListener('click', e => { if (!e.target.closest('.send')) open(8); }));
+document.addEventListener('keydown', e => {
+  if (viewer.classList.contains('on')) {
+    if (e.key === 'ArrowLeft') open(cur - 1);
+    if (e.key === 'ArrowRight') open(cur + 1);
+    if (e.key === 'Escape') viewer.classList.remove('on');
+    if (e.key.toLowerCase() === 'f') $('vboxes').click();
+  } else if (e.key === 'Escape') clearSel();
+});
+
+// #photos, #explore, #share, #viewer, #light, #narrow open a view directly (for screenshots).
+const want = location.hash.slice(1).split(',');
+if (want.includes('light')) $('theme').querySelector('[data-v=light]').click();
+if (want.includes('narrow')) $('size').querySelector('[data-v=narrow]').click();
+for (const p of ['photos', 'explore', 'share']) if (want.includes(p)) document.querySelector(`.nav[data-page="${p}"]`).click();
+if (want.includes('photos')) [2, 5, 6].forEach(i => toggle(document.querySelector(`.ph[data-i="${i}"]`)));
+if (want.includes('viewer')) open(8);
+</script>
+</body>
+</html>

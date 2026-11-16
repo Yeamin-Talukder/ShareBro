@@ -24,8 +24,9 @@ Future<void> showPhotoInfo(
   );
 }
 
-class _Info {
-  _Info({
+/// What the details panels show about one photo.
+class PhotoDetails {
+  PhotoDetails({
     required this.asset,
     required this.title,
     required this.bytes,
@@ -40,6 +41,36 @@ class _Info {
   final LatLng? location;
   final bool scanned;
   final List<PhotoPerson> people;
+
+  /// "4032 × 3024 · 12.2 MP · 3.4 MB".
+  String get sizeLine {
+    final a = asset;
+    return [
+      '${a.orientatedWidth} × ${a.orientatedHeight}',
+      if (a.width * a.height >= 50000) '${(a.width * a.height / 1e6).toStringAsFixed(1)} MP',
+      if (bytes != null) formatBytes(bytes!),
+    ].join(' · ');
+  }
+}
+
+/// Reads a photo's details (null if it's gone). Shared by the bottom sheet,
+/// the viewer's pull-up panel and its desktop side panel.
+Future<PhotoDetails?> loadPhotoDetails(String assetId, ScanController controller) async {
+  final asset = await AssetThumb.entity(assetId);
+  if (asset == null) return null;
+  final db = controller.db;
+  final file = await asset.localFile;
+  // Desktop reads the GPS tag from the file itself.
+  final ll = Device.desktop ? await DesktopScanItem(asset.id).location() : await asset.latlngAsync();
+  return PhotoDetails(
+    asset: asset,
+    title: Device.desktop ? asset.title ?? '' : await asset.titleAsync,
+    bytes: file == null ? null : await file.length(),
+    // Photos without GPS report 0,0.
+    location: ll == null || (ll.latitude == 0 && ll.longitude == 0) ? null : ll,
+    scanned: await db.isScanned(assetId),
+    people: await db.peopleInPhoto(assetId),
+  );
 }
 
 /// The photo details themselves, used in the bottom sheet and in the
@@ -61,30 +92,12 @@ class PhotoInfoPanel extends StatefulWidget {
 }
 
 class _PhotoInfoState extends State<PhotoInfoPanel> {
-  late final Future<_Info?> _info = _load();
-
-  Future<_Info?> _load() async {
-    final asset = await AssetThumb.entity(widget.assetId);
-    if (asset == null) return null;
-    final db = widget.controller.db;
-    final file = await asset.localFile;
-    // Desktop reads the GPS tag from the file itself.
-    final ll = Device.desktop ? await DesktopScanItem(asset.id).location() : await asset.latlngAsync();
-    return _Info(
-      asset: asset,
-      title: Device.desktop ? asset.title ?? '' : await asset.titleAsync,
-      bytes: file == null ? null : await file.length(),
-      // Photos without GPS report 0,0.
-      location: ll == null || (ll.latitude == 0 && ll.longitude == 0) ? null : ll,
-      scanned: await db.isScanned(widget.assetId),
-      people: await db.peopleInPhoto(widget.assetId),
-    );
-  }
+  late final Future<PhotoDetails?> _info = loadPhotoDetails(widget.assetId, widget.controller);
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
-    return FutureBuilder<_Info?>(
+    return FutureBuilder<PhotoDetails?>(
       future: _info,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {

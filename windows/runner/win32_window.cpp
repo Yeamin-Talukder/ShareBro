@@ -16,6 +16,9 @@ namespace {
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
 
+/// DWMWA_CAPTION_COLOR (Windows 11), by number for the same reason.
+constexpr DWORD kDwmCaptionColor = 35;
+
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 
 /// Registry key for app theme preference.
@@ -216,6 +219,17 @@ Win32Window::MessageHandler(HWND hwnd,
     case WM_DWMCOLORIZATIONCOLORCHANGED:
       UpdateTheme(hwnd);
       return 0;
+
+    case WM_GETMINMAXINFO: {
+      // Small enough for half a laptop screen, big enough for the sidebar
+      // rail and a usable page (720 x 520 at 100% scaling).
+      auto info = reinterpret_cast<MINMAXINFO*>(lparam);
+      UINT dpi = GetDpiForWindow(hwnd);
+      if (dpi == 0) dpi = 96;
+      info->ptMinTrackSize.x = MulDiv(720, dpi, 96);
+      info->ptMinTrackSize.y = MulDiv(520, dpi, 96);
+      return 0;
+    }
   }
 
   return DefWindowProc(window_handle_, message, wparam, lparam);
@@ -284,5 +298,10 @@ void Win32Window::UpdateTheme(HWND const window) {
     BOOL enable_dark_mode = light_mode == 0;
     DwmSetWindowAttribute(window, DWMWA_USE_IMMERSIVE_DARK_MODE,
                           &enable_dark_mode, sizeof(enable_dark_mode));
+    // The title bar takes the sidebar's colour, so the sidebar seems to
+    // run up into it (Windows 11; older Windows ignores this).
+    COLORREF caption = enable_dark_mode ? RGB(0x14, 0x12, 0x19)
+                                        : RGB(0xED, 0xEB, 0xF1);
+    DwmSetWindowAttribute(window, kDwmCaptionColor, &caption, sizeof(caption));
   }
 }

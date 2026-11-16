@@ -27,6 +27,8 @@ import 'motion.dart';
 import 'update_banner.dart';
 import 'update_sheet.dart';
 import 'desktop_gallery.dart';
+import 'desktop_layout.dart';
+import 'desktop_shell.dart';
 
 /// Bottom navigation between People, Photos, Albums, Explore and Share. Tabs keep
 /// their scroll position and filters when you switch.
@@ -41,6 +43,10 @@ class RootScreen extends StatefulWidget {
 
 class _RootScreenState extends State<RootScreen> {
   int _tab = 0;
+
+  /// Desktop: the page the sidebar shows, and the ones opened so far.
+  DesktopPage _page = DesktopPage.people;
+  final Set<DesktopPage> _openedPages = {DesktopPage.people};
 
   /// Gallery tabs ask for photo access, so build them only when first opened.
   final Set<int> _opened = {0};
@@ -93,7 +99,10 @@ class _RootScreenState extends State<RootScreen> {
     Widget? screen;
     switch (target) {
       case 'people':
-        setState(() => _tab = 0);
+        setState(() {
+          _tab = 0;
+          _page = DesktopPage.people;
+        });
       case 'scan':
         screen = ScanScreen(controller: c);
       case 'review':
@@ -142,8 +151,44 @@ class _RootScreenState extends State<RootScreen> {
     DockItem(Icons.swap_horiz_rounded, Icons.swap_horiz_rounded, 'Share'),
   ];
 
+  /// Desktop: a sidebar and the page beside it, instead of the dock.
+  Widget _desktop(BuildContext context) {
+    final c = widget.controller;
+    final pages = <DesktopPage, Widget>{
+      for (final p in _openedPages)
+        if (p != DesktopPage.folder)
+          p: switch (p) {
+            DesktopPage.people => HomeScreen(controller: c),
+            DesktopPage.photos => PhotosTab(controller: c),
+            DesktopPage.explore => ExploreTab(controller: c),
+            _ => ShareTab(controller: c),
+          },
+    };
+    final quiet = _page == DesktopPage.photos || _page == DesktopPage.folder;
+    final app = Scaffold(
+      backgroundColor: Colors.transparent,
+      body: DesktopShell(
+        controller: c,
+        page: _page,
+        pages: pages,
+        onPage: (p) => setState(() {
+          _page = p;
+          _openedPages.add(p);
+        }),
+        // Quieter behind the photo grids, so photos keep their true colours.
+        background: (child) => Aurora(intensity: quiet ? 0.3 : 1, child: child),
+      ),
+    );
+    return Stack(children: [
+      AppLockGate(controller: c, child: IncomingWatcher(controller: c, child: app)),
+      if (_launching)
+        LaunchClink(onDone: () => setState(() => _launching = false)),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (DesktopLayout.on) return _desktop(context);
     final c = widget.controller;
     final tabs = [
       HomeScreen(controller: c),

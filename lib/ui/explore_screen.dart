@@ -11,13 +11,16 @@ import '../scan/scan_controller.dart';
 import '../data/duplicates.dart';
 import '../data/group_shots.dart';
 import 'best_shots_screen.dart';
+import 'desktop_layout.dart';
 import 'duplicates_screen.dart';
 import 'gallery_view.dart';
 import 'glass.dart';
 import 'motion.dart';
 import 'places_screen.dart';
 import 'sections.dart';
+import 'storage_screen.dart';
 import 'theme.dart';
+import 'together_screen.dart';
 import 'widgets.dart';
 
 typedef _Meta = (String title, IconData icon);
@@ -92,6 +95,11 @@ class _ExploreTabState extends State<ExploreTab> {
 
   /// Photos with a location, for the Places map.
   int _located = 0;
+
+  /// Desktop cards: a few photos with a location, and the people who are
+  /// most often in photos (for "Together").
+  List<String> _placeCovers = const [];
+  List<PersonSummary> _people2 = const [];
   int _loadedRevision = -1;
 
   /// One scroll controller per row, for the parallax effect.
@@ -125,9 +133,18 @@ class _ExploreTabState extends State<ExploreTab> {
         .toList();
     final bursts = findBursts(await c.db.groupShots());
     final located = await c.db.locatedCount();
+    var placeCovers = const <String>[];
+    var people = const <PersonSummary>[];
+    if (DesktopLayout.on) {
+      final where = await c.db.photoLocations(dates: _dates);
+      placeCovers = [for (final p in where.reversed.take(5)) p.id];
+      people = [for (final p in await c.db.people()) if (p.name != null) p];
+    }
     if (mounted) {
       setState(() {
         _located = located;
+        _placeCovers = placeCovers;
+        _people2 = people;
         _counts = counts;
         _dupes = dupes;
         _bursts = bursts;
@@ -192,6 +209,18 @@ class _ExploreTabState extends State<ExploreTab> {
                   : 'No scanned photos in these dates.',
             ),
           )
+        else if (DesktopLayout.on) ...[
+          SliverToBoxAdapter(child: _deskFeatures(context)),
+          ..._deskSection(context, 'People', [
+            for (final e in _people.entries)
+              if (counts[e.key] != null) (e.key, e.value.$1, e.value.$2, counts[e.key]!),
+          ]),
+          ..._deskSection(context, 'Photo types', [
+            for (final e in _types.entries)
+              if (counts[e.key] != null) (e.key, e.value.$1, e.value.$2, counts[e.key]!),
+          ]),
+          const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
+        ]
         else ...[
             // Places is always here, so the map is easy to find.
             SliverToBoxAdapter(
@@ -267,6 +296,136 @@ class _ExploreTabState extends State<ExploreTab> {
         ],
       ]),
     );
+  }
+
+  void _push(Widget screen) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => screen)).then((_) => _load());
+
+  /// Desktop: the app's tools as a grid of cards (2 or 3 across), each with
+  /// a few of its photos. Cards with nothing to show are left out.
+  Widget _deskFeatures(BuildContext context) {
+    final extra = _dupes.fold<int>(0, (n, d) => n + d.photos.length - 1);
+    final cards = <({bool wide, Widget card})>[
+      (
+        wide: true,
+        card: _FeatureCard(
+          icon: Icons.map_rounded,
+          color: const Color(0xFF2BB5A6),
+          title: 'Places',
+          note: _located > 0 ? '$_located photos on the map' : 'Your photos by where they were taken',
+          photos: _placeCovers,
+          onTap: () => _push(PlacesScreen(controller: c)),
+        ),
+      ),
+      if (_bursts.isNotEmpty)
+        (
+          wide: false,
+          card: _FeatureCard(
+            icon: Icons.auto_awesome_rounded,
+            color: const Color(0xFFFF9F0A),
+            title: 'Best group shots',
+            note: '${_bursts.length} ${_bursts.length == 1 ? 'moment' : 'moments'}',
+            photos: [for (final b in _bursts.take(3)) b.bestShot.shot.assetId],
+            onTap: () => _push(BestShotsScreen(controller: c)),
+          ),
+        ),
+      if (_dupes.isNotEmpty)
+        (
+          wide: false,
+          card: _FeatureCard(
+            icon: Icons.filter_none_rounded,
+            color: const Color(0xFF0A84FF),
+            title: 'Duplicates',
+            note: '${_dupes.length} sets · $extra extra',
+            photos: [for (final p in _dupes.first.photos.take(2)) p.assetId],
+            onTap: () => _push(DuplicatesScreen(controller: c)),
+          ),
+        ),
+      if (_people2.length >= 2)
+        (
+          wide: false,
+          card: _FeatureCard(
+            icon: Icons.favorite_rounded,
+            color: const Color(0xFFE8457A),
+            title: 'Together',
+            note: 'Photos with two or more people',
+            faces: [for (final p in _people2.take(4)) ?p.coverThumb],
+            onTap: () => _push(TogetherScreen(controller: c)),
+          ),
+        ),
+      (
+        wide: false,
+        card: _FeatureCard(
+          icon: Icons.pie_chart_rounded,
+          color: const Color(0xFF8E8E93),
+          title: 'Storage',
+          note: 'What takes up the most space',
+          onTap: () => _push(StorageScreen(controller: c)),
+        ),
+      ),
+    ];
+    return LayoutBuilder(builder: (context, box) {
+      const gap = 14.0, pad = 24.0;
+      final width = box.maxWidth - 2 * pad;
+      final columns = width >= 1000 ? 3 : 2;
+      final cell = (width - (columns - 1) * gap) / columns;
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(pad, 8, pad, 0),
+        child: Wrap(spacing: gap, runSpacing: gap, children: [
+          for (final (i, c) in cards.indexed)
+            SizedBox(
+              width: c.wide ? cell * 2 + gap : cell,
+              height: 210,
+              child: c.card,
+            ).animate().fadeIn(delay: (40 * i).ms).moveY(begin: 8, curve: Curves.easeOutCubic),
+        ]),
+      );
+    });
+  }
+
+  /// Desktop: a category section as a wrapping grid of cards (a mouse can't
+  /// swipe the phone's sideways rows).
+  List<Widget> _deskSection(
+    BuildContext context,
+    String title,
+    List<(String, String, IconData, ({int count, String cover}))> cards,
+  ) {
+    if (cards.isEmpty) return const [];
+    return [
+      SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 26, 24, 12),
+          child: Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+        ),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        sliver: SliverGrid.builder(
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 190,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: _cardWidth / 170,
+          ),
+          itemCount: cards.length,
+          itemBuilder: (context, i) {
+            final (tag, name, icon, info) = cards[i];
+            return _CategoryCard(
+              key: ValueKey('$tag$_dates'),
+              title: name,
+              icon: icon,
+              count: info.count,
+              cover: info.cover,
+              tag: tag,
+              loadCovers: () => c.db.tagCovers(tag, dates: _dates, limit: 9),
+              scroll: null,
+              index: i,
+              onTap: (cover) => _open(tag, name, cover),
+            ).animate().fadeIn(delay: (30 * i.clamp(0, 12)).ms).scaleXY(begin: 0.92, curve: Curves.easeOutBack);
+          },
+        ),
+      ),
+    ];
   }
 
   List<Widget> _section(
@@ -347,7 +506,10 @@ class _CategoryCard extends StatefulWidget {
   final int count;
   final String cover;
   final Future<List<String>> Function() loadCovers;
-  final ScrollController scroll;
+
+  /// The sideways row it's in, for the parallax; null in a grid (desktop),
+  /// where the card also fills its cell.
+  final ScrollController? scroll;
   final int index;
   /// Called with the cover showing at the moment of the tap.
   final ValueChanged<String> onTap;
@@ -411,7 +573,7 @@ class _CategoryCardState extends State<_CategoryCard>
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: _cardWidth,
+      width: widget.scroll == null ? null : _cardWidth,
       child: AnimatedBuilder(
         animation: _flip,
         builder: (context, _) {
@@ -480,9 +642,11 @@ class _CategoryCardState extends State<_CategoryCard>
                 ClipRect(
                   child: AnimatedBuilder(
                     // Parallax: the image drifts opposite to the row's scroll.
-                    animation: widget.scroll,
+                    animation: widget.scroll ?? const AlwaysStoppedAnimation(0),
                     builder: (context, child) {
-                      final offset = widget.scroll.hasClients ? widget.scroll.offset : 0.0;
+                      final scroll = widget.scroll;
+                      if (scroll == null) return child!;
+                      final offset = scroll.hasClients ? scroll.offset : 0.0;
                       final centre = _rowPad + widget.index * (_cardWidth + _cardGap) + _cardWidth / 2 - offset;
                       final shift = ((centre - screen / 2) / screen).clamp(-1.0, 1.0) * -22;
                       return Transform.translate(offset: Offset(shift, 0), child: child);
@@ -631,3 +795,82 @@ IconData categoryIcon(String tag) =>
     _types[tag]?.$2 ??
     _labelIcons[tag.startsWith(labelPrefix) ? tag.substring(labelPrefix.length) : tag] ??
     Icons.label_outline;
+
+/// Desktop Explore: one of the app's tools as a card: its icon and name,
+/// a line about it, and a few of its photos (or faces) underneath.
+class _FeatureCard extends StatelessWidget {
+  const _FeatureCard({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.note,
+    required this.onTap,
+    this.photos = const [],
+    this.faces = const [],
+  });
+
+  final IconData icon;
+  final Color color;
+  final String title, note;
+  final VoidCallback onTap;
+  final List<String> photos;
+  final List<Uint8List> faces;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final Widget visual;
+    if (photos.isNotEmpty) {
+      visual = Row(children: [
+        for (final (i, id) in photos.indexed) ...[
+          if (i > 0) const SizedBox(width: 3),
+          Expanded(child: AssetThumb(id: id, size: 300)),
+        ],
+      ]);
+    } else if (faces.isNotEmpty) {
+      visual = ColoredBox(
+        color: scheme.surfaceContainerHighest,
+        child: Center(
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            for (final f in faces)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: CircleAvatar(radius: 24, backgroundImage: MemoryImage(f)),
+              ),
+          ]),
+        ),
+      );
+    } else {
+      visual = ColoredBox(
+        color: scheme.surfaceContainerHighest,
+        child: Center(child: Icon(icon, size: 40, color: color)),
+      );
+    }
+    return SectionCard(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              IconTile(icon: icon, color: color),
+              const SizedBox(width: 10),
+              Text(title, style: const TextStyle(fontSize: TextSize.callout, fontWeight: FontWeight.w700)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(note,
+                    textAlign: TextAlign.right,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(12), child: visual)),
+          ]),
+        ),
+      ),
+    );
+  }
+}

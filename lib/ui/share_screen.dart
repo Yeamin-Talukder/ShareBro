@@ -14,7 +14,9 @@ import '../share/net.dart';
 import '../share/prepare.dart';
 import '../share/protocol.dart';
 import '../share/receive.dart';
+import '../share/send_center.dart' show JobStatus;
 import 'app_picker.dart';
+import 'desktop_layout.dart';
 import 'devices.dart';
 import 'file_icons.dart';
 import 'find_me_screen.dart';
@@ -139,9 +141,23 @@ class _ShareTabState extends State<ShareTab> {
   @override
   Widget build(BuildContext context) {
     final s = c.sharing;
+    final desk = DesktopLayout.on;
     return GlassScrollView(
       title: 'Share',
       actions: [
+        // Desktop: Send / Receive sits in the toolbar, like the demo.
+        if (desk) ...[
+          SizedBox(
+            width: 200,
+            child: CapsuleSwitch<bool>(
+              value: _receive,
+              height: 36,
+              options: const [(false, 'Send', null), (true, 'Receive', null)],
+              onChanged: (v) => setState(() => _receive = v),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
         ToolbarCapsule(children: [
               ListenableBuilder(
                 listenable: s,
@@ -165,6 +181,32 @@ class _ShareTabState extends State<ShareTab> {
         ]),
       ],
       slivers: [
+        if (desk)
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(24, 4, 24, MediaQuery.paddingOf(context).bottom + 24),
+            sliver: SliverToBoxAdapter(
+              child: LayoutBuilder(
+                builder: (context, box) => AnimatedSwitcher(
+                  duration: 320.ms,
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  child: _receive
+                      // Receiving is one centred column at any width.
+                      ? Center(
+                          key: const ValueKey('receive'),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 720),
+                            child: _ReceivePanel(controller: c),
+                          ),
+                        )
+                      : box.maxWidth >= DesktopLayout.twoColumnsFrom
+                          ? _deskSend(context)
+                          : _sendPanel(context),
+                ),
+              ),
+            ),
+          )
+        else
         SliverPadding(
           // Clear the floating nav bar so the last buttons stay reachable.
           padding: EdgeInsets.fromLTRB(16, 4, 16, MediaQuery.paddingOf(context).bottom + 24),
@@ -195,11 +237,68 @@ class _ShareTabState extends State<ShareTab> {
     );
   }
 
+  /// Desktop, wide: what to send and how on the left; nearby devices and
+  /// what's being sent or received on the right.
+  Widget _deskSend(BuildContext context) {
+    return Row(key: const ValueKey('send-desk'), crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Expanded(
+        flex: 10,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const SizedBox(height: 12),
+          _pickCard(context, hint: true),
+          const SizedBox(height: 16),
+          _optionsCard(context),
+          const SectionFooter(
+            'Works with the free LocalSend app on Android, iPhone, Windows, Mac and Linux on the same Wi‑Fi or hotspot. '
+            'The link works in any browser.',
+          ),
+        ]),
+      ),
+      const SizedBox(width: 16),
+      Expanded(
+        flex: 11,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _devicePicker(context),
+          const SizedBox(height: 16),
+          _ActivityCard(controller: c),
+        ]),
+      ),
+    ]);
+  }
+
+  Widget _devicePicker(BuildContext context) => DevicePicker(
+        sharing: c.sharing,
+        count: _items.length,
+        onPick: (t) async {
+          final items = List.of(_items);
+          setState(_items.clear);
+          // Progress shows on the device in the orbit; tap it to open the send.
+          await sendItemsTo(context, c, t, items, open: false);
+        },
+        onOpenJob: (job) =>
+            Navigator.push(context, MaterialPageRoute(builder: (_) => TransferScreen(controller: c, job: job))),
+      );
+
   Widget _sendPanel(BuildContext context) {
-    final picked = describeItems(_items);
     return Column(key: const ValueKey('send'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const SizedBox(height: 18),
-      SectionCard(
+      _pickCard(context),
+      _devicePicker(context),
+      const SizedBox(height: 22),
+      _optionsCard(context),
+      const SectionFooter(
+        'Works with the free LocalSend app on Android, iPhone, Windows, Mac and Linux on the same Wi‑Fi or hotspot, '
+        'and with ShareBro phones over Nearby, no Wi‑Fi needed. The link works in any browser.',
+      ),
+    ]);
+  }
+
+  /// The pick buttons and, below them, what's picked. With [hint] and
+  /// nothing picked yet, a dashed row says what can be added.
+  Widget _pickCard(BuildContext context, {bool hint = false}) {
+    final picked = describeItems(_items);
+    final scheme = Theme.of(context).colorScheme;
+    return SectionCard(
         child: Column(children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 16, 8, 14),
@@ -219,7 +318,17 @@ class _ShareTabState extends State<ShareTab> {
             curve: Curves.easeOutCubic,
             alignment: Alignment.topCenter,
             child: _items.isEmpty
-                ? const SizedBox(width: double.infinity)
+                ? (hint
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                        child: _DashedHint(
+                          icon: Icons.file_upload_outlined,
+                          title: 'Add photos, files or a folder',
+                          subtitle: 'Pick them with the buttons above, then choose a device',
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      )
+                    : const SizedBox(width: double.infinity))
                 : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                     const Divider(height: 0.5, thickness: 0.5),
                     Padding(
@@ -243,21 +352,12 @@ class _ShareTabState extends State<ShareTab> {
                   ]),
           ),
         ]),
-      ),
-      DevicePicker(
-        sharing: c.sharing,
-        count: _items.length,
-        onPick: (t) async {
-          final items = List.of(_items);
-          setState(_items.clear);
-          // Progress shows on the device in the orbit; tap it to open the send.
-          await sendItemsTo(context, c, t, items, open: false);
-        },
-        onOpenJob: (job) =>
-            Navigator.push(context, MaterialPageRoute(builder: (_) => TransferScreen(controller: c, job: job))),
-      ),
-      const SizedBox(height: 22),
-      SectionCard.rows(rows: [
+      );
+  }
+
+  /// Link or QR code, other apps, trip group and Find my photos.
+  Widget _optionsCard(BuildContext context) {
+    return SectionCard.rows(rows: [
         SectionRow(
           leading: const IconTile(icon: Icons.qr_code_2_rounded, color: Color(0xFF5E5CE6)),
           title: 'Link or QR code',
@@ -304,12 +404,215 @@ class _ShareTabState extends State<ShareTab> {
           ),
         ),
         ],
-      ]),
-      const SectionFooter(
-        'Works with the free LocalSend app on Android, iPhone, Windows, Mac and Linux on the same Wi‑Fi or hotspot, '
-        'and with ShareBro phones over Nearby, no Wi‑Fi needed. The link works in any browser.',
+      ]);
+  }
+}
+
+/// A dashed, rounded box with an icon and two lines: what can be added
+/// (desktop Share's empty pick card).
+class _DashedHint extends StatelessWidget {
+  const _DashedHint({required this.icon, required this.title, required this.subtitle, required this.color});
+
+  final IconData icon;
+  final String title, subtitle;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DashedBorder(color.withValues(alpha: 0.35)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(children: [
+          Icon(icon, size: 24, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: const TextStyle(fontSize: TextSize.label, fontWeight: FontWeight.w600)),
+              Text(subtitle, style: TextStyle(fontSize: TextSize.small, color: color)),
+            ]),
+          ),
+        ]),
       ),
-    ]);
+    );
+  }
+}
+
+class _DashedBorder extends CustomPainter {
+  _DashedBorder(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final path = Path()..addRRect(RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(14)));
+    for (final m in path.computeMetrics()) {
+      for (var d = 0.0; d < m.length; d += 10) {
+        canvas.drawPath(m.extractPath(d, math.min(d + 5, m.length)), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedBorder old) => old.color != color;
+}
+
+/// Desktop Share: what's being received and sent right now, and the last
+/// few transfers, with "All transfers" for the rest.
+class _ActivityCard extends StatelessWidget {
+  const _ActivityCard({required this.controller});
+
+  final ScanController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = controller.sharing;
+    final scheme = Theme.of(context).colorScheme;
+    return ListenableBuilder(
+      listenable: Listenable.merge([s, s.receiver]),
+      builder: (context, _) {
+        final rows = <Widget>[];
+        final r = s.receiver.session;
+        if (r != null && !r.cancelled) {
+          final total = r.tokens.length, got = r.done.length;
+          final files = '$got of $total ${total == 1 ? 'file' : 'files'}';
+          rows.add(_ActivityRow(
+            icon: Icons.south_west_rounded,
+            color: const Color(0xFF30D158),
+            title: r.finished ? 'Received from ${r.from}' : 'Receiving from ${r.from}',
+            subtitle: r.finished ? '$files · ${formatTime(r.started)}' : '$files · saving to Downloads\\ShareBro',
+            progress: r.finished || r.totalBytes == 0 ? null : (r.bytes / r.totalBytes).clamp(0.0, 1.0),
+            done: r.finished,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReceiveScreen(controller: controller))),
+          ));
+        }
+        for (final j in s.jobs.reversed.take(4)) {
+          final n = '${j.count} ${j.noun}';
+          rows.add(_ActivityRow(
+            icon: Icons.north_east_rounded,
+            color: scheme.primary,
+            title: switch (j.status) {
+              JobStatus.done => 'Sent $n to ${j.deviceAlias}',
+              JobStatus.failed || JobStatus.declined || JobStatus.needsPin => 'Not sent to ${j.deviceAlias}',
+              JobStatus.cancelled => 'Stopped sending to ${j.deviceAlias}',
+              _ => 'Sending $n to ${j.deviceAlias}',
+            },
+            subtitle: switch (j.status) {
+              JobStatus.done || JobStatus.cancelled => j.personName,
+              JobStatus.declined => 'They said no',
+              JobStatus.needsPin => 'Needs their PIN',
+              JobStatus.failed => j.message ?? 'Something went wrong',
+              JobStatus.waiting => 'Waiting for the device',
+              JobStatus.asking => 'Waiting for them to accept',
+              JobStatus.preparing => 'Getting the files ready',
+              JobStatus.sending => '${j.filesDone} of ${j.count} sent',
+            },
+            progress: j.active ? j.progress : null,
+            done: j.status == JobStatus.done,
+            failed: j.canRetry,
+            onTap: () =>
+                Navigator.push(context, MaterialPageRoute(builder: (_) => TransferScreen(controller: controller, job: j))),
+          ));
+        }
+        return SectionCard(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Row(children: [
+                const Text('Activity', style: TextStyle(fontSize: TextSize.callout, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                TextButton(
+                  onPressed: () =>
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => SendCenterScreen(controller: controller))),
+                  child: const Text('All transfers'),
+                ),
+              ]),
+              if (rows.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 2, 8, 10),
+                  child: Text('Nothing sent or received yet. Transfers show up here as they happen.',
+                      style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
+                )
+              else
+                for (final (i, row) in rows.indexed) ...[
+                  if (i > 0) Divider(height: 1, thickness: 0.5, color: scheme.outlineVariant),
+                  row,
+                ],
+            ]),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ActivityRow extends StatelessWidget {
+  const _ActivityRow({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.progress,
+    this.done = false,
+    this.failed = false,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String title, subtitle;
+  final VoidCallback onTap;
+
+  /// 0..1 while under way; null when finished or waiting.
+  final double? progress;
+  final bool done, failed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(children: [
+          IconTile(icon: icon, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: TextSize.label, fontWeight: FontWeight.w600)),
+              Text(subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
+              if (progress != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 7, right: 8),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(value: progress, minHeight: 5),
+                  ),
+                ),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          if (done)
+            const Icon(Icons.check_circle_rounded, color: Color(0xFF30D158), size: 22)
+          else if (failed)
+            Icon(Icons.error_outline_rounded, color: scheme.error, size: 22)
+          else
+            Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+          const SizedBox(width: 4),
+        ]),
+      ),
+    );
   }
 }
 

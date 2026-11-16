@@ -2,18 +2,22 @@ import 'dart:math' as math;
 import 'dart:ui' show ImageFilter, lerpDouble;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'anim.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:video_player/video_player.dart';
 
+import '../data/dates.dart';
 import '../data/db.dart';
 import '../scan/scan_controller.dart';
+import 'desktop_layout.dart';
 import 'fast_thumb.dart';
 import 'glass.dart';
 import 'media_actions.dart';
 import 'motion.dart';
 import 'person_screen.dart';
 import 'photo_info.dart';
+import 'photo_side_panel.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
@@ -120,10 +124,19 @@ class _PhotoViewerState extends State<PhotoViewer> with TickerProviderStateMixin
   _SpotlightData? _spotlight;
 
   @override
+  void initState() {
+    super.initState();
+    // Desktop: the filmstrip opens on the photo you clicked.
+    if (DesktopLayout.on) WidgetsBinding.instance.addPostFrameCallback((_) => _centreFilmstrip(jump: true));
+  }
+
+  @override
   void dispose() {
     _pages.dispose();
     _settle.dispose();
     _infoAnim.dispose();
+    _keys.dispose();
+    _film.dispose();
     super.dispose();
   }
 
@@ -227,8 +240,328 @@ class _PhotoViewerState extends State<PhotoViewer> with TickerProviderStateMixin
     }
   }
 
+  /// The photos themselves, one page each: swiped on a phone, stepped with
+  /// the keys, arrows and filmstrip on desktop.
+  Widget _photoPages() {
+    final desktop = DesktopLayout.on;
+    return PageView.builder(
+      controller: _pages,
+      // Keeps the next and previous pages built, so they're ready.
+      allowImplicitScrolling: true,
+      physics: _zoomed || _info > 0 || _multiTouch
+          ? const NeverScrollableScrollPhysics()
+          : const PageScrollPhysics(parent: BouncingScrollPhysics()),
+      itemCount: _ids.length,
+      onPageChanged: (i) {
+        Haptics.tick();
+        setState(() {
+          _index = i;
+          _zoomed = false;
+        });
+        _preload(i);
+        _centreFilmstrip();
+      },
+      itemBuilder: (context, i) => AnimatedBuilder(
+        animation: _pages,
+        builder: (context, child) {
+          // Layered cards: the photo on the left drifts a
+          // little slower and sinks back while the one on the
+          // right slides over it at full speed, so the two
+          // never cross-blend. The tree keeps the same shape
+          // at rest; changing it would rebuild the page (and
+          // reload its photo) every time a swipe starts.
+          final page = _pages.hasClients && _pages.position.haveDimensions
+              ? _pages.page ?? _index.toDouble()
+              : _index.toDouble();
+          final back = (page - i).clamp(0.0, 1.0);
+          final t = Curves.easeOut.transform(back);
+          final width = MediaQuery.sizeOf(context).width;
+          return Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.translationValues(back * width * 0.3, 0, 0)
+              ..scaleByDouble(1 - t * 0.08, 1 - t * 0.08, 1, 1),
+            child: Opacity(opacity: 1 - t * 0.45, child: child),
+          );
+        },
+        child: RepaintBoundary(
+          child: _ZoomPage(
+            key: ValueKey(_ids[i]),
+            id: _ids[i],
+            active: i == _index,
+            face: widget.faces[_ids[i]],
+            highlight: _highlight && i == _index,
+            // Desktop outlines every face, with names.
+            outlines: desktop && _highlight,
+            db: widget.controller.db,
+            onZoomChanged: (z) {
+              if (i == _index && z != _zoomed) setState(() => _zoomed = z);
+            },
+            onFaceTap: (data) {
+              Haptics.lift();
+              setState(() => _spotlight = data);
+            },
+            // A click beside the faces does nothing on desktop: the bars
+            // stay put for the mouse.
+            onMiss: desktop ? () {} : _toggleChrome,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---- Desktop ----
+
+  /// Keys go to the viewer as soon as it opens.
+  final _keys = FocusNode(debugLabel: 'Photo viewer');
+
+  /// The info panel beside the photo (wide windows); toggled with I.
+  bool _panel = true;
+
+  final _film = ScrollController();
+
+  /// One thumbnail in the filmstrip plus the gap after it.
+  static const _filmItem = 54.0;
+
+  /// Steps to photo [i]: a slide to the next one, a jump further away.
+  void _go(int i) {
+    if (i < 0 || i >= _ids.length || i == _index || !_pages.hasClients) return;
+    if ((i - _index).abs() == 1) {
+      _pages.animateToPage(i, duration: 280.ms, curve: Curves.easeOutCubic);
+    } else {
+      _pages.jumpToPage(i);
+    }
+  }
+
+  /// Keeps the current photo in the middle of the filmstrip.
+  void _centreFilmstrip({bool jump = false}) {
+    if (!_film.hasClients) return;
+    final view = _film.position.viewportDimension;
+    final target = (_index * _filmItem - (view - _filmItem) / 2).clamp(0.0, _film.position.maxScrollExtent);
+    jump ? _film.jumpTo(target) : _film.animateTo(target, duration: 250.ms, curve: Curves.easeOutCubic);
+  }
+
+  void _toggleInfo() {
+    if (DesktopLayout.wide(context)) {
+      setState(() => _panel = !_panel);
+    } else {
+      showPhotoInfo(context, _ids[_index], widget.controller);
+    }
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent e) {
+    if (e is KeyUpEvent) return KeyEventResult.ignored;
+    final k = e.logicalKey;
+    final repeat = e is KeyRepeatEvent;
+    if (k == LogicalKeyboardKey.arrowLeft) {
+      _go(_index - 1);
+    } else if (k == LogicalKeyboardKey.arrowRight) {
+      _go(_index + 1);
+    } else if (repeat) {
+      return KeyEventResult.ignored;
+    } else if (k == LogicalKeyboardKey.escape) {
+      if (_spotlight != null) {
+        setState(() => _spotlight = null);
+      } else {
+        Navigator.maybePop(context);
+      }
+    } else if (k == LogicalKeyboardKey.keyF) {
+      setState(() => _highlight = !_highlight);
+    } else if (k == LogicalKeyboardKey.keyI) {
+      _toggleInfo();
+    } else if (k == LogicalKeyboardKey.space && widget.selection != null) {
+      _toggleSelected();
+    } else {
+      return KeyEventResult.ignored;
+    }
+    return KeyEventResult.handled;
+  }
+
+  /// Desktop: a top bar, the photo with arrows either side, a filmstrip
+  /// below and (on wide windows) the info panel on the right.
+  Widget _desktopBuild(BuildContext context) {
+    final id = _ids[_index];
+    final panel = _panel && DesktopLayout.wide(context);
+    return Scaffold(
+      backgroundColor: const Color(0xFF08070A),
+      body: Focus(
+        focusNode: _keys,
+        autofocus: true,
+        onKeyEvent: _onKey,
+        child: Stack(children: [
+          Row(children: [
+            Expanded(
+              child: Column(children: [
+                _desktopTopBar(id, panel),
+                Expanded(
+                  child: Stack(children: [
+                    Positioned.fill(child: _photoPages()),
+                    Positioned(
+                      left: 14,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: _RoundArrow(
+                          icon: Icons.chevron_left_rounded,
+                          tooltip: 'Previous (←)',
+                          onTap: _index > 0 ? () => _go(_index - 1) : null,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 14,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: _RoundArrow(
+                          icon: Icons.chevron_right_rounded,
+                          tooltip: 'Next (→)',
+                          onTap: _index < _ids.length - 1 ? () => _go(_index + 1) : null,
+                        ),
+                      ),
+                    ),
+                    // Select toggle for a picking viewer.
+                    if (widget.selection != null && _spotlight == null)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 16,
+                        child: Center(
+                          child: _SelectPill(selected: widget.selection!.contains(id), onTap: _toggleSelected),
+                        ),
+                      ),
+                    // The actions live in the panel when it's open.
+                    if (widget.selection == null && !panel)
+                      Positioned(
+                        left: 80,
+                        right: 80,
+                        bottom: 14,
+                        child: Center(
+                          child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 560), child: _actionBar()),
+                        ),
+                      ),
+                  ]),
+                ),
+                _filmstrip(),
+              ]),
+            ),
+            if (panel)
+              PhotoSidePanel(
+                assetId: id,
+                controller: widget.controller,
+                onSend: _busy ? null : () => _act((a, x) => a.send([x])),
+                onShowInFolder: _busy ? null : () => _act((a, x) => a.share([x])),
+                onDelete: _busy ? null : () => _act(_trash),
+              ),
+          ]),
+          if (_spotlight != null)
+            Positioned.fill(
+              child: _Spotlight(
+                key: ValueKey(_spotlight),
+                data: _spotlight!,
+                controller: widget.controller,
+                onClosed: () => setState(() => _spotlight = null),
+              ),
+            ),
+        ]),
+      ),
+    );
+  }
+
+  /// Back, the file name and date, and the outline and info toggles.
+  Widget _desktopTopBar(String id, bool panel) {
+    const dim = Color(0xB3F2EFF5);
+    const faint = Color(0x73F2EFF5);
+    final count = widget.selection == null
+        ? '${_index + 1} of ${_ids.length}'
+        : '${_index + 1} of ${_ids.length} · ${_ids.where(widget.selection!.contains).length} selected';
+    Widget toggle({required IconData icon, required String tooltip, required bool on, required VoidCallback onTap}) =>
+        IconButton(
+          tooltip: tooltip,
+          onPressed: onTap,
+          icon: Icon(icon, size: 21, color: on ? Brand.accentDark : dim),
+        );
+    // The buttons never take the keyboard: the arrow keys stay with the
+    // photos.
+    return ExcludeFocus(
+      child: SizedBox(
+      height: 56,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Row(children: [
+          IconButton(
+            tooltip: 'Back (Esc)',
+            onPressed: () => Navigator.maybePop(context),
+            icon: const Icon(Icons.arrow_back_rounded, size: 21, color: dim),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: FutureBuilder<AssetEntity?>(
+              future: AssetThumb.entity(id),
+              initialData: AssetThumb.peek(id),
+              builder: (context, snap) {
+                final a = snap.data;
+                final when = a == null ? '' : '${formatSectionDay(a.createDateTime)} · ${formatTime(a.createDateTime)} · ';
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(a?.title ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontSize: TextSize.label, fontWeight: FontWeight.w600)),
+                    Text('$when$count',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: faint, fontSize: TextSize.small)),
+                  ],
+                );
+              },
+            ),
+          ),
+          toggle(
+            icon: _highlight ? Icons.center_focus_strong : Icons.center_focus_weak,
+            tooltip: _highlight ? 'Hide face outlines (F)' : 'Show face outlines (F)',
+            on: _highlight,
+            onTap: () => setState(() => _highlight = !_highlight),
+          ),
+          toggle(
+            icon: panel ? Icons.info_rounded : Icons.info_outline_rounded,
+            tooltip: panel ? 'Hide info (I)' : 'Info (I)',
+            on: panel,
+            onTap: _toggleInfo,
+          ),
+        ]),
+      ),
+      ),
+    );
+  }
+
+  /// Small squares of the photos; the current one is outlined.
+  Widget _filmstrip() {
+    return SizedBox(
+      height: 76,
+      child: LayoutBuilder(builder: (context, box) {
+        // Short lists sit in the middle; long ones scroll.
+        final side = math.max(8.0, (box.maxWidth - _ids.length * _filmItem) / 2);
+        return ListView.builder(
+          controller: _film,
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.symmetric(horizontal: side, vertical: 13),
+          itemExtent: _filmItem,
+          itemCount: _ids.length,
+          itemBuilder: (context, i) => _FilmThumb(
+            id: _ids[i],
+            current: i == _index,
+            onTap: () => _go(i),
+          ),
+        );
+      }),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (DesktopLayout.on) return _desktopBuild(context);
     final size = MediaQuery.sizeOf(context);
     final hasFaces = widget.faces.isNotEmpty;
     // 0 = resting, 1 = dragged far enough to close.
@@ -326,64 +659,7 @@ class _PhotoViewerState extends State<PhotoViewer> with TickerProviderStateMixin
                 offset: Offset(0, _drag - _info * panelH * 0.5),
                 child: Transform.scale(
                   scale: (1 - progress * 0.35) * (1 - _info * 0.38),
-                  child: PageView.builder(
-                    controller: _pages,
-                    // Keeps the next and previous pages built, so they're ready.
-                    allowImplicitScrolling: true,
-                    physics: _zoomed || _info > 0 || _multiTouch
-                        ? const NeverScrollableScrollPhysics()
-                        : const PageScrollPhysics(parent: BouncingScrollPhysics()),
-                    itemCount: _ids.length,
-                    onPageChanged: (i) {
-                      Haptics.tick();
-                      setState(() {
-                        _index = i;
-                        _zoomed = false;
-                      });
-                      _preload(i);
-                    },
-                    itemBuilder: (context, i) => AnimatedBuilder(
-                      animation: _pages,
-                      builder: (context, child) {
-                        // Layered cards: the photo on the left drifts a
-                        // little slower and sinks back while the one on the
-                        // right slides over it at full speed, so the two
-                        // never cross-blend. The tree keeps the same shape
-                        // at rest; changing it would rebuild the page (and
-                        // reload its photo) every time a swipe starts.
-                        final page = _pages.hasClients && _pages.position.haveDimensions
-                            ? _pages.page ?? _index.toDouble()
-                            : _index.toDouble();
-                        final back = (page - i).clamp(0.0, 1.0);
-                        final t = Curves.easeOut.transform(back);
-                        final width = MediaQuery.sizeOf(context).width;
-                        return Transform(
-                          alignment: Alignment.center,
-                          transform: Matrix4.translationValues(back * width * 0.3, 0, 0)
-                            ..scaleByDouble(1 - t * 0.08, 1 - t * 0.08, 1, 1),
-                          child: Opacity(opacity: 1 - t * 0.45, child: child),
-                        );
-                      },
-                      child: RepaintBoundary(
-                        child: _ZoomPage(
-                          key: ValueKey(_ids[i]),
-                          id: _ids[i],
-                          active: i == _index,
-                          face: widget.faces[_ids[i]],
-                          highlight: _highlight && i == _index,
-                          db: widget.controller.db,
-                          onZoomChanged: (z) {
-                            if (i == _index && z != _zoomed) setState(() => _zoomed = z);
-                          },
-                          onFaceTap: (data) {
-                            Haptics.lift();
-                            setState(() => _spotlight = data);
-                          },
-                          onMiss: _toggleChrome,
-                        ),
-                      ),
-                    ),
-                  ),
+                  child: _photoPages(),
                 ),
               ),
             ),
@@ -545,6 +821,7 @@ class _ZoomPage extends StatefulWidget {
     required this.active,
     required this.face,
     required this.highlight,
+    this.outlines = false,
     required this.db,
     required this.onZoomChanged,
     required this.onFaceTap,
@@ -557,6 +834,9 @@ class _ZoomPage extends StatefulWidget {
   final bool active;
   final Rect? face;
   final bool highlight;
+
+  /// Desktop: every face outlined, with its name (or "Add a name") below.
+  final bool outlines;
   final AppDb db;
   final ValueChanged<bool> onZoomChanged;
   final ValueChanged<_SpotlightData> onFaceTap;
@@ -746,7 +1026,33 @@ class _ZoomPageState extends State<_ZoomPage> with SingleTickerProviderStateMixi
                         AnimatedOpacity(opacity: frame == null ? 0 : 1, duration: 200.ms, child: child),
                   ),
                 ),
-              if (f != null)
+              if (widget.outlines)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: FutureBuilder<List<({Rect box, PhotoPerson? person})>>(
+                      future: _faces,
+                      builder: (context, snap) => Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          for (final (i, face) in (snap.data ?? const <({Rect box, PhotoPerson? person})>[]).indexed)
+                            Positioned(
+                              left: face.box.left * w,
+                              top: face.box.top * h,
+                              width: face.box.width * w,
+                              height: face.box.height * h,
+                              child: _FaceOutline(person: face.person)
+                                  .animate()
+                                  .fadeIn(delay: (60 * i).ms, duration: 220.ms)
+                                  .scaleXY(begin: 1.15, delay: (60 * i).ms, duration: 320.ms, curve: Curves.easeOutBack),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              // The person's own face, when opened from their page (desktop
+              // outlines every face instead).
+              if (f != null && !widget.outlines)
                 Positioned(
                   left: f.left * w - 6,
                   top: f.top * h - 6,
@@ -905,6 +1211,184 @@ class _SpotlightState extends State<_Spotlight> with SingleTickerProviderStateMi
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Desktop: a rounded box on a face with the person's name in a pill below
+/// it; faces without a name get a dashed coral box and "Add a name".
+class _FaceOutline extends StatelessWidget {
+  const _FaceOutline({required this.person});
+
+  final PhotoPerson? person;
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = Brand.accentDark;
+    final name = person?.name;
+    final box = name == null
+        ? const CustomPaint(painter: _DashedRRect(color: accent), child: SizedBox.expand())
+        : DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.white.withAlpha(230), width: 2),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: const [BoxShadow(color: Color(0x40000000), spreadRadius: 1)],
+            ),
+            child: const SizedBox.expand(),
+          );
+    return Stack(clipBehavior: Clip.none, children: [
+      Positioned.fill(child: box),
+      Positioned(
+        left: -80,
+        right: -80,
+        bottom: -30,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xD1141219),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              name ?? 'Add a name',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: name == null ? accent : Colors.white,
+                fontSize: TextSize.tiny,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ]);
+  }
+}
+
+/// The dashed box of a face that has no name yet.
+class _DashedRRect extends CustomPainter {
+  const _DashedRRect({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    final path = Path()..addRRect(RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(10)));
+    for (final metric in path.computeMetrics()) {
+      for (var d = 0.0; d < metric.length; d += 10) {
+        canvas.drawPath(metric.extractPath(d, math.min(d + 6, metric.length)), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedRRect old) => old.color != color;
+}
+
+/// Desktop: the round previous / next buttons beside the photo. Hidden at
+/// either end.
+class _RoundArrow extends StatefulWidget {
+  const _RoundArrow({required this.icon, required this.tooltip, required this.onTap});
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  @override
+  State<_RoundArrow> createState() => _RoundArrowState();
+}
+
+class _RoundArrowState extends State<_RoundArrow> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final on = widget.onTap != null;
+    return IgnorePointer(
+      ignoring: !on,
+      child: AnimatedOpacity(
+        opacity: on ? (_hover ? 1 : 0.75) : 0,
+        duration: 150.ms,
+        child: Tooltip(
+          message: widget.tooltip,
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            onEnter: (_) => setState(() => _hover = true),
+            onExit: (_) => setState(() => _hover = false),
+            child: GestureDetector(
+              onTap: widget.onTap,
+              child: AnimatedContainer(
+                duration: 150.ms,
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withAlpha(_hover ? 38 : 20),
+                ),
+                child: Icon(widget.icon, color: Colors.white, size: 26),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One square in the desktop filmstrip.
+class _FilmThumb extends StatefulWidget {
+  const _FilmThumb({required this.id, required this.current, required this.onTap});
+
+  final String id;
+  final bool current;
+  final VoidCallback onTap;
+
+  @override
+  State<_FilmThumb> createState() => _FilmThumbState();
+}
+
+class _FilmThumbState extends State<_FilmThumb> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: 150.ms,
+            transform: Matrix4.translationValues(0, _hover && !widget.current ? -2 : 0, 0),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: widget.current ? Brand.accentDark : Colors.transparent, width: 2),
+            ),
+            padding: const EdgeInsets.all(2),
+            child: AnimatedOpacity(
+              duration: 150.ms,
+              opacity: widget.current ? 1 : (_hover ? 0.9 : 0.45),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(7),
+                child: Image(
+                  image: FastThumb(widget.id, FastThumb.step(128), cover: true),
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  errorBuilder: (context, _, _) => const ColoredBox(color: Color(0xFF1C1A22)),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

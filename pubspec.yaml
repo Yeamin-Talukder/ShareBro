@@ -91,6 +91,9 @@ flutter:
     # w600k_mbf fingerprint model, from InsightFace (non-commercial).
     - path: assets/models/desktop/
       platforms: [windows, linux, macos]
+    # The sidebar's logo on desktop.
+    - path: assets/icon/app_icon_store_512.png
+      platforms: [windows, linux, macos]
     - assets/geo/
     - assets/icon/app_icon_1024.png
 

@@ -18,7 +18,9 @@ import 'sections.dart';
 import 'theme.dart';
 import 'trash_screen.dart';
 import 'widgets.dart';
-import '../platform/device.dart';
+import '../scan/desktop_folders.dart';
+import 'desktop_gallery.dart' show addDesktopFolder;
+import 'desktop_layout.dart';
 
 /// Shown until the user allows photo access.
 class _AccessGate extends StatefulWidget {
@@ -134,8 +136,84 @@ class _PhotosTabState extends State<PhotosTab> {
         child: AnimatedOpacity(opacity: _selecting ? 0 : 1, duration: 180.ms, child: child),
       );
 
+  /// Desktop: "1,248 photos from 2 folders", refreshed after each scan.
+  late Future<String> _meta = _loadMeta();
+  bool _wasRunning = false;
+
+  Future<String> _loadMeta() async {
+    final db = widget.controller.db;
+    final photos = (await db.photosIn()).length;
+    final folders = [for (final t in await db.trips()) if (desktopFolderOf(t.albumId) != null) t].length;
+    String n(int v) => v.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
+    return '${n(photos)} ${photos == 1 ? 'photo' : 'photos'} from $folders ${folders == 1 ? 'folder' : 'folders'}';
+  }
+
+  /// Desktop: a large title with the count, then the date filter, the tile
+  /// size slider (wide windows) and "Add folder", like the other pages.
+  PreferredSizeWidget _deskBar(BuildContext context) {
+    final c = widget.controller;
+    if (_wasRunning != c.running) {
+      _wasRunning = c.running;
+      _meta = _loadMeta();
+    }
+    final scheme = Theme.of(context).colorScheme;
+    return AppBar(
+      toolbarHeight: 76,
+      titleSpacing: 24,
+      automaticallyImplyLeading: false,
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      title: Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+        const Text('Photos', style: TextStyle(fontSize: TextSize.title1, fontWeight: FontWeight.w800, letterSpacing: -0.6)),
+        const SizedBox(width: 10),
+        Flexible(
+          child: FutureBuilder<String>(
+            future: _meta,
+            builder: (context, snap) => Text(snap.data ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w400, letterSpacing: 0, color: scheme.onSurface.withValues(alpha: 0.5))),
+          ),
+        ),
+      ]),
+      actions: [
+        DateChip(value: _dates, onChanged: (d) => setState(() => _dates = d)),
+        if (DesktopLayout.wide(context)) ...[
+          const SizedBox(width: 12),
+          const _TileSizeSlider(),
+        ],
+        const SizedBox(width: 12),
+        FilledButton.icon(
+          onPressed: () => addDesktopFolder(context, c),
+          icon: const Icon(Icons.create_new_folder_outlined),
+          label: const Text('Add folder'),
+        ),
+        const SizedBox(width: 24),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (DesktopLayout.on) {
+      return ListenableBuilder(
+        listenable: widget.controller,
+        builder: (context, _) => Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: _deskBar(context),
+          // Every scanned photo, from all the scanned folders. Reloads when
+          // a scan starts and when it finishes.
+          body: GalleryView(
+            key: ValueKey((_dates, widget.controller.running)),
+            controller: widget.controller,
+            source: GallerySource.ids(() => widget.controller.db.photosIn(dates: _dates)),
+            emptyMessage: _dates == null
+                ? 'No photos yet. Add a folder to scan it.'
+                : 'No photos taken in these dates.',
+          ),
+        ),
+      );
+    }
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
@@ -161,24 +239,7 @@ class _PhotosTabState extends State<PhotosTab> {
           ])),
         ],
       ),
-      body: Device.desktop
-          // Desktop: every scanned photo, from all the scanned folders.
-          // Reloads when a scan starts and when it finishes.
-          ? ListenableBuilder(
-              listenable: widget.controller,
-              builder: (context, _) => GalleryView(
-                key: ValueKey((_dates, widget.controller.running)),
-                controller: widget.controller,
-                source: GallerySource.ids(() => widget.controller.db.photosIn(dates: _dates)),
-                emptyMessage: _dates == null
-                    ? 'No photos yet. Scan a folder from People or Albums.'
-                    : 'No photos taken in these dates.',
-                onSelectingChanged: (v) {
-                  if (mounted) setState(() => _selecting = v);
-                },
-              ),
-            )
-          : _AccessGate(
+      body: _AccessGate(
         child: GalleryView(
           key: ValueKey(_dates),
           controller: widget.controller,
@@ -582,6 +643,43 @@ class _SmartCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Desktop: the Photos toolbar's tile size slider, small to large photos.
+/// Ctrl + mouse wheel over the grid moves it too.
+class _TileSizeSlider extends StatelessWidget {
+  const _TileSizeSlider();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ValueListenableBuilder<double>(
+      valueListenable: GalleryView.tileSize,
+      builder: (context, v, _) => Tooltip(
+        message: 'Photo size (Ctrl + mouse wheel)',
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.photo_size_select_small_rounded, size: 18, color: scheme.onSurfaceVariant),
+          SizedBox(
+            width: 120,
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 3,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+              ),
+              child: Slider(
+                value: v.clamp(deskTileMin, deskTileMax),
+                min: deskTileMin,
+                max: deskTileMax,
+                onChanged: (x) => GalleryView.tileSize.value = x,
+              ),
+            ),
+          ),
+          Icon(Icons.photo_size_select_large_rounded, size: 18, color: scheme.onSurfaceVariant),
+        ]),
       ),
     );
   }

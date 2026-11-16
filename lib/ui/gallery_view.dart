@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'anim.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import '../data/dates.dart';
 import '../scan/scan_controller.dart';
+import 'desktop_layout.dart';
 import 'face_refresh.dart';
 import 'fast_thumb.dart';
 import 'glass.dart';
@@ -20,6 +24,15 @@ import '../platform/device.dart';
 
 const _pageSize = 120;
 const _gap = 2.0;
+
+/// Desktop: the gap between tiles, the grid's side margins, the tile sizes
+/// the slider and Ctrl + wheel move between, and the size below which
+/// photos group by month instead of by day.
+const _deskGap = 3.0;
+const _deskPadX = 20.0;
+const deskTileMin = 100.0;
+const deskTileMax = 260.0;
+const _deskMonthBelow = 112.0;
 
 sealed class _Row {}
 
@@ -121,6 +134,10 @@ class GalleryView extends StatefulWidget {
   /// selection bar.
   final ValueChanged<bool>? onSelectingChanged;
 
+  /// Desktop: the tile size in logical pixels, shared by every grid and the
+  /// Photos toolbar's slider (Ctrl + mouse wheel changes it too).
+  static final tileSize = ValueNotifier<double>(150);
+
   @override
   State<GalleryView> createState() => _GalleryViewState();
 }
@@ -175,10 +192,52 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
   void initState() {
     super.initState();
     _reset();
+    if (_desk) {
+      GalleryView.tileSize.addListener(_tileSizeChanged);
+      HardwareKeyboard.instance.addHandler(_key);
+    }
+  }
+
+  // ---- Desktop: tile size and keys ----
+
+  bool get _desk => DesktopLayout.on;
+
+  /// Columns that fit at the chosen tile size (set on every layout).
+  int _deskColumns = 7;
+
+  double get _g => _desk ? _deskGap : _gap;
+  double get _padX => _desk ? _deskPadX : 0;
+
+  void _tileSizeChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Ctrl + mouse wheel: bigger or smaller photos (instead of scrolling).
+  void _wheel(PointerSignalEvent e) {
+    if (e is! PointerScrollEvent || !HardwareKeyboard.instance.isControlPressed) return;
+    GestureBinding.instance.pointerSignalResolver.register(e, (e) {
+      final dy = (e as PointerScrollEvent).scrollDelta.dy;
+      if (dy == 0) return;
+      final s = GalleryView.tileSize;
+      s.value = (s.value * (dy < 0 ? 1.1 : 1 / 1.1)).clamp(deskTileMin, deskTileMax);
+    });
+  }
+
+  /// Esc clears the selection (when this grid is the screen in front).
+  bool _key(KeyEvent e) {
+    if (e is! KeyDownEvent || e.logicalKey != LogicalKeyboardKey.escape) return false;
+    if (!mounted || _selected.isEmpty || widget.onPicked != null) return false;
+    if (!(ModalRoute.of(context)?.isCurrent ?? true)) return false;
+    _clearSelection();
+    return true;
   }
 
   @override
   void dispose() {
+    if (_desk) {
+      GalleryView.tileSize.removeListener(_tileSizeChanged);
+      HardwareKeyboard.instance.removeHandler(_key);
+    }
     DockVisibility.show(this);
     // After this frame: the tree is locked while widgets are disposed.
     final changed = widget.onSelectingChanged;
@@ -201,8 +260,8 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
     widget.onSelectingChanged?.call(shown);
   }
 
-  int get _columns => _levels[_level];
-  bool get _byMonth => _columns >= _monthFrom;
+  int get _columns => _desk ? _deskColumns : _levels[_level];
+  bool get _byMonth => _desk ? GalleryView.tileSize.value < _deskMonthBelow : _columns >= _monthFrom;
 
   double _span() {
     final p = _pointers.values.toList();
@@ -243,6 +302,14 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
     if (_pointers.length >= 2 || _pinchStart == null) return;
     _pinchStart = null;
     final r = _pinchScale.value;
+    if (_desk) {
+      // A touch screen's pinch sets the tile size; the grid settles back.
+      final s = GalleryView.tileSize;
+      s.value = (s.value * r).clamp(deskTileMin, deskTileMax);
+      _animateScale(from: 1);
+      setState(() => _pinching = false);
+      return;
+    }
     // Spread fingers = bigger photos (fewer columns), pinch = more.
     var delta = 0;
     if (r > 1.15) delta = r > 1.75 ? -2 : -1;
@@ -412,7 +479,7 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
     }
     final row = rows[lo];
     if (row is! _Photos) return null;
-    final col = (local.dx / (_layoutTile + _gap)).floor();
+    final col = ((local.dx - _padX) / (_layoutTile + _g)).floor();
     if (col < 0 || col >= row.count) return null;
     return row.start + col;
   }
@@ -488,7 +555,60 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
     }
   }
 
+  /// Desktop: one bar floating at the bottom centre: how many are selected,
+  /// select all, the actions and a close button (Esc does the same).
+  Widget _deskSelectionBar(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: MediaQuery.viewPaddingOf(context).bottom + 20,
+      child: Center(
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Glass(
+            radius: 28,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              IconButton(
+                tooltip: 'Clear selection (Esc)',
+                onPressed: _clearSelection,
+                icon: const Icon(Icons.close_rounded),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Text('${_selected.length} selected',
+                    style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+              ),
+              TextButton(
+                onPressed: _selectAll,
+                child: Text(_selected.length >= _total ? 'Select none' : 'Select all'),
+              ),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 320,
+            child: MediaActionBar(
+              favourite: false,
+              onSend: _busy ? null : () => _run((a, sel) => a.send(sel)),
+              onShare: _busy ? null : () => _run((a, sel) => a.share(sel)),
+              onFavourite: null,
+              onAlbum: null,
+              onTrash: _busy
+                  ? null
+                  : () => _run((a, sel) async {
+                        if (!await a.confirmTrash(sel.length)) return;
+                        _dropIds(await a.trash(sel));
+                      }),
+            ),
+          ),
+        ]),
+      ).animate().fadeIn(duration: 200.ms).moveY(begin: 30, curve: Curves.easeOutBack),
+    );
+  }
+
   Widget _selectionBars(BuildContext context) {
+    if (_desk && widget.onPicked == null) return Stack(children: [_deskSelectionBar(context)]);
     final pad = MediaQuery.paddingOf(context);
     // Over the page's own top bar when the grid runs underneath it (that
     // bar steps aside), else at the top of the grid.
@@ -583,15 +703,80 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
     );
   }
 
+  /// Desktop rows: a day header ("Saturday 14 November · 15 photos", with
+  /// "Select all" on hover) or a row of tiles with hover ticks.
+  Widget _deskRow(BuildContext context, _Row row, double tile, int px) {
+    final scheme = Theme.of(context).colorScheme;
+    switch (row) {
+      case _Header(:final day, :final start, :final count):
+        final ids = [for (var i = start; i < start + count && i < _assets.length; i++) _assets[i].id];
+        final all = ids.isNotEmpty && ids.every(_selected.contains);
+        return _Hover(
+          builder: (context, hovered) => Padding(
+            padding: const EdgeInsets.fromLTRB(_deskPadX, 14, _deskPadX + 40, 4),
+            child: Row(children: [
+              Text(_byMonth ? formatMonth(day) : formatSectionDay(day),
+                  style: const TextStyle(fontSize: TextSize.headline, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
+              const SizedBox(width: 8),
+              Text('$count ${count == 1 ? 'photo' : 'photos'}',
+                  style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
+              const Spacer(),
+              AnimatedOpacity(
+                opacity: hovered || _selecting ? 1 : 0,
+                duration: 150.ms,
+                child: TextButton(
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, 30),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed: () => _selectDay(start, count),
+                  child: Text(all ? 'Deselect' : 'Select all'),
+                ),
+              ),
+            ]),
+          ),
+        );
+      case _Photos(:final start, :final count):
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(_deskPadX, 0, _deskPadX, _deskGap),
+          child: Row(children: [
+            for (var k = 0; k < count; k++) ...[
+              if (k > 0) const SizedBox(width: _deskGap),
+              SizedBox.square(
+                dimension: tile,
+                child: _Tile(
+                  asset: _assets[start + k],
+                  px: px,
+                  small: _byMonth,
+                  selecting: _selecting,
+                  selected: _selected.contains(_assets[start + k].id),
+                  onTap: () => _selecting ? _toggle(start + k) : _open(start + k),
+                  onSelect: () => _toggle(start + k),
+                ),
+              ),
+            ],
+          ]),
+        );
+    }
+  }
+
   Widget _grid(BuildContext context) {
     final text = Theme.of(context).textTheme;
     return LayoutBuilder(builder: (context, box) {
+      final g = _g;
+      final width = box.maxWidth - 2 * _padX;
+      if (_desk) {
+        // As many columns as fit at the chosen size, then stretched to fill.
+        _deskColumns = math.max(2, ((width + g) / (GalleryView.tileSize.value + g)).round());
+      }
       final columns = _columns;
-      final tile = (box.maxWidth - (columns - 1) * _gap) / columns;
+      final tile = (width - (columns - 1) * g) / columns;
       final rows = _rows(columns);
       final more = _requested < _total;
       final extents = [
-        for (final r in rows) r is _Header ? _headerHeight : tile + _gap,
+        for (final r in rows) r is _Header ? _headerHeight : tile + g,
         if (more) 72.0,
       ];
       // Start offset of every row, for the date scrubber's label.
@@ -643,6 +828,10 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
               }
               // Start fetching the next page a little before the end.
               if (more && r > rows.length - 8) _loadMore();
+              final row = _desk ? _deskRow(context, rows[r], tile, px) : null;
+              // Ctrl + wheel over the photos resizes them. The rows sit
+              // below the scroll view, so they claim the wheel first.
+              if (row != null) return Listener(onPointerSignal: _wheel, child: row);
               return switch (rows[r]) {
                 _Header(:final day, :final start, :final count) => Padding(
                     padding: const EdgeInsets.fromLTRB(16, 16, 8, 6),
@@ -901,11 +1090,35 @@ String _duration(Duration d) {
 
 /// Grid thumbnail with a play badge for videos and a heart for favourites.
 /// While selecting it shows a check circle and shrinks a little when picked.
+/// Tracks whether the mouse is over [builder]'s widget (desktop hovers).
+class _Hover extends StatefulWidget {
+  const _Hover({required this.builder, this.cursor = MouseCursor.defer});
+
+  final Widget Function(BuildContext context, bool hovered) builder;
+  final MouseCursor cursor;
+
+  @override
+  State<_Hover> createState() => _HoverState();
+}
+
+class _HoverState extends State<_Hover> {
+  bool _on = false;
+
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+        cursor: widget.cursor,
+        onEnter: (_) => setState(() => _on = true),
+        onExit: (_) => setState(() => _on = false),
+        child: widget.builder(context, _on),
+      );
+}
+
 class _Tile extends StatelessWidget {
   const _Tile({
     required this.asset,
     required this.px,
     required this.onTap,
+    this.onSelect,
     this.small = false,
     this.selecting = false,
     this.selected = false,
@@ -913,6 +1126,9 @@ class _Tile extends StatelessWidget {
 
   final AssetEntity asset;
   final VoidCallback onTap;
+
+  /// Desktop: the tick (shown on hover) selects without opening the photo.
+  final VoidCallback? onSelect;
 
   /// Thumbnail size step for the tile's size on screen.
   final int px;
@@ -923,9 +1139,31 @@ class _Tile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!DesktopLayout.on) return _build(context, false);
+    return _Hover(cursor: SystemMouseCursors.click, builder: _build);
+  }
+
+  Widget _build(BuildContext context, bool hovered) {
     final scheme = Theme.of(context).colorScheme;
     final video = asset.type == AssetType.video;
+    final desk = DesktopLayout.on;
     const shadow = [Shadow(color: Colors.black54, blurRadius: 4)];
+    final showTick = selecting || (desk && hovered);
+    final tick = AnimatedContainer(
+      duration: 160.ms,
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: selected ? scheme.primary : Colors.black26,
+        border: Border.all(color: selected && desk ? scheme.primary : Colors.white, width: 2),
+      ),
+      child: selected
+          ? Icon(Icons.check_rounded, size: 14, color: scheme.onPrimary)
+              .animate()
+              .scaleXY(begin: 0.3, duration: 200.ms, curve: Curves.easeOutBack)
+          : null,
+    );
     return GestureDetector(
       onTap: onTap,
       child: ColoredBox(
@@ -937,24 +1175,29 @@ class _Tile extends StatelessWidget {
             curve: Curves.easeOutCubic,
             // Shrinks and rounds its corners together.
             builder: (context, t, child) => Transform.scale(
-              scale: 1 - 0.16 * t,
-              child: ClipRRect(borderRadius: BorderRadius.circular(12 * t), child: child),
+              scale: 1 - (desk ? 0.12 : 0.16) * t,
+              child: ClipRRect(borderRadius: BorderRadius.circular((desk ? 8 : 12) * t), child: child),
             ),
-            child: Hero(
-                tag: 'photo-${asset.id}',
-                child: Image(
-                  image: FastThumb(asset.id, px, cover: true),
-                  fit: BoxFit.cover,
-                  gaplessPlayback: true,
-                  filterQuality: FilterQuality.low,
-                  frameBuilder: (context, child, frame, sync) => sync
-                      ? child
-                      : AnimatedOpacity(opacity: frame == null ? 0 : 1, duration: 160.ms, child: child),
-                  errorBuilder: (context, _, _) =>
-                      ColoredBox(color: Theme.of(context).colorScheme.surfaceContainerHighest),
-                ),
-              ),
+            child: desk
+                // A slight zoom under the mouse, inside the tile's edges.
+                ? ClipRect(
+                    child: AnimatedScale(
+                      scale: hovered && !selected ? 1.035 : 1,
+                      duration: 250.ms,
+                      curve: Curves.easeOutCubic,
+                      child: _image(),
+                    ),
+                  )
+                : _image(),
           ),
+          if (desk)
+            IgnorePointer(
+              child: AnimatedOpacity(
+                opacity: hovered && !selected ? 1 : 0,
+                duration: 150.ms,
+                child: const ColoredBox(color: Color(0x2E000000)),
+              ),
+            ),
           if (video && !small)
             Positioned(
               right: 6,
@@ -976,28 +1219,31 @@ class _Tile extends StatelessWidget {
               bottom: 5,
               child: Icon(Icons.favorite_rounded, size: 15, color: Colors.white, shadows: shadow),
             ),
-          if (selecting)
+          if (showTick)
             Positioned(
               top: 6,
               left: 6,
-              child: AnimatedContainer(
-                duration: 160.ms,
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: selected ? scheme.primary : Colors.black26,
-                  border: Border.all(color: Colors.white, width: 2),
-                ),
-                child: selected
-                    ? Icon(Icons.check_rounded, size: 14, color: scheme.onPrimary)
-                        .animate()
-                        .scaleXY(begin: 0.3, duration: 200.ms, curve: Curves.easeOutBack)
-                    : null,
-              ),
+              child: desk
+                  // On desktop the tick selects; the rest of the tile opens.
+                  ? GestureDetector(onTap: onSelect ?? onTap, child: tick)
+                  : tick,
             ),
         ]),
       ),
     );
   }
+
+  Widget _image() => Hero(
+        tag: 'photo-${asset.id}',
+        child: Image(
+          image: FastThumb(asset.id, px, cover: true),
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          filterQuality: FilterQuality.low,
+          frameBuilder: (context, child, frame, sync) => sync
+              ? child
+              : AnimatedOpacity(opacity: frame == null ? 0 : 1, duration: 160.ms, child: child),
+          errorBuilder: (context, _, _) => ColoredBox(color: Theme.of(context).colorScheme.surfaceContainerHighest),
+        ),
+      );
 }

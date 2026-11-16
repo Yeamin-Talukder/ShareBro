@@ -34,6 +34,9 @@ import 'timeline_screen.dart';
 import 'together_screen.dart';
 import 'widgets.dart';
 import 'package:file_picker/file_picker.dart';
+import 'desktop_layout.dart';
+import 'send_to_sheet.dart';
+import '../share/prepare.dart' show SendItem;
 
 /// Room under the last row for the Scan button floating above the nav bar.
 const _fabClearance = 88.0;
@@ -470,7 +473,7 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: EdgeInsets.only(
           bottom: math.max(0, MediaQuery.paddingOf(context).bottom - MediaQuery.viewPaddingOf(context).bottom),
         ),
-        child: !Device.photoLibrary && !Device.desktop ? null : ListenableBuilder(
+        child: !Device.photoLibrary ? null : ListenableBuilder(
           listenable: c,
           builder: (context, _) => _ScanButton(
             controller: c,
@@ -567,6 +570,18 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ]),
+          if (DesktopLayout.on)
+            Padding(
+              padding: const EdgeInsets.only(left: 10),
+              child: ListenableBuilder(
+                listenable: c,
+                builder: (context, _) => FilledButton.icon(
+                  onPressed: c.running ? _openScan : _pickAlbumAndScan,
+                  icon: Icon(c.running ? Icons.downloading_rounded : Icons.add_photo_alternate_outlined, size: 19),
+                  label: Text(c.running ? 'Scan progress' : 'Scan folder'),
+                ),
+              ),
+            ),
         ],
         slivers: [
         if (_showFilters) SliverToBoxAdapter(child: _filterBar(people)),
@@ -587,7 +602,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         if (_tripId != null && people != null && !_layout.spatial)
           SliverToBoxAdapter(child: _MissingCard(people: people, onOpen: _openPerson)),
-        if (c.running)
+        if (c.running && !DesktopLayout.on)
           SliverToBoxAdapter(
             child: ListenableBuilder(
               listenable: c,
@@ -645,6 +660,46 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FaceCloud(people: people, onOpen: _openPerson),
             ),
           )
+        else if (DesktopLayout.on) ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+              child: Text('Drag one person onto another to merge them.',
+                  style: Theme.of(context).textTheme.bodySmall),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(24, 14, 24, 28),
+            sliver: SliverGrid.builder(
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 270,
+                mainAxisSpacing: 14,
+                crossAxisSpacing: 14,
+                childAspectRatio: 1.5,
+              ),
+              itemCount: people.length,
+              itemBuilder: (context, i) {
+                final person = people[i];
+                return _PersonCard(
+                  key: ValueKey(person.id),
+                  person: person,
+                  loadPhotos: () => c.db.photosWithAll([person.id], tripId: _tripId),
+                  onTap: () => _openPerson(person),
+                  onSend: (ids) => showSendToSheet(
+                    context,
+                    controller: c,
+                    items: [for (final id in ids) SendItem.asset(id)],
+                    title: person.name == null ? null : 'Send to ${person.name}',
+                  ),
+                  onMerge: (dragged) => _dropMerge(dragged, person),
+                )
+                    .animate(key: ValueKey('in${person.id}'))
+                    .fadeIn(delay: (25 * i.clamp(0, 24)).ms, duration: 220.ms)
+                    .moveY(begin: 8, delay: (25 * i.clamp(0, 24)).ms, duration: 300.ms, curve: Curves.easeOutCubic);
+              },
+            ),
+          ),
+        ]
         else ...[
           SliverToBoxAdapter(
             child: Padding(
@@ -890,6 +945,173 @@ class _PersonTileState extends State<_PersonTile> with AutomaticKeepAliveClientM
 
 /// "Scan album" button that shrinks into a filling progress ring while a
 /// scan runs; tapping the ring opens the scan screen.
+/// Desktop: a person as a card, with their latest photos, "Send" on
+/// hover, and drag onto another card to merge.
+class _PersonCard extends StatefulWidget {
+  const _PersonCard({
+    super.key,
+    required this.person,
+    required this.loadPhotos,
+    required this.onTap,
+    required this.onSend,
+    required this.onMerge,
+  });
+
+  final PersonSummary person;
+  final Future<List<String>> Function() loadPhotos;
+  final VoidCallback onTap;
+  final ValueChanged<List<String>> onSend;
+  final ValueChanged<PersonSummary> onMerge;
+
+  @override
+  State<_PersonCard> createState() => _PersonCardState();
+}
+
+class _PersonCardState extends State<_PersonCard> {
+  late Future<List<String>> _photos = widget.loadPhotos();
+  bool _hover = false;
+
+  @override
+  void didUpdateWidget(_PersonCard old) {
+    super.didUpdateWidget(old);
+    if (old.person.photoCount != widget.person.photoCount) _photos = widget.loadPhotos();
+  }
+
+  Widget _avatar(double size) {
+    final p = widget.person;
+    final scheme = Theme.of(context).colorScheme;
+    return ClipOval(
+      child: SizedBox.square(
+        dimension: size,
+        child: p.coverThumb == null
+            ? ColoredBox(color: scheme.surfaceContainerHighest, child: Icon(Icons.person, color: scheme.outline))
+            : Image.memory(p.coverThumb!, fit: BoxFit.cover, gaplessPlayback: true),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.person;
+    final scheme = Theme.of(context).colorScheme;
+    final faint = scheme.onSurface.withValues(alpha: 0.45);
+    return DragTarget<PersonSummary>(
+      onWillAcceptWithDetails: (d) => d.data.id != p.id,
+      onAcceptWithDetails: (d) => widget.onMerge(d.data),
+      builder: (context, hovering, _) {
+        final over = hovering.isNotEmpty;
+        final card = AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          transform: Matrix4.translationValues(0, _hover && !over ? -2 : 0, 0),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1C1A22) : Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: over ? scheme.primary : scheme.onSurface.withValues(alpha: _hover ? 0.14 : 0.07),
+              width: over ? 2 : 1,
+            ),
+            boxShadow: _hover
+                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.28), blurRadius: 30, offset: const Offset(0, 12))]
+                : null,
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              Hero(tag: 'person-${p.id}', child: _avatar(54)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(
+                    p.name ?? 'Add a name',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: TextSize.callout,
+                      fontWeight: p.name == null ? FontWeight.w500 : FontWeight.w700,
+                      color: p.name == null ? faint : null,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text('${p.photoCount} ${p.photoCount == 1 ? 'photo' : 'photos'}',
+                      style: TextStyle(fontSize: TextSize.small, color: faint)),
+                ]),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: FutureBuilder<List<String>>(
+                  future: _photos,
+                  builder: (context, snap) {
+                    final ids = (snap.data ?? const <String>[]).take(4).toList();
+                    return Row(children: [
+                      for (var k = 0; k < 4; k++) ...[
+                        if (k > 0) const SizedBox(width: 3),
+                        Expanded(
+                          child: k < ids.length
+                              ? AssetThumb(id: ids[k], size: 128)
+                              : ColoredBox(color: scheme.onSurface.withValues(alpha: 0.05)),
+                        ),
+                      ],
+                    ]);
+                  },
+                ),
+              ),
+            ),
+          ]),
+        );
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _hover = true),
+          onExit: (_) => setState(() => _hover = false),
+          child: Draggable<PersonSummary>(
+            data: p,
+            feedback: Material(
+              color: Colors.transparent,
+              child: Container(
+                decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 20),
+                ]),
+                child: _avatar(72),
+              ),
+            ),
+            childWhenDragging: Opacity(opacity: 0.4, child: card),
+            child: GestureDetector(
+              onTap: widget.onTap,
+              child: Stack(children: [
+                Positioned.fill(child: card),
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: AnimatedOpacity(
+                    opacity: _hover ? 1 : 0,
+                    duration: const Duration(milliseconds: 150),
+                    child: IgnorePointer(
+                      ignoring: !_hover,
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          textStyle: const TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w700),
+                        ),
+                        onPressed: () async => widget.onSend(await _photos),
+                        icon: const Icon(Icons.send_rounded, size: 16),
+                        label: Text('Send ${p.photoCount}'),
+                      ),
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _ScanButton extends StatelessWidget {
   const _ScanButton({
     required this.controller,

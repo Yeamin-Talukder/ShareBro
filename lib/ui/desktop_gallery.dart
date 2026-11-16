@@ -62,20 +62,7 @@ class _DesktopAlbumsTabState extends State<DesktopAlbumsTab> {
     return out;
   }
 
-  Future<void> _addFolder() async {
-    final folder = await FilePicker.getDirectoryPath(dialogTitle: 'Choose a folder of photos to scan');
-    if (folder == null || !mounted) return;
-    final found = await c.scanDesktopFolder(folder);
-    if (!mounted) return;
-    if (found == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(c.running
-              ? 'A scan is already running. Try again when it finishes.'
-              : 'No photos in that folder (JPEG, PNG, WebP, GIF or BMP).')));
-      return;
-    }
-    Navigator.push(context, MaterialPageRoute(builder: (_) => ScanScreen(controller: c)));
-  }
+  Future<void> _addFolder() => addDesktopFolder(context, c);
 
   @override
   Widget build(BuildContext context) {
@@ -144,7 +131,9 @@ class _DesktopAlbumsTabState extends State<DesktopAlbumsTab> {
                     folder: f,
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => _DesktopFolderScreen(controller: c, folder: f)),
+                      MaterialPageRoute(
+                          builder: (_) => DesktopFolderPage(
+                              controller: c, tripId: f.trip.id, name: f.trip.name, path: f.path, embedded: false)),
                     ),
                   );
                   // Once each: cards scrolling back into view don't pop in again.
@@ -216,54 +205,110 @@ class _FolderCard extends StatelessWidget {
   }
 }
 
-/// One scanned folder's photos, newest first.
-class _DesktopFolderScreen extends StatefulWidget {
-  const _DesktopFolderScreen({required this.controller, required this.folder});
-
-  final ScanController controller;
-  final _Folder folder;
-
-  @override
-  State<_DesktopFolderScreen> createState() => _DesktopFolderScreenState();
+/// Desktop: picks a folder of photos and scans it (and the folders inside
+/// it), then shows the scan. Says so when there's nothing to scan.
+Future<void> addDesktopFolder(BuildContext context, ScanController c) async {
+  final folder = await FilePicker.getDirectoryPath(dialogTitle: 'Choose a folder of photos to scan');
+  if (folder == null || !context.mounted) return;
+  final found = await c.scanDesktopFolder(folder);
+  if (!context.mounted) return;
+  if (found == 0) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(c.running
+            ? 'A scan is already running. Try again when it finishes.'
+            : 'No photos in that folder (JPEG, PNG, WebP, GIF or BMP).')));
+    return;
+  }
+  Navigator.push(context, MaterialPageRoute(builder: (_) => ScanScreen(controller: c)));
 }
 
-class _DesktopFolderScreenState extends State<_DesktopFolderScreen> {
+/// One scanned folder's photos, newest first, with a large title and the
+/// folder's actions (show it in File Explorer, scan it for new photos, a
+/// date filter). Works inside the desktop sidebar's content area, or as its
+/// own screen ([embedded] false adds a back button).
+class DesktopFolderPage extends StatefulWidget {
+  const DesktopFolderPage({
+    super.key,
+    required this.controller,
+    required this.tripId,
+    required this.name,
+    required this.path,
+    this.embedded = true,
+  });
+
+  final ScanController controller;
+  final int tripId;
+  final String name;
+
+  /// The folder on disk.
+  final String path;
+  final bool embedded;
+
+  @override
+  State<DesktopFolderPage> createState() => _DesktopFolderPageState();
+}
+
+class _DesktopFolderPageState extends State<DesktopFolderPage> {
   DaySpan? _dates;
 
   ScanController get c => widget.controller;
 
   @override
   Widget build(BuildContext context) {
-    final f = widget.folder;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(f.trip.name),
-        actions: [
-          DateChip(value: _dates, onChanged: (d) => setState(() => _dates = d)),
-          IconButton(
-            tooltip: 'Show in File Explorer',
-            icon: const Icon(Icons.folder_open_outlined),
-            onPressed: () => revealInFolder(f.path),
-          ),
-          IconButton(
-            tooltip: 'Scan for new photos',
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: c.running
-                ? null
-                : () async {
-                    await c.scanDesktopFolder(f.path);
-                    if (!context.mounted) return;
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => ScanScreen(controller: c)));
-                  },
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      body: GalleryView(
-        key: ValueKey(_dates),
-        controller: c,
-        source: GallerySource.ids(() => c.db.photosIn(tripId: f.trip.id, dates: _dates)),
-        emptyMessage: _dates == null ? 'No photos in this folder.' : 'No photos taken in these dates.',
+    final scheme = Theme.of(context).colorScheme;
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) => Scaffold(
+        backgroundColor: widget.embedded ? Colors.transparent : null,
+        appBar: AppBar(
+          toolbarHeight: 76,
+          titleSpacing: widget.embedded ? 24 : 4,
+          automaticallyImplyLeading: !widget.embedded,
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(widget.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: TextSize.title1, fontWeight: FontWeight.w800, letterSpacing: -0.6)),
+            Text(widget.path,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: TextSize.small,
+                    fontWeight: FontWeight.w400,
+                    letterSpacing: 0,
+                    color: scheme.onSurface.withValues(alpha: 0.5))),
+          ]),
+          actions: [
+            DateChip(value: _dates, onChanged: (d) => setState(() => _dates = d)),
+            const SizedBox(width: 4),
+            IconButton(
+              tooltip: 'Show in File Explorer',
+              icon: const Icon(Icons.folder_open_outlined),
+              onPressed: () => revealInFolder(widget.path),
+            ),
+            IconButton(
+              tooltip: c.running ? 'A scan is running' : 'Scan for new photos',
+              icon: const Icon(Icons.refresh_rounded),
+              onPressed: c.running
+                  ? null
+                  : () async {
+                      await c.scanDesktopFolder(widget.path);
+                      if (!context.mounted) return;
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => ScanScreen(controller: c)));
+                    },
+            ),
+            const SizedBox(width: 20),
+          ],
+        ),
+        body: GalleryView(
+          // Reloads when a scan starts and when it finishes.
+          key: ValueKey((_dates, c.running)),
+          controller: c,
+          source: GallerySource.ids(() => c.db.photosIn(tripId: widget.tripId, dates: _dates)),
+          emptyMessage: _dates == null ? 'No photos in this folder.' : 'No photos taken in these dates.',
+        ),
       ),
     );
   }
