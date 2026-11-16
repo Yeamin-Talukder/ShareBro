@@ -12,6 +12,7 @@ import '../share/protocol.dart';
 import '../share/receive.dart';
 import '../share/send_center.dart';
 import 'aurora.dart';
+import 'desktop_layout.dart';
 import 'devices.dart';
 import 'file_icons.dart';
 import 'glass.dart';
@@ -818,7 +819,7 @@ class TransferScreen extends StatelessWidget {
               };
               final speed = job.speed, left = job.remaining;
               return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                padding: DesktopLayout.pad(context, const EdgeInsets.fromLTRB(16, 4, 16, 32)),
                 children: [
                   _heading(context, 'Sending', '${job.personName} to ${job.deviceAlias}'),
                   SectionCard(
@@ -947,7 +948,7 @@ class ReceiveLiveScreen extends StatelessWidget {
               final color = phase == TransferPhase.failed ? scheme.error : scheme.primary;
               final n = session.tokens.length;
               return ListView(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+                padding: DesktopLayout.pad(context, const EdgeInsets.fromLTRB(16, 4, 16, 32)),
                 children: [
                   _heading(context, 'Receiving', '$n ${n == 1 ? 'file' : 'files'} from ${session.from}'),
                   SectionCard(

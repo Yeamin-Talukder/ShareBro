@@ -5,10 +5,12 @@ import 'package:flutter/services.dart';
 import 'anim.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../platform/device.dart';
 import '../scan/scan_controller.dart';
 import '../share/prepare.dart';
 import '../share/server.dart';
 import 'aurora.dart';
+import 'desktop_layout.dart';
 import 'glass.dart';
 import 'motion.dart';
 
@@ -133,7 +135,7 @@ class _WebShareScreenState extends State<WebShareScreen> {
               )
             : ListenableBuilder(
                 listenable: widget.controller.sharing.server,
-                builder: (context, _) => ListView(padding: const EdgeInsets.all(20), children: [
+                builder: (context, _) => ListView(padding: DesktopLayout.pad(context, const EdgeInsets.all(20)), children: [
                   Center(
                     child: Glass(
                       radius: 32,
@@ -197,9 +199,13 @@ class _WebShareScreenState extends State<WebShareScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'They need to be on the same Wi-Fi as you, or connected to your phone\'s hotspot. '
-                    'You can leave this screen or lock your phone — the link keeps working until you stop it. '
-                    'Find it again under Sending.',
+                    Device.desktop
+                        ? 'They need to be on the same Wi-Fi as this computer. '
+                            'You can leave this screen; the link keeps working while ShareBro is open. '
+                            'Find it again under Sending.'
+                        : 'They need to be on the same Wi-Fi as you, or connected to your phone\'s hotspot. '
+                            'You can leave this screen or lock your phone — the link keeps working until you stop it. '
+                            'Find it again under Sending.',
                     style: text.bodySmall,
                     textAlign: TextAlign.center,
                   ),

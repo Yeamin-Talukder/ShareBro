@@ -9,6 +9,7 @@ import '../scan/scan_controller.dart';
 import '../share/net.dart';
 import '../share/receive.dart';
 import 'aurora.dart';
+import 'desktop_layout.dart';
 import 'glass.dart';
 import 'island.dart';
 import 'motion.dart';
@@ -66,7 +67,7 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
           listenable: Listenable.merge([s, r]),
           builder: (context, _) {
             final session = r.session;
-            return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
+            return ListView(padding: DesktopLayout.pad(context, const EdgeInsets.fromLTRB(16, 8, 16, 32)), children: [
               Center(
                 child: Glass(
                   radius: 32,

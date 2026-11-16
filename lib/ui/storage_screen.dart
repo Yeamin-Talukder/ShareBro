@@ -4,6 +4,7 @@ import 'anim.dart';
 import '../data/dates.dart';
 import '../data/duplicates.dart';
 import '../scan/scan_controller.dart';
+import 'desktop_layout.dart';
 import 'photo_viewer.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -93,7 +94,7 @@ class _StorageScreenState extends State<StorageScreen> {
                     : 'Measuring photos $_measured of $_toMeasure'),
               ]),
             )
-          : ListView(padding: const EdgeInsets.all(16), children: [
+          : ListView(padding: DesktopLayout.pad(context, const EdgeInsets.all(16)), children: [
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(20),

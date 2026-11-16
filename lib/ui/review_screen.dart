@@ -1,10 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'anim.dart';
 
 import '../data/db.dart';
 import '../scan/scan_controller.dart';
+import 'desktop_layout.dart';
 import 'motion.dart';
 import 'aurora.dart';
 import 'sections.dart';
@@ -171,10 +173,30 @@ class _ReviewScreenState extends State<ReviewScreen> {
             ? const Center(child: CircularProgressIndicator())
             : _current == null
             ? _done(context)
+            : DesktopLayout.on
+            ? _desktopDeck(context, items)
             : _deck(context, items),
       ),
     );
   }
+
+  /// Desktop: the deck at a card's width in the middle of the window, and
+  /// the left and right arrow keys answer No and Yes like the two buttons.
+  Widget _desktopDeck(BuildContext context, List<ReviewItem> items) => CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.arrowLeft): () => _cardKey.currentState?.fling(false),
+          const SingleActivator(LogicalKeyboardKey.arrowRight): () => _cardKey.currentState?.fling(true),
+        },
+        child: Focus(
+          autofocus: true,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 620),
+              child: _deck(context, items),
+            ),
+          ),
+        ),
+      );
 
   Widget _deck(BuildContext context, List<ReviewItem> items) {
     final item = _current!;

@@ -6,6 +6,7 @@ import '../data/group_shots.dart';
 import '../scan/scan_controller.dart';
 import '../share/prepare.dart';
 import 'aurora.dart';
+import 'desktop_layout.dart';
 import 'glass.dart';
 import 'motion.dart';
 import 'photo_viewer.dart';
@@ -99,6 +100,7 @@ class _BestShotsScreenState extends State<BestShotsScreen> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: GlassScrollView(
+          maxContentWidth: DesktopLayout.pageWidth,
           title: 'Best group shots',
           subtitle: bursts == null || bursts.isEmpty
               ? null

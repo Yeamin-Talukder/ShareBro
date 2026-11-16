@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 
 import '../platform/device.dart';
@@ -19,6 +21,23 @@ abstract final class DesktopLayout {
 
   /// The desktop layout is on (Windows, Mac, Linux).
   static bool get on => Device.desktop;
+
+  /// How wide a page of rows and cards gets on a computer; past this the
+  /// lines get too long to read and the page looks empty at the sides.
+  static const pageWidth = 860.0;
+
+  /// Extra side padding that keeps a page's content [max] wide and centred
+  /// in a wide window. It goes on the scroll view's own padding, so the
+  /// scroll view still fills the window and the mouse wheel works anywhere
+  /// on it. Nothing on phones.
+  static double inset(BuildContext context, {double max = pageWidth}) =>
+      on ? math.max(0.0, (MediaQuery.sizeOf(context).width - max) / 2) : 0.0;
+
+  /// [base] padding plus [inset] on both sides.
+  static EdgeInsets pad(BuildContext context, EdgeInsets base, {double max = pageWidth}) {
+    final i = inset(context, max: max);
+    return i == 0 ? base : base.add(EdgeInsets.symmetric(horizontal: i)) as EdgeInsets;
+  }
 
   /// On, and the window is wide enough for labels and side panels.
   static bool wide(BuildContext context) => on && MediaQuery.sizeOf(context).width >= wideFrom;

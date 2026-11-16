@@ -2,6 +2,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
+import 'desktop_layout.dart';
 import 'motion.dart';
 
 /// Regular glass for bars, sheets and anything with text; clear glass only
@@ -204,9 +205,15 @@ class GlassScrollView extends StatefulWidget {
     this.subtitle,
     this.physics,
     this.controller,
+    this.maxContentWidth,
   });
 
   final String title;
+
+  /// On a computer, keeps the title and [slivers] this wide and centred
+  /// (see [DesktopLayout.pad]). Null: full width (grids, desktop pages
+  /// with their own layout).
+  final double? maxContentWidth;
 
   /// The page's scroll position, for a page that scrolls itself (e.g. while
   /// something is dragged near the edge); one is made when not given.
@@ -262,6 +269,8 @@ class _GlassScrollViewState extends State<GlassScrollView> {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final max = widget.maxContentWidth;
+    final inset = max == null ? 0.0 : DesktopLayout.inset(context, max: max);
     return NotificationListener<ScrollNotification>(
       onNotification: _onScroll,
       child: CustomScrollView(controller: _scroll, physics: widget.physics, slivers: [
@@ -284,7 +293,7 @@ class _GlassScrollViewState extends State<GlassScrollView> {
         ),
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            padding: EdgeInsets.fromLTRB(20 + inset, 0, 20 + inset, 8),
             child: AnimatedOpacity(
               opacity: _scrolled ? 0 : 1,
               duration: const Duration(milliseconds: 160),
@@ -297,7 +306,8 @@ class _GlassScrollViewState extends State<GlassScrollView> {
             ),
           ),
         ),
-        ...widget.slivers,
+        for (final s in widget.slivers)
+          inset == 0 ? s : SliverPadding(padding: EdgeInsets.symmetric(horizontal: inset), sliver: s),
       ]),
     );
   }

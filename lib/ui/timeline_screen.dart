@@ -6,6 +6,7 @@ import 'anim.dart';
 import '../data/dates.dart';
 import '../data/trip_days.dart';
 import '../scan/scan_controller.dart';
+import 'desktop_layout.dart';
 import 'photo_viewer.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -136,7 +137,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
           ? const Center(child: CircularProgressIndicator())
           : days.isEmpty
               ? const EmptyIllustration(message: 'No dated photos in this trip yet.')
-              : ListView(padding: const EdgeInsets.only(bottom: 32), children: [
+              : ListView(padding: DesktopLayout.pad(context, const EdgeInsets.only(bottom: 32)), children: [
                   if (mapped.length >= 2)
                     Padding(
                       padding: const EdgeInsets.all(16),

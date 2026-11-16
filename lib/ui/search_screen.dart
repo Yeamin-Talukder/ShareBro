@@ -9,6 +9,7 @@ import '../data/search.dart';
 import '../face/tags.dart' show labelPrefix;
 import '../scan/scan_controller.dart';
 import 'aurora.dart';
+import 'desktop_layout.dart';
 import 'explore_screen.dart' show builtInCategories, categoryIcon;
 import 'gallery_view.dart';
 import 'motion.dart';
@@ -157,7 +158,7 @@ class _SearchScreenState extends State<SearchScreen> {
           bottom: false,
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(4, 8, 16, 8),
+              padding: DesktopLayout.pad(context, const EdgeInsets.fromLTRB(4, 8, 16, 8)),
               child: Row(children: [
                 const BackButton(),
                 Expanded(
@@ -194,7 +195,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 height: 46,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  padding: DesktopLayout.pad(context, const EdgeInsets.symmetric(horizontal: 12)),
                   children: [
                     for (final t in _terms)
                       Padding(
@@ -267,7 +268,7 @@ class _SearchScreenState extends State<SearchScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Wrap(spacing: 8, runSpacing: 8, children: children),
         );
-    return ListView(padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 24), children: [
+    return ListView(padding: DesktopLayout.pad(context, EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 24)), children: [
       if (_people.isNotEmpty) ...[
         const Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: SectionHeader(title: 'People', top: 12)),
         SizedBox(

@@ -4,6 +4,7 @@ import 'package:photo_manager/photo_manager.dart';
 
 import '../data/duplicates.dart';
 import '../scan/scan_controller.dart';
+import 'desktop_layout.dart';
 import 'motion.dart';
 import 'photo_viewer.dart';
 import 'widgets.dart';
@@ -160,7 +161,7 @@ class _DuplicatesScreenState extends State<DuplicatesScreen> {
               ? const EmptyIllustration(
                   message: 'No near-duplicate photos found.\n'
                       'Scan an album and bursts or repeated poses show up here.')
-              : ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
+              : ListView(padding: DesktopLayout.pad(context, const EdgeInsets.fromLTRB(16, 8, 16, 32)), children: [
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(16),

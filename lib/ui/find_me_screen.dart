@@ -5,9 +5,11 @@ import 'package:flutter/services.dart';
 import 'anim.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../platform/device.dart';
 import '../scan/scan_controller.dart';
 import '../share/server.dart';
 import 'aurora.dart';
+import 'desktop_layout.dart';
 import 'glass.dart';
 import 'motion.dart';
 import 'sections.dart';
@@ -83,6 +85,7 @@ class _FindMeScreenState extends State<FindMeScreen> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: GlassScrollView(
+          maxContentWidth: DesktopLayout.pageWidth,
           title: 'Find my photos',
           subtitle: link?.title ?? widget.tripName ?? 'All photos',
           slivers: [
@@ -136,8 +139,8 @@ class _FindMeScreenState extends State<FindMeScreen> {
                       ]),
                     ),
                     const SectionHeader(title: 'How it works'),
-                    SectionCard.rows(rows: const [
-                      SectionRow(
+                    SectionCard.rows(rows: [
+                      const SectionRow(
                         leading: IconTile(icon: Icons.qr_code_scanner_rounded, color: Color(0xFF5E5CE6)),
                         title: 'Friends scan the code',
                         subtitle: 'With the phone camera, no app needed',
@@ -145,7 +148,7 @@ class _FindMeScreenState extends State<FindMeScreen> {
                       SectionRow(
                         leading: IconTile(icon: Icons.camera_front_rounded, color: Color(0xFFFF9F0A)),
                         title: 'They take a selfie',
-                        subtitle: 'This phone works out who they are',
+                        subtitle: 'This ${Device.noun} works out who they are',
                       ),
                       SectionRow(
                         leading: IconTile(icon: Icons.photo_library_rounded, color: Color(0xFF30D158)),
@@ -174,9 +177,9 @@ class _FindMeScreenState extends State<FindMeScreen> {
                             : link.found.join(', '),
                       ),
                     ]),
-                    const SectionFooter(
+                    SectionFooter(
                       'Everyone needs to be on the same Wi‑Fi as you, or on your hotspot. Selfies are checked on this '
-                      'phone and deleted straight away. Someone holding up a photo of a friend could get that friend\'s '
+                      '${Device.noun} and deleted straight away. Someone holding up a photo of a friend could get that friend\'s '
                       'photos, so add a PIN in a crowd. The link keeps working in the background until you stop it.',
                     ),
                     const SizedBox(height: 18),

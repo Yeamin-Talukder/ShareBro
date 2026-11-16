@@ -7,6 +7,7 @@ import '../data/dates.dart';
 import '../scan/scan_controller.dart';
 import '../share/send_center.dart';
 import 'aurora.dart';
+import 'desktop_layout.dart';
 import 'devices.dart';
 import 'find_me_screen.dart';
 import 'glass.dart';
@@ -112,6 +113,7 @@ class _SendCenterScreenState extends State<SendCenterScreen> {
             final finds = s.server.finds.values.toList();
             final r = s.receiver;
             return GlassScrollView(
+              maxContentWidth: DesktopLayout.pageWidth,
               title: 'Sending',
               actions: [
                 ToolbarCapsule(children: [

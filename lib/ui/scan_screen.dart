@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'anim.dart';
 
 import '../data/db.dart';
+import '../platform/device.dart';
 import '../scan/scan_controller.dart';
+import 'desktop_layout.dart';
 import 'motion.dart';
 import 'review_screen.dart';
 import 'aurora.dart';
@@ -131,7 +133,7 @@ class _ScanScreenState extends State<ScanScreen> {
         SliverFillRemaining(
           hasScrollBody: false,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: DesktopLayout.pad(context, const EdgeInsets.symmetric(horizontal: 16)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text('Scanning', style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.7)),
               if (c.albumName != null)
@@ -252,7 +254,11 @@ class _ScanScreenState extends State<ScanScreen> {
                 ]),
               ),
               const Spacer(),
-              const SectionFooter('You can lock your phone; scanning keeps going in the background.', align: TextAlign.center),
+              SectionFooter(
+                Device.desktop
+                    ? 'You can keep using your computer; scanning keeps going while ShareBro is open.'
+                    : 'You can lock your phone; scanning keeps going in the background.',
+                align: TextAlign.center),
               SafeArea(
                 top: false,
                 child: Padding(

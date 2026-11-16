@@ -7,9 +7,11 @@ import 'package:image_picker/image_picker.dart';
 
 import '../data/db.dart';
 import '../data/profile.dart';
+import '../platform/device.dart';
 import '../scan/scan_controller.dart';
 import '../share/net.dart';
 import 'aurora.dart';
+import 'desktop_layout.dart';
 import 'glass.dart';
 import 'motion.dart';
 import 'sections.dart';
@@ -185,6 +187,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ? 'More photos of you match better'
                         : 'From $n ${p.source == FaceSource.upload ? 'photos' : 'selfies and photos'}';
             return GlassScrollView(
+              maxContentWidth: DesktopLayout.pageWidth,
               title: 'Profile',
               subtitle: 'Who you are to other phones',
               slivers: [
@@ -266,8 +269,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                     ],
-                    const SectionFooter(
-                      'Your photos and selfies never leave this phone. Only a face fingerprint (a list of numbers) and '
+                    SectionFooter(
+                      'Your photos and selfies never leave this ${Device.noun}. Only a face fingerprint (a list of numbers) and '
                       'a small crop for your picture are shared, and only with groups you join.',
                     ),
                   ]),

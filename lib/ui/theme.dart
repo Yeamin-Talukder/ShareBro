@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/db.dart';
+import '../platform/device.dart';
 
 /// Light or dark: follow the phone (the default), or always one of them.
 /// Picked in Settings and remembered.
@@ -159,6 +160,9 @@ ThemeData buildTheme(ColorScheme scheme) {
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
       backgroundColor: dark ? const Color(0xF51C1A22) : const Color(0xF7FFFFFF),
+      // On a computer a sheet is a panel of readable width, not the whole
+      // window's width.
+      constraints: Device.desktop ? const BoxConstraints(maxWidth: 640) : null,
       modalBarrierColor: Colors.black.withAlpha(90),
       elevation: 0,
     ),

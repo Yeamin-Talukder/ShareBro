@@ -9,6 +9,10 @@ import 'package:flutter/foundation.dart';
 abstract final class Device {
   static bool get android => defaultTargetPlatform == TargetPlatform.android;
 
+  /// What people call this device in a sentence: "phone" or "computer"
+  /// ("never leaves this phone").
+  static String get noun => desktop ? 'computer' : 'phone';
+
   static bool get phone =>
       defaultTargetPlatform == TargetPlatform.android ||
       defaultTargetPlatform == TargetPlatform.iOS;

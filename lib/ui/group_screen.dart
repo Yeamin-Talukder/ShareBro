@@ -6,10 +6,12 @@ import 'package:flutter/services.dart';
 import 'anim.dart';
 
 import '../data/group_match.dart';
+import '../platform/device.dart';
 import '../scan/scan_controller.dart';
 import '../share/group.dart';
 import '../share/send_center.dart';
 import 'aurora.dart';
+import 'desktop_layout.dart';
 import 'devices.dart' show deviceColor;
 import 'gallery_view.dart';
 import 'glass.dart';
@@ -185,6 +187,7 @@ class _TripGroupScreenState extends State<TripGroupScreen> {
   Widget _lobby(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return GlassScrollView(
+      maxContentWidth: DesktopLayout.pageWidth,
       title: 'Trip group',
       subtitle: 'Each photo goes only to the people in it',
       actions: [
@@ -262,7 +265,7 @@ class _TripGroupScreenState extends State<TripGroupScreen> {
                   Text(hub.searching ? 'Looking for groups…' : 'No groups nearby yet',
                       style: const TextStyle(fontSize: TextSize.body, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
-                  Text('Be on the same Wi‑Fi or hotspot as the phone that started it.',
+                  Text('Be on the same Wi‑Fi or hotspot as the device that started it.',
                       textAlign: TextAlign.center, style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
                 ]),
               )
@@ -293,6 +296,7 @@ class _TripGroupScreenState extends State<TripGroupScreen> {
     final me = c.sharing.identity.fingerprint;
     final jobs = [for (final j in c.sharing.jobs) if (j.groupId == g.id) j];
     return GlassScrollView(
+      maxContentWidth: DesktopLayout.pageWidth,
       title: g.name,
       subtitle: g.hosting ? 'Trip group · you started it' : 'Trip group · started by ${g.host?.alias ?? 'a friend'}',
       actions: [
@@ -399,7 +403,7 @@ class _TripGroupScreenState extends State<TripGroupScreen> {
             ),
             const SectionFooter(
               'Members\' phones accept photos from each other without asking while the group is open. '
-              'The group lasts until it\'s ended or ShareBro is closed on the phone that started it.',
+              'The group lasts until it\'s ended or ShareBro is closed on the device that started it.',
             ),
           ]),
         ),
@@ -625,6 +629,7 @@ class _GroupShareScreenState extends State<GroupShareScreen> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: GlassScrollView(
+          maxContentWidth: DesktopLayout.pageWidth,
           title: switch (_phase) {
             _Phase.looking || _Phase.matching => 'Who\'s in each photo',
             _Phase.review => 'Quick check',
@@ -632,7 +637,7 @@ class _GroupShareScreenState extends State<GroupShareScreen> {
           },
           subtitle: switch (_phase) {
             _Phase.looking => _toLook == 0 ? 'Looking at faces…' : 'Looking at new photos · $_looked of $_toLook',
-            _Phase.matching => 'Checked on this phone, nothing sent yet',
+            _Phase.matching => 'Checked on this ${Device.noun}, nothing sent yet',
             _Phase.review => 'So nothing goes to the wrong person',
             _Phase.ready => '${widget.assetIds.length} photos · $friends ${friends == 1 ? 'friend' : 'friends'} in them',
           },
@@ -693,8 +698,8 @@ class _GroupShareScreenState extends State<GroupShareScreen> {
                 SectionFooter(
                   _phase == _Phase.ready && plan != null
                       ? 'Each friend gets only the photos they\'re in. ${plan.stay} '
-                          '${plan.stay == 1 ? 'photo has' : 'photos have'} nobody else from the group and stay on this phone.'
-                      : 'Faces are compared on this phone with the group\'s face fingerprints.',
+                          '${plan.stay == 1 ? 'photo has' : 'photos have'} nobody else from the group and stay on this ${Device.noun}.'
+                      : 'Faces are compared on this ${Device.noun} with the group\'s face fingerprints.',
                   align: TextAlign.center,
                 ),
               ]),

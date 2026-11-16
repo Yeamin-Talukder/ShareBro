@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
@@ -18,6 +19,7 @@ import '../share/net.dart';
 import '../share/prepare.dart';
 import '../update/updater.dart';
 import 'app_lock.dart';
+import 'desktop_layout.dart';
 import 'island.dart';
 import 'profile_screen.dart';
 import 'sections.dart';
@@ -53,6 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) setState(() => _current = _preview = n);
     });
     _loadChips();
+    _scroll.addListener(_onScroll);
   }
 
   /// What scanning has learned about this phone's chips so far.
@@ -113,6 +116,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -196,6 +200,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _backup() async {
     final file = await makeBackup();
+    // A computer saves it where you choose; a phone shares it to an app.
+    if (DesktopLayout.on) {
+      final saved = await FilePicker.saveFile(
+        fileName: file.uri.pathSegments.last,
+        bytes: await file.readAsBytes(),
+        dialogTitle: 'Save the backup',
+      );
+      if (saved == null || !mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Backup saved. It contains face data, so keep it private.')),
+      );
+      return;
+    }
     await SharePlus.instance.share(
       ShareParams(
         files: [XFile(file.path)],
@@ -303,6 +320,316 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {});
     }
 
+    final desk = DesktopLayout.on;
+    final windows = defaultTargetPlatform == TargetPlatform.windows;
+
+    final profile = ListenableBuilder(
+      listenable: c,
+      builder: (context, _) => SectionCard(
+        child: SectionRow(
+          leading: CircleAvatar(
+            radius: 20,
+            backgroundColor: scheme.surfaceContainerHighest,
+            backgroundImage: c.profile.thumb == null ? null : MemoryImage(c.profile.thumb!),
+            child: c.profile.thumb == null ? Icon(Icons.face_rounded, color: scheme.onSurfaceVariant) : null,
+          ),
+          title: 'Profile',
+          subtitle: c.profile.isSet ? 'Your face is set · ${c.sharing.identity.alias}' : 'Set up your face for trip groups',
+          chevron: true,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(controller: c))),
+        ),
+      ),
+    );
+
+    final strictIntro = [
+      Text('Grouping strictness', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+      const SizedBox(height: 4),
+      Text(
+        'Loose puts more faces together (may mix people up). '
+        'Strict keeps groups clean (may split one person into several).',
+        style: text.bodySmall?.copyWith(fontSize: TextSize.label, color: scheme.onSurfaceVariant),
+      ),
+    ];
+    final strictSlider = [
+      Slider(
+        value: _value,
+        divisions: 20,
+        onChanged: _applying || c.running ? null : _onSlide,
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            Text('Loose', style: text.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+            const Spacer(),
+            Text('Strict', style: text.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
+          ],
+        ),
+      ),
+    ];
+    final strictPreview = AnimatedSwitcher(
+      duration: 250.ms,
+      transitionBuilder: (child, a) => ScaleTransition(
+        scale: a,
+        child: FadeTransition(opacity: a, child: child),
+      ),
+      child: _preview == null || _previewing
+          ? const SizedBox(
+              key: ValueKey('busy'),
+              height: 56,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : Column(
+              key: ValueKey(_preview),
+              children: [
+                Text(
+                  '≈ $_preview people',
+                  style: text.displaySmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: scheme.primary,
+                  ),
+                ),
+                if (_current != null && _preview != _current)
+                  Text('now $_current', style: text.bodySmall),
+              ],
+            ),
+    );
+    final strictApply = AnimatedSize(
+      duration: 250.ms,
+      child: changed
+          ? SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _applying ? null : _apply,
+                icon: _applying
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.auto_fix_high),
+                label: const Text('Regroup with this setting'),
+              ),
+            )
+          : const SizedBox(width: double.infinity),
+    );
+    final strictNote = Text(
+      'Named people and faces you fixed by hand are never changed.',
+      style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+    );
+    final grouping = SectionCard(
+      padding: const EdgeInsets.all(20),
+      child: desk
+          // Wide: the slider on the left, the live count beside it.
+          ? Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ...strictIntro,
+                  const SizedBox(height: 12),
+                  ...strictSlider,
+                  const SizedBox(height: 12),
+                  strictApply,
+                  const SizedBox(height: 4),
+                  strictNote,
+                ]),
+              ),
+              const SizedBox(width: 24),
+              SizedBox(width: 190, child: Center(child: strictPreview)),
+            ])
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ...strictIntro,
+                const SizedBox(height: 16),
+                ...strictSlider,
+                const SizedBox(height: 16),
+                Center(child: strictPreview),
+                const SizedBox(height: 16),
+                strictApply,
+                const SizedBox(height: 4),
+                strictNote,
+              ],
+            ),
+    );
+
+    final appearance = [
+      SectionCard(
+        padding: const EdgeInsets.all(8),
+        child: ValueListenableBuilder<ThemeMode>(
+          valueListenable: Appearance.mode,
+          builder: (context, mode, _) => CapsuleSwitch<ThemeMode>(
+            value: mode,
+            height: 44,
+            options: const [
+              (ThemeMode.system, 'System', null),
+              (ThemeMode.light, 'Light', null),
+              (ThemeMode.dark, 'Dark', null),
+            ],
+            onChanged: (m) => Appearance.set(c.db, m),
+          ),
+        ),
+      ),
+      SectionFooter(desk
+          ? 'System follows your computer\'s light or dark mode.'
+          : 'System follows your phone\'s dark mode setting.'),
+    ];
+
+    final sharing = [
+      SectionCard.rows(rows: [
+        SectionRow(
+          leading: const IconTile(icon: Icons.badge_rounded, color: Color(0xFF0A84FF)),
+          title: desk ? 'Name on other devices' : 'Name on other phones',
+          subtitle: c.sharing.identity.alias,
+          chevron: true,
+          onTap: _renameDevice,
+        ),
+        SectionRow(
+          leading: const IconTile(icon: Icons.hd_rounded, color: Color(0xFF5E5CE6)),
+          title: 'Default send quality',
+          subtitle: switch (c.sharing.defaultQuality) {
+            SendQuality.original => 'Original',
+            SendQuality.noLocation => 'Original without location',
+            SendQuality.smaller => 'Smaller (2048 px)',
+          },
+          chevron: true,
+          onTap: _pickQuality,
+        ),
+      ]),
+    ];
+
+    final general = [
+      SectionCard.rows(rows: [
+        SectionRow(
+          leading: const IconTile(icon: Icons.sync_rounded, color: Color(0xFF30B0C7)),
+          title: 'Auto-scan new photos',
+          subtitle: desk
+              ? 'When a scanned folder gets new photos, scan just those'
+              : 'When a scanned album gets new photos, scan just those',
+          trailing: Switch(value: c.autoScanEnabled, onChanged: setAutoScan),
+          onTap: () => setAutoScan(!c.autoScanEnabled),
+        ),
+        // Phones only: desktop scanning doesn't use the phone's chips.
+        if (!desk)
+          SectionRow(
+            leading: const IconTile(icon: Icons.memory_rounded, color: Color(0xFFFF375F)),
+            title: 'Face scanning chip',
+            subtitle: _chipSummary,
+            chevron: true,
+            onTap: _pickChip,
+          ),
+        SectionRow(
+          leading: const IconTile(icon: Icons.lock_rounded, color: Color(0xFF8E8E93)),
+          title: 'App lock',
+          subtitle: !desk
+              ? 'Fingerprint, face or screen lock to open the app'
+              : windows
+                  ? 'Windows Hello (face, fingerprint or PIN) to open the app'
+                  : 'Your computer\'s sign-in to open the app',
+          trailing: Switch(value: c.appLock, onChanged: setLock),
+          onTap: () => setLock(!c.appLock),
+        ),
+        SectionRow(
+          leading: const IconTile(icon: Icons.call_to_action_rounded, color: Color(0xFF48484A)),
+          title: 'Island at the top',
+          subtitle: 'Shows sending, receiving, scanning and requests in a pill. '
+              'Off: requests ask in a popup, messages show at the bottom',
+          trailing: Switch(value: Island.enabled.value, onChanged: setIsland),
+          onTap: () => setIsland(!Island.enabled.value),
+        ),
+      ]),
+    ];
+
+    final data = [
+      SectionCard.rows(rows: [
+        SectionRow(
+          leading: const IconTile(icon: Icons.pie_chart_rounded, color: Color(0xFFFF9F0A)),
+          title: 'Storage',
+          subtitle: 'Space used by trips, duplicates and screenshots',
+          chevron: true,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => StorageScreen(controller: c)),
+          ),
+        ),
+        SectionRow(
+          leading: const IconTile(icon: Icons.person_off_rounded, color: Color(0xFFAF52DE)),
+          title: 'Not in our group',
+          subtitle: 'People you hid, to bring back',
+          chevron: true,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => _IgnoredScreen(controller: c)),
+          ),
+        ),
+        SectionRow(
+          leading: const IconTile(icon: Icons.backup_rounded, color: Color(0xFF34C759)),
+          title: 'Back up',
+          subtitle: 'Names, faces, trips and groups to one file (not the photos)',
+          enabled: !c.running,
+          onTap: _backup,
+        ),
+        SectionRow(
+          leading: const IconTile(icon: Icons.settings_backup_restore_rounded, color: Color(0xFF30B0C7)),
+          title: 'Restore from backup',
+          subtitle: 'Replaces what\'s in the app now',
+          enabled: !c.running,
+          onTap: _restore,
+        ),
+      ]),
+      const SizedBox(height: 22),
+      SectionCard(
+        child: SectionRow(
+          leading: IconTile(icon: Icons.delete_sweep_rounded, color: scheme.error),
+          title: 'Clear all face data',
+          subtitle: 'Photos are not affected',
+          destructive: true,
+          enabled: !c.running,
+          onTap: _confirmClear,
+        ),
+      ),
+    ];
+
+    final updates = [
+      ListenableBuilder(
+        listenable: Updater.instance,
+        builder: (context, _) {
+          final u = Updater.instance;
+          return SectionCard.rows(rows: [
+            SectionRow(
+              leading: const IconTile(icon: Icons.update_rounded, color: Color(0xFF34C759)),
+              title: 'Check for updates automatically',
+              subtitle: "Once a day, and tells you when there's a new version",
+              trailing: Switch(value: u.autoCheck, onChanged: u.setAutoCheck),
+              onTap: () => u.setAutoCheck(!u.autoCheck),
+            ),
+            SectionRow(
+              leading: const IconTile(icon: Icons.wifi_rounded, color: Color(0xFF0A84FF)),
+              title: 'Download on Wi-Fi only',
+              subtitle: 'On mobile data, asks first. Updates are about 90 MB',
+              trailing: Switch(value: u.wifiOnly, onChanged: u.setWifiOnly),
+              onTap: () => u.setWifiOnly(!u.wifiOnly),
+            ),
+          ]);
+        },
+      ),
+      const SectionFooter(
+        "Updates come from ShareBro's releases on GitHub and are checked before they install. "
+        'Only the version check goes online; nothing about you or your photos is sent.',
+      ),
+    ];
+
+    final sections = [
+      _Section('Profile', Icons.account_circle_outlined, [profile], header: false),
+      _Section('Face grouping', Icons.tune_rounded, [grouping], header: false),
+      _Section('Appearance', Icons.palette_outlined, appearance),
+      _Section('Sharing', Icons.swap_horiz_rounded, sharing),
+      _Section('General', Icons.settings_outlined, general),
+      _Section('Your data', Icons.storage_rounded, data),
+      if (Device.selfUpdate) _Section('Updates', Icons.system_update_alt_rounded, updates),
+      const _Section('About', Icons.info_outline_rounded, [_AboutCard()]),
+    ];
+
+    if (desk) return _desktop(context, sections);
+
     return Aurora(
       intensity: 0.7,
       child: Scaffold(
@@ -313,263 +640,189 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SliverPadding(
               padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.paddingOf(context).bottom + 24),
               sliver: SliverList.list(children: [
-                ListenableBuilder(
-                  listenable: c,
-                  builder: (context, _) => SectionCard(
-                    child: SectionRow(
-                      leading: CircleAvatar(
-                        radius: 20,
-                        backgroundColor: scheme.surfaceContainerHighest,
-                        backgroundImage: c.profile.thumb == null ? null : MemoryImage(c.profile.thumb!),
-                        child: c.profile.thumb == null ? Icon(Icons.face_rounded, color: scheme.onSurfaceVariant) : null,
-                      ),
-                      title: 'Profile',
-                      subtitle: c.profile.isSet ? 'Your face is set · ${c.sharing.identity.alias}' : 'Set up your face for trip groups',
-                      chevron: true,
-                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(controller: c))),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SectionCard(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Grouping strictness', style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Loose puts more faces together (may mix people up). '
-                        'Strict keeps groups clean (may split one person into several).',
-                        style: text.bodySmall?.copyWith(fontSize: TextSize.label, color: scheme.onSurfaceVariant),
-                      ),
-                      const SizedBox(height: 16),
-                      Slider(
-                        value: _value,
-                        divisions: 20,
-                        onChanged: _applying || c.running ? null : _onSlide,
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          children: [
-                            Text('Loose', style: text.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
-                            const Spacer(),
-                            Text('Strict', style: text.labelMedium?.copyWith(color: scheme.onSurfaceVariant)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Center(
-                        child: AnimatedSwitcher(
-                          duration: 250.ms,
-                          transitionBuilder: (child, a) => ScaleTransition(
-                            scale: a,
-                            child: FadeTransition(opacity: a, child: child),
-                          ),
-                          child: _preview == null || _previewing
-                              ? const SizedBox(
-                                  key: ValueKey('busy'),
-                                  height: 56,
-                                  child: Center(child: CircularProgressIndicator()),
-                                )
-                              : Column(
-                                  key: ValueKey(_preview),
-                                  children: [
-                                    Text(
-                                      '≈ $_preview people',
-                                      style: text.displaySmall?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        color: scheme.primary,
-                                      ),
-                                    ),
-                                    if (_current != null && _preview != _current)
-                                      Text('now $_current', style: text.bodySmall),
-                                  ],
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      AnimatedSize(
-                        duration: 250.ms,
-                        child: changed
-                            ? SizedBox(
-                                width: double.infinity,
-                                child: FilledButton.icon(
-                                  onPressed: _applying ? null : _apply,
-                                  icon: _applying
-                                      ? const SizedBox.square(
-                                          dimension: 18,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        )
-                                      : const Icon(Icons.auto_fix_high),
-                                  label: const Text('Regroup with this setting'),
-                                ),
-                              )
-                            : const SizedBox(width: double.infinity),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Named people and faces you fixed by hand are never changed.',
-                        style: text.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-                const SectionHeader(title: 'Appearance'),
-                SectionCard(
-                  padding: const EdgeInsets.all(8),
-                  child: ValueListenableBuilder<ThemeMode>(
-                    valueListenable: Appearance.mode,
-                    builder: (context, mode, _) => CapsuleSwitch<ThemeMode>(
-                      value: mode,
-                      height: 44,
-                      options: const [
-                        (ThemeMode.system, 'System', null),
-                        (ThemeMode.light, 'Light', null),
-                        (ThemeMode.dark, 'Dark', null),
-                      ],
-                      onChanged: (m) => Appearance.set(c.db, m),
-                    ),
-                  ),
-                ),
-                const SectionFooter('System follows your phone\'s dark mode setting.'),
-                const SectionHeader(title: 'Sharing'),
-                SectionCard.rows(rows: [
-                  SectionRow(
-                    leading: const IconTile(icon: Icons.badge_rounded, color: Color(0xFF0A84FF)),
-                    title: 'Name on other phones',
-                    subtitle: c.sharing.identity.alias,
-                    chevron: true,
-                    onTap: _renameDevice,
-                  ),
-                  SectionRow(
-                    leading: const IconTile(icon: Icons.hd_rounded, color: Color(0xFF5E5CE6)),
-                    title: 'Default send quality',
-                    subtitle: switch (c.sharing.defaultQuality) {
-                      SendQuality.original => 'Original',
-                      SendQuality.noLocation => 'Original without location',
-                      SendQuality.smaller => 'Smaller (2048 px)',
-                    },
-                    chevron: true,
-                    onTap: _pickQuality,
-                  ),
-                ]),
-                const SectionHeader(title: 'General'),
-                SectionCard.rows(rows: [
-                  SectionRow(
-                    leading: const IconTile(icon: Icons.sync_rounded, color: Color(0xFF30B0C7)),
-                    title: 'Auto-scan new photos',
-                    subtitle: 'When a scanned album gets new photos, scan just those',
-                    trailing: Switch(value: c.autoScanEnabled, onChanged: setAutoScan),
-                    onTap: () => setAutoScan(!c.autoScanEnabled),
-                  ),
-                  SectionRow(
-                    leading: const IconTile(icon: Icons.memory_rounded, color: Color(0xFFFF375F)),
-                    title: 'Face scanning chip',
-                    subtitle: _chipSummary,
-                    chevron: true,
-                    onTap: _pickChip,
-                  ),
-                  SectionRow(
-                    leading: const IconTile(icon: Icons.lock_rounded, color: Color(0xFF8E8E93)),
-                    title: 'App lock',
-                    subtitle: 'Fingerprint, face or screen lock to open the app',
-                    trailing: Switch(value: c.appLock, onChanged: setLock),
-                    onTap: () => setLock(!c.appLock),
-                  ),
-                  SectionRow(
-                    leading: const IconTile(icon: Icons.call_to_action_rounded, color: Color(0xFF48484A)),
-                    title: 'Island at the top',
-                    subtitle: 'Shows sending, receiving, scanning and requests in a pill. '
-                        'Off: requests ask in a popup, messages show at the bottom',
-                    trailing: Switch(value: Island.enabled.value, onChanged: setIsland),
-                    onTap: () => setIsland(!Island.enabled.value),
-                  ),
-                ]),
-                const SectionHeader(title: 'Your data'),
-                SectionCard.rows(rows: [
-                  SectionRow(
-                    leading: const IconTile(icon: Icons.pie_chart_rounded, color: Color(0xFFFF9F0A)),
-                    title: 'Storage',
-                    subtitle: 'Space used by trips, duplicates and screenshots',
-                    chevron: true,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => StorageScreen(controller: c)),
-                    ),
-                  ),
-                  SectionRow(
-                    leading: const IconTile(icon: Icons.person_off_rounded, color: Color(0xFFAF52DE)),
-                    title: 'Not in our group',
-                    subtitle: 'People you hid, to bring back',
-                    chevron: true,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => _IgnoredScreen(controller: c)),
-                    ),
-                  ),
-                  SectionRow(
-                    leading: const IconTile(icon: Icons.backup_rounded, color: Color(0xFF34C759)),
-                    title: 'Back up',
-                    subtitle: 'Names, faces, trips and groups to one file (not the photos)',
-                    enabled: !c.running,
-                    onTap: _backup,
-                  ),
-                  SectionRow(
-                    leading: const IconTile(icon: Icons.settings_backup_restore_rounded, color: Color(0xFF30B0C7)),
-                    title: 'Restore from backup',
-                    subtitle: 'Replaces what\'s in the app now',
-                    enabled: !c.running,
-                    onTap: _restore,
-                  ),
-                ]),
-                const SizedBox(height: 22),
-                SectionCard(
-                  child: SectionRow(
-                    leading: IconTile(icon: Icons.delete_sweep_rounded, color: scheme.error),
-                    title: 'Clear all face data',
-                    subtitle: 'Photos are not affected',
-                    destructive: true,
-                    enabled: !c.running,
-                    onTap: _confirmClear,
-                  ),
-                ),
-                if (Device.selfUpdate) ...[
-                const SectionHeader(title: 'Updates'),
-                ListenableBuilder(
-                  listenable: Updater.instance,
-                  builder: (context, _) {
-                    final u = Updater.instance;
-                    return SectionCard.rows(rows: [
-                      SectionRow(
-                        leading: const IconTile(icon: Icons.update_rounded, color: Color(0xFF34C759)),
-                        title: 'Check for updates automatically',
-                        subtitle: "Once a day, and tells you when there's a new version",
-                        trailing: Switch(value: u.autoCheck, onChanged: u.setAutoCheck),
-                        onTap: () => u.setAutoCheck(!u.autoCheck),
-                      ),
-                      SectionRow(
-                        leading: const IconTile(icon: Icons.wifi_rounded, color: Color(0xFF0A84FF)),
-                        title: 'Download on Wi-Fi only',
-                        subtitle: 'On mobile data, asks first. Updates are about 90 MB',
-                        trailing: Switch(value: u.wifiOnly, onChanged: u.setWifiOnly),
-                        onTap: () => u.setWifiOnly(!u.wifiOnly),
-                      ),
-                    ]);
-                  },
-                ),
-                const SectionFooter(
-                  "Updates come from ShareBro's releases on GitHub and are checked before they install. "
-                  'Only the version check goes online; nothing about you or your photos is sent.',
-                ),
+                for (final (i, s) in sections.indexed) ...[
+                  if (s.header)
+                    SectionHeader(title: s.title)
+                  else if (i > 0)
+                    const SizedBox(height: 16),
+                  ...s.children,
                 ],
-                const SectionHeader(title: 'About'),
-                const _AboutCard(),
               ]),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ---- Desktop: a list of sections on the left, the page beside it ----
+
+  final _scroll = ScrollController();
+  final _pageKey = GlobalKey();
+  final List<GlobalKey> _sectionKeys = [];
+  int _section = 0;
+
+  /// How far below the top of the page a section has to reach to count as
+  /// the one being read (clears the title bar).
+  static const _readLine = 110.0;
+
+  double? _topOf(GlobalKey key) {
+    final box = key.currentContext?.findRenderObject() as RenderBox?;
+    final page = _pageKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || page == null || !box.attached) return null;
+    return box.localToGlobal(Offset.zero).dy - page.localToGlobal(Offset.zero).dy;
+  }
+
+  /// Highlights the section being read as the page scrolls.
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    var current = 0;
+    final p = _scroll.position;
+    if (p.pixels >= p.maxScrollExtent - 4) {
+      current = _sectionKeys.length - 1;
+    } else {
+      for (final (i, k) in _sectionKeys.indexed) {
+        final top = _topOf(k);
+        if (top != null && top <= _readLine) current = i;
+      }
+    }
+    if (current != _section) setState(() => _section = current);
+  }
+
+  void _jumpTo(int i) {
+    final top = _topOf(_sectionKeys[i]);
+    if (top == null || !_scroll.hasClients) return;
+    final p = _scroll.position;
+    final target = (p.pixels + top - _readLine + 24).clamp(0.0, p.maxScrollExtent);
+    setState(() => _section = i);
+    if (reduceMotion) {
+      _scroll.jumpTo(target);
+    } else {
+      _scroll.animateTo(target, duration: 320.ms, curve: Curves.easeOutCubic);
+    }
+  }
+
+  Widget _desktop(BuildContext context, List<_Section> sections) {
+    while (_sectionKeys.length < sections.length) {
+      _sectionKeys.add(GlobalKey());
+    }
+    final section = _section.clamp(0, sections.length - 1);
+    return Aurora(
+      intensity: 0.5,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: LayoutBuilder(builder: (context, box) {
+          final nav = box.maxWidth >= DesktopLayout.twoColumnsFrom;
+          final page = KeyedSubtree(
+            key: _pageKey,
+            child: GlassScrollView(
+              title: 'Settings',
+              controller: _scroll,
+              slivers: [
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(nav ? 8 : 24, 8, 24, 48),
+                  sliver: SliverToBoxAdapter(
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      // Rows stay a readable length on a wide window.
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 760),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                          for (final (i, s) in sections.indexed)
+                            KeyedSubtree(
+                              key: _sectionKeys[i],
+                              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                                SectionHeader(title: s.title, top: i == 0 ? 4 : 30),
+                                ...s.children,
+                              ]),
+                            ),
+                        ]),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+          if (!nav) return page;
+          return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SizedBox(
+              width: 220,
+              child: _SettingsNav(
+                sections: sections,
+                selected: section,
+                onSelect: _jumpTo,
+              ),
+            ),
+            Expanded(child: page),
+          ]);
+        }),
+      ),
+    );
+  }
+}
+
+/// One part of Settings: its title (and icon, for the desktop list).
+class _Section {
+  const _Section(this.title, this.icon, this.children, {this.header = true});
+
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+
+  /// Phones show a header above it; Profile and grouping go without one.
+  final bool header;
+}
+
+/// Desktop: the list of sections beside the page, like a settings app's
+/// sidebar. Clicking one scrolls the page to it.
+class _SettingsNav extends StatelessWidget {
+  const _SettingsNav({required this.sections, required this.selected, required this.onSelect});
+
+  final List<_Section> sections;
+  final int selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SafeArea(
+      right: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 96, 8, 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (final (i, s) in sections.indexed)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2),
+              child: Material(
+                color: i == selected ? scheme.primary.withAlpha(26) : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => onSelect(i),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    child: Row(children: [
+                      Icon(s.icon, size: 20, color: i == selected ? scheme.primary : scheme.onSurfaceVariant),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          s.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: TextSize.label,
+                            fontWeight: i == selected ? FontWeight.w700 : FontWeight.w500,
+                            color: i == selected ? scheme.primary : scheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+        ]),
       ),
     );
   }
