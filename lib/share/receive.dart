@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import '../data/db.dart';
+import '../platform/device.dart';
 import '../scan/background.dart';
 import 'native_files.dart';
 
@@ -250,7 +251,11 @@ class Receiver extends ChangeNotifier {
       final name = parts.isEmpty ? 'file' : parts.last;
       final folder = parts.length > 1 ? parts.sublist(0, parts.length - 1).join('/') : null;
       final String location;
-      if (f.mime.startsWith('video/')) {
+      if (!Device.photoLibrary) {
+        // No phone gallery on desktop: everything goes to Downloads\ShareBro.
+        location = await NativeFiles.saveToDownloads(tmp.path, name, f.mime, dir: folder) ?? '';
+        s.savedFiles++;
+      } else if (f.mime.startsWith('video/')) {
         final saved = await PhotoManager.editor.saveVideo(tmp, title: name, relativePath: 'Movies/$receivedAlbum');
         s.savedIds.add(saved.id);
         location = saved.id;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'anim.dart';
 
 import '../data/db.dart';
+import '../platform/device.dart';
 import '../scan/scan_controller.dart';
 import '../share/prepare.dart';
 import '../share/protocol.dart';
@@ -272,8 +273,10 @@ class _SendSheetState extends State<_SendSheet> {
                   ),
                 ]),
               ),
-            _Section('Phones with this app — no Wi-Fi needed', Icons.bluetooth_searching),
-            if (!s.nearby.discovering)
+            if (Device.nearbyNoNetwork) _Section('Phones with this app — no Wi-Fi needed', Icons.bluetooth_searching),
+            if (!Device.nearbyNoNetwork)
+              const SizedBox.shrink()
+            else if (!s.nearby.discovering)
               _OptionTile(
                 icon: Icons.bluetooth_searching,
                 title: 'Find phones nearby',

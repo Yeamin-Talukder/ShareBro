@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'anim.dart';
 
+import '../platform/device.dart';
 import '../scan/scan_controller.dart';
 import '../share/receive.dart';
 import '../share/notify.dart';
@@ -10,6 +11,7 @@ import '../share/send_center.dart';
 import '../update/updater.dart';
 import 'app_lock.dart';
 import 'aurora.dart';
+import 'desktop_soon.dart';
 import 'explore_screen.dart';
 import 'gallery_screen.dart';
 import 'launch_clink.dart';
@@ -144,8 +146,9 @@ class _RootScreenState extends State<RootScreen> {
     final c = widget.controller;
     final tabs = [
       HomeScreen(controller: c),
-      PhotosTab(controller: c),
-      AlbumsTab(controller: c),
+      // The gallery tabs need the phone's photo library.
+      if (Device.photoLibrary) PhotosTab(controller: c) else const DesktopSoon(title: 'Photos'),
+      if (Device.photoLibrary) AlbumsTab(controller: c) else const DesktopSoon(title: 'Albums'),
       ExploreTab(controller: c),
       ShareTab(controller: c),
     ];

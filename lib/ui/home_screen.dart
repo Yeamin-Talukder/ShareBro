@@ -7,11 +7,13 @@ import 'anim.dart';
 
 import '../data/dates.dart';
 import '../data/db.dart';
+import 'desktop_soon.dart';
 import 'permission_explainer.dart';
 import 'places_screen.dart';
 import 'theme.dart';
 import 'unmatched_screen.dart';
 import '../data/trip_days.dart';
+import '../platform/device.dart';
 import '../scan/scan_controller.dart';
 import 'face_cloud.dart';
 import 'find_me_screen.dart';
@@ -235,6 +237,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _pickAlbumAndScan() async {
+    if (!Device.photoLibrary) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text(desktopSoonMessage)));
+      return;
+    }
     if (!await ensurePhotoAccess(context) || !mounted) return;
     final choice = await showScanSheet(context);
     if (choice == null || !mounted) return;
@@ -448,7 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: EdgeInsets.only(
           bottom: math.max(0, MediaQuery.paddingOf(context).bottom - MediaQuery.viewPaddingOf(context).bottom),
         ),
-        child: ListenableBuilder(
+        child: !Device.photoLibrary ? null : ListenableBuilder(
           listenable: c,
           builder: (context, _) => _ScanButton(
             controller: c,
@@ -588,7 +594,9 @@ class _HomeScreenState extends State<HomeScreen> {
         else if (people.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
-            child: EmptyIllustration(
+            child: !Device.photoLibrary
+                ? const EmptyIllustration(message: desktopSoonMessage)
+                : EmptyIllustration(
               message: c.running
                   ? 'People will appear here when the scan finishes.'
                   : 'Scan a trip album or folder to group photos by the people in them.\n'

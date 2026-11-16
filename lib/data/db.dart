@@ -3,7 +3,11 @@ import 'dart:ui' show Rect;
 
 import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart' show databaseFactoryFfi, sqfliteFfiInit;
+
+import '../platform/device.dart';
 
 /// Faces narrower than this share of the photo are too small for ML Kit's
 /// eye-open, smile and head-turn readings to be trusted.
@@ -316,7 +320,16 @@ class AppDb {
   final transfersChanged = ValueNotifier<int>(0);
 
   static Future<AppDb> open() async {
-    final path = p.join(await getDatabasesPath(), 'photo_organizer.db');
+    final String path;
+    if (Device.desktop) {
+      // No sqflite plugin on desktop: use the bundled SQLite directly, and
+      // keep the database in the app's own data folder.
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
+      path = p.join((await getApplicationSupportDirectory()).path, 'photo_organizer.db');
+    } else {
+      path = p.join(await getDatabasesPath(), 'photo_organizer.db');
+    }
     final db = await openDatabase(
       path,
       version: 8,

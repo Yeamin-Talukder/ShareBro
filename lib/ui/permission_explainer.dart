@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart' show openAppSettings;
 
 import '../data/gallery.dart';
+import '../platform/device.dart';
 import '../share/nearby.dart';
 
 /// Says in one short sheet why ShareBro needs a permission, right before
@@ -90,6 +91,7 @@ Future<bool> ensurePhotoAccess(BuildContext context) async {
 /// [quiet] is for turning on Receive, which works over Wi-Fi without
 /// Nearby: it asks at most once per run and doesn't complain if refused.
 Future<bool> ensureNearbyAccess(BuildContext context, NearbyLink nearby, {bool quiet = false}) async {
+  if (!Device.nearbyNoNetwork) return false; // Android only
   if (await nearby.hasPermissions()) return true;
   if (quiet && _askedQuietly) return false;
   _askedQuietly = true;

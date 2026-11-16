@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'anim.dart';
 
 import '../data/db.dart';
+import '../platform/device.dart';
 import '../share/protocol.dart';
 import '../share/send_center.dart';
 import 'island.dart';
@@ -1409,7 +1410,8 @@ class _DevicePickerState extends State<DevicePicker> {
           enabled: !s.discovery.scanning,
           child: const ListTile(leading: Icon(Icons.refresh_rounded), title: Text('Scan again')),
         ),
-        CheckedPopupMenuItem(value: 1, checked: s.nearby.discovering, child: const Text('Find phones without Wi‑Fi')),
+        if (Device.nearbyNoNetwork)
+          CheckedPopupMenuItem(value: 1, checked: s.nearby.discovering, child: const Text('Find phones without Wi‑Fi')),
         const PopupMenuItem(
           value: 2,
           child: ListTile(leading: Icon(Icons.dialpad_rounded), title: Text('Connect by address…')),

@@ -21,6 +21,7 @@ import '../face/clustering.dart';
 import '../face/face_engine.dart';
 import '../face/gender.dart';
 import '../face/tags.dart';
+import '../platform/device.dart';
 import '../share/receive.dart' show receivedAlbum;
 import '../share/send_center.dart';
 import '../share/server.dart' show FindLink, WebShare;
@@ -188,6 +189,9 @@ class ScanController extends ChangeNotifier {
     autoScanEnabled = (await db.setting(_autoScanKey)) != '0';
     appLock = (await db.setting(_appLockKey)) == '1';
     faceChip = AccelChoice.byName(await db.setting(_faceChipKey));
+    // Desktop has no phone photo library (yet): nothing to backfill, scan
+    // or watch. Sharing works the same.
+    if (!Device.photoLibrary) return;
     backfillDates();
     unawaited(backfillLocations());
     unawaited(upgradeFaces());
@@ -264,6 +268,7 @@ class ScanController extends ChangeNotifier {
   /// Scans the album received photos are saved in (after the current scan,
   /// if one is running).
   Future<void> scanReceived() async {
+    if (!Device.photoLibrary) return;
     if (running) {
       _receivedPending = true;
       return;
@@ -602,6 +607,7 @@ class ScanController extends ChangeNotifier {
   /// A selfie from a "Find my photos" link: open (or reopen) a gallery of
   /// that person's photos.
   Future<({WebShare share, String name})?> _answerSelfie(FindLink link, File selfie) async {
+    if (!Device.photoLibrary) return null; // no faces scanned on desktop yet
     final found = await findInSelfie(selfie, tripId: link.tripId);
     if (found == null || found.photos.isEmpty) return null;
     final name = found.name ?? 'you';

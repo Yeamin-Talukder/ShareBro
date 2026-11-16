@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../data/dates.dart';
 import '../data/db.dart';
+import '../platform/device.dart';
 import '../share/notify.dart';
 import 'release.dart';
 
@@ -141,7 +142,9 @@ class Updater extends ChangeNotifier {
 
   /// The once-a-day check, when the app opens or comes back.
   Future<void> maybeCheck() async {
-    if (!autoCheck || busy || hasUpdate) return;
+    // Releases are Android APKs; desktop updates come later (see
+    // design/windows-port-plan.md).
+    if (!Device.selfUpdate || !autoCheck || busy || hasUpdate) return;
     final last = checkedAt;
     if (last != null && DateTime.now().difference(last) < const Duration(hours: 20)) return;
     await check();

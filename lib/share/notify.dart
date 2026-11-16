@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 import '../data/dates.dart';
+import '../platform/device.dart';
 import '../scan/scan_controller.dart';
 import '../ui/widgets.dart' show AssetThumb;
 import '../update/updater.dart';
@@ -206,7 +207,7 @@ class NotifyBridge with WidgetsBindingObserver {
   }
 
   Future<Uint8List?> _thumbFor(String? assetId, {int size = 160}) async {
-    if (assetId == null) return null;
+    if (assetId == null || !Device.photoLibrary) return null;
     final key = Object.hash(assetId, size);
     if (_thumbs.containsKey(key)) return _thumbs[key];
     final a = await AssetThumb.entity(assetId);

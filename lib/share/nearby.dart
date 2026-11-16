@@ -12,6 +12,7 @@ import 'native_files.dart';
 import 'prepare.dart';
 import 'receive.dart';
 import 'sender.dart';
+import '../platform/device.dart';
 
 /// Same id on every phone running this app, so they find each other.
 const _serviceId = 'com.photoorganizer.photo_organizer.share';
@@ -59,11 +60,11 @@ class NearbyLink extends ChangeNotifier {
   ];
 
   /// Asks for Bluetooth / nearby-devices (and location on older Android).
-  Future<bool> ensurePermissions() async =>
+  Future<bool> ensurePermissions() async => Device.nearbyNoNetwork &&
       nearbyAllowed(await _permissions.request(), await NativeFiles.androidSdk());
 
   /// Whether Nearby is already allowed, without asking.
-  Future<bool> hasPermissions() async => nearbyAllowed(
+  Future<bool> hasPermissions() async => Device.nearbyNoNetwork && nearbyAllowed(
         {for (final p in _permissions) p: await p.status},
         await NativeFiles.androidSdk(),
       );

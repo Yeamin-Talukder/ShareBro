@@ -11,6 +11,7 @@ import 'anim.dart';
 import '../data/backup.dart';
 import '../data/db.dart';
 import '../face/accel.dart';
+import '../platform/device.dart';
 import '../scan/scan_controller.dart';
 import '../share/native_files.dart';
 import '../share/net.dart';
@@ -534,6 +535,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: _confirmClear,
                   ),
                 ),
+                if (Device.selfUpdate) ...[
                 const SectionHeader(title: 'Updates'),
                 ListenableBuilder(
                   listenable: Updater.instance,
@@ -561,6 +563,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   "Updates come from ShareBro's releases on GitHub and are checked before they install. "
                   'Only the version check goes online; nothing about you or your photos is sent.',
                 ),
+                ],
                 const SectionHeader(title: 'About'),
                 const _AboutCard(),
               ]),
@@ -601,8 +604,10 @@ class _AboutCard extends StatelessWidget {
           ]),
         ),
         const Divider(height: 0.5, thickness: 0.5, indent: 16),
-        const _UpdateRow(),
-        const Divider(height: 0.5, thickness: 0.5, indent: 62),
+        if (Device.selfUpdate) ...[
+          const _UpdateRow(),
+          const Divider(height: 0.5, thickness: 0.5, indent: 62),
+        ],
         SectionRow(
           leading: const IconTile(icon: Icons.person_rounded, color: Color(0xFF636366)),
           title: 'Developer',

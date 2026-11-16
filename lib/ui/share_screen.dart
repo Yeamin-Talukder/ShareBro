@@ -8,6 +8,7 @@ import 'anim.dart';
 import '../data/dates.dart';
 import '../data/db.dart';
 import '../data/gallery.dart';
+import '../platform/device.dart';
 import '../scan/scan_controller.dart';
 import '../share/native_files.dart';
 import '../share/net.dart';
@@ -204,12 +205,12 @@ class _ShareTabState extends State<ShareTab> {
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 16, 8, 14),
             child: Row(children: [
-              _PickButton(icon: Icons.photo_library_outlined, label: 'Media', onTap: _pickMedia),
+              if (Device.photoLibrary) _PickButton(icon: Icons.photo_library_outlined, label: 'Media', onTap: _pickMedia),
               _PickButton(icon: Icons.insert_drive_file_outlined, label: 'Files', onTap: _pickFiles),
               _PickButton(icon: Icons.folder_outlined, label: 'Folder', onTap: _pickFolder),
               _PickButton(icon: Icons.notes_rounded, label: 'Text', onTap: _writeText),
               _PickButton(icon: Icons.content_paste_rounded, label: 'Paste', onTap: _paste),
-              _PickButton(icon: Icons.apps_rounded, label: 'Apps', onTap: _pickApps),
+              if (Device.installedApps) _PickButton(icon: Icons.apps_rounded, label: 'Apps', onTap: _pickApps),
             ]),
           ),
           // What's picked appears in the same card, ready to send.
@@ -278,6 +279,8 @@ class _ShareTabState extends State<ShareTab> {
           enabled: _items.isNotEmpty,
           onTap: () => shareItemsWithApps(List.of(_items)),
         ),
+        // Both match faces, which needs scanned photos (phone only for now).
+        if (Device.photoLibrary) ...[
         SectionRow(
           leading: const IconTile(icon: Icons.diversity_3_rounded, color: Color(0xFF30D158)),
           title: 'Trip group',
@@ -300,6 +303,7 @@ class _ShareTabState extends State<ShareTab> {
             MaterialPageRoute(builder: (_) => FindMeScreen(controller: c)),
           ),
         ),
+        ],
       ]),
       const SectionFooter(
         'Works with the free LocalSend app on Android, iPhone, Windows, Mac and Linux on the same Wi‑Fi or hotspot, '
