@@ -25,9 +25,9 @@ for group trips, weddings and events: the friend who took 2,000 photos can
 share them with everyone in minutes instead of hours. **Works 100% offline:
 no cloud, no uploads, no account.**
 
-### [⬇️ Download the APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) &nbsp;·&nbsp; [🌐 Website](https://yeamin-talukder.github.io/ShareBro/) &nbsp;·&nbsp; [▶️ 1-minute video](https://yeamin-talukder.github.io/ShareBro/#video)
+### [⬇️ Download the APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) &nbsp;·&nbsp; [🖥️ Windows (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.6.0-windows) &nbsp;·&nbsp; [🌐 Website](https://yeamin-talukder.github.io/ShareBro/) &nbsp;·&nbsp; [▶️ 1-minute video](https://yeamin-talukder.github.io/ShareBro/#video)
 
-<sub>Most phones: <code>ShareBro-…-arm64-v8a.apk</code> · Android 9 or newer · free</sub>
+<sub>Most phones: <code>ShareBro-…-arm64-v8a.apk</code> · Android 9 or newer · Windows 10 and 11 in preview · free</sub>
 
 </div>
 
@@ -44,7 +44,7 @@ no cloud, no uploads, no account.**
 | **Internet** | Not needed. Face recognition, search and sharing all run on the phone and the local network |
 | **Privacy** | Photos are never uploaded. No account, no analytics |
 | **Works with** | [LocalSend](https://localsend.org) on Android, iPhone, Windows, macOS and Linux, and any web browser |
-| **Get it** | APK from [GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) (not on the Play Store yet) |
+| **Get it** | APK from [GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) (not on the Play Store yet); [Windows installer](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.6.0-windows) in preview |
 | **Website** | [yeamin-talukder.github.io/ShareBro](https://yeamin-talukder.github.io/ShareBro/) |
 
 ---
@@ -453,6 +453,23 @@ and settings are kept.
 **Checking a download:** each release includes `SHA256SUMS.txt` with the
 checksum of every APK.
 
+### Windows (preview)
+
+1. Download **[`ShareBro-1.6.0-windows-setup.exe`](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.6.0-windows/ShareBro-1.6.0-windows-setup.exe)** (Windows 10
+   and 11, 64-bit) from the [Windows release](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.6.0-windows).
+2. Open it. If Windows says **"Windows protected your PC"**, choose
+   **More info › Run anyway**: the installer isn't signed yet.
+3. Follow the steps. ShareBro installs for your user (no admin password)
+   and appears in the Start menu; uninstall it from Settings › Apps.
+4. Open ShareBro and click **Scan folder** to pick a folder of trip photos.
+   When Windows Firewall asks, allow ShareBro on **private networks** so
+   phones on the same Wi-Fi can find your PC.
+
+On Windows, photos are read from the folders you scan (nothing is copied
+or moved), faces are matched the same way as on the phone, and received
+files go to `Downloads\ShareBro`. Not there yet: scene categories,
+smile / eyes-open picks, HEIC and RAW photos, and videos.
+
 ## FAQ
 
 <details open>
@@ -847,6 +864,7 @@ from History.
 
 | Version | Highlights |
 |---|---|
+| [**Windows 1.6.0** (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.6.0-windows) | First desktop version: scan folders on your PC, People cards, a photo viewer with face names, and sending to phones nearby |
 | [**v1.6.0**](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.6.0) | Photos show on Xiaomi/Redmi and other Android 13 phones; Nearby works on Android 9–11; clear permission screens; easier to read with large text, "Remove animations" and a deeper coral |
 | [v1.5.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.5.0) | Updates from inside the app; face scanning on the GPU or NPU when it's faster; a tidier People page; quicker page changes |
 | [v1.4.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.4.0) | Search by place name (towns, spots and countries, offline); Places cards show the town |
@@ -859,8 +877,9 @@ from History.
 
 ## Known limitations
 
-- **Android only.** The iOS and Windows folders are Flutter scaffolding and
-  aren't tested. iPhones can still receive photos (LocalSend or a browser).
+- **Android and Windows (preview) only.** The iOS, macOS and Linux folders
+  are Flutter scaffolding and aren't tested. iPhones can still receive
+  photos (LocalSend or a browser).
 - **Not on the Play Store yet.** Install the APK from GitHub Releases.
 - **Sharing needs the same network.** Nearby sending, links and Find my
   photos work on a shared Wi-Fi or hotspot, not over the internet. ShareBro
