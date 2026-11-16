@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter, lerpDouble;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'anim.dart';
@@ -10,6 +11,7 @@ import 'package:video_player/video_player.dart';
 import '../data/dates.dart';
 import '../data/db.dart';
 import '../scan/scan_controller.dart';
+import 'desktop_keys.dart';
 import 'desktop_layout.dart';
 import 'fast_thumb.dart';
 import 'glass.dart';
@@ -128,10 +130,13 @@ class _PhotoViewerState extends State<PhotoViewer> with TickerProviderStateMixin
     super.initState();
     // Desktop: the filmstrip opens on the photo you clicked.
     if (DesktopLayout.on) WidgetsBinding.instance.addPostFrameCallback((_) => _centreFilmstrip(jump: true));
+    DesktopKeys.escClaims.add(this);
   }
 
   @override
   void dispose() {
+    DesktopKeys.escClaims.remove(this);
+    _zoomCmd.dispose();
     _pages.dispose();
     _settle.dispose();
     _infoAnim.dispose();
@@ -293,6 +298,7 @@ class _PhotoViewerState extends State<PhotoViewer> with TickerProviderStateMixin
             // Desktop outlines every face, with names.
             outlines: desktop && _highlight,
             db: widget.controller.db,
+            commands: _zoomCmd,
             onZoomChanged: (z) {
               if (i == _index && z != _zoomed) setState(() => _zoomed = z);
             },
@@ -310,6 +316,31 @@ class _PhotoViewerState extends State<PhotoViewer> with TickerProviderStateMixin
   }
 
   // ---- Desktop ----
+
+  // Two-finger swipe on a touchpad: how far it went sideways, on which
+  // photo it started, and whether it turned into a pinch.
+  double _swipeDx = 0;
+  int _swipeFrom = 0;
+  bool _swipePinch = false;
+
+  void _swipeStart(PointerPanZoomStartEvent e) {
+    _swipeDx = 0;
+    _swipeFrom = _index;
+    _swipePinch = false;
+  }
+
+  void _swipeUpdate(PointerPanZoomUpdateEvent e) {
+    if ((e.scale - 1).abs() > 0.04) _swipePinch = true;
+    _swipeDx = e.pan.dx;
+  }
+
+  void _swipeEnd(PointerPanZoomEndEvent e) {
+    // Zoomed in, the fingers move the photo; a pinch zooms. And if the
+    // pages already turned with the fingers, that was the swipe.
+    if (_zoomed || _swipePinch || _index != _swipeFrom) return;
+    if (_swipeDx.abs() < 90) return;
+    _go(_index + (_swipeDx < 0 ? 1 : -1));
+  }
 
   /// Keys go to the viewer as soon as it opens.
   final _keys = FocusNode(debugLabel: 'Photo viewer');
@@ -348,10 +379,36 @@ class _PhotoViewerState extends State<PhotoViewer> with TickerProviderStateMixin
     }
   }
 
+  /// Zoom asked for from the keyboard; the photo on screen follows it.
+  final _zoomCmd = _ZoomCommand();
+
   KeyEventResult _onKey(FocusNode node, KeyEvent e) {
     if (e is KeyUpEvent) return KeyEventResult.ignored;
     final k = e.logicalKey;
     final repeat = e is KeyRepeatEvent;
+    // Alt + Left is "back" (closes the viewer), not the previous photo.
+    if (HardwareKeyboard.instance.isAltPressed || HardwareKeyboard.instance.isControlPressed) {
+      return KeyEventResult.ignored;
+    }
+    if (k == LogicalKeyboardKey.equal || k == LogicalKeyboardKey.numpadAdd) {
+      _zoomCmd.send(1.25);
+      return KeyEventResult.handled;
+    } else if (k == LogicalKeyboardKey.minus || k == LogicalKeyboardKey.numpadSubtract) {
+      _zoomCmd.send(0.8);
+      return KeyEventResult.handled;
+    } else if (k == LogicalKeyboardKey.digit0 || k == LogicalKeyboardKey.numpad0) {
+      _zoomCmd.send(0);
+      return KeyEventResult.handled;
+    } else if (k == LogicalKeyboardKey.home && !repeat) {
+      _go(0);
+      return KeyEventResult.handled;
+    } else if (k == LogicalKeyboardKey.end && !repeat) {
+      _go(_ids.length - 1);
+      return KeyEventResult.handled;
+    } else if (k == LogicalKeyboardKey.delete && !repeat) {
+      if (!_busy) _act(_trash);
+      return KeyEventResult.handled;
+    }
     if (k == LogicalKeyboardKey.arrowLeft) {
       _go(_index - 1);
     } else if (k == LogicalKeyboardKey.arrowRight) {
@@ -394,7 +451,14 @@ class _PhotoViewerState extends State<PhotoViewer> with TickerProviderStateMixin
                 _desktopTopBar(id, panel),
                 Expanded(
                   child: Stack(children: [
-                    Positioned.fill(child: _photoPages()),
+                    Positioned.fill(
+                      child: Listener(
+                        onPointerPanZoomStart: _swipeStart,
+                        onPointerPanZoomUpdate: _swipeUpdate,
+                        onPointerPanZoomEnd: _swipeEnd,
+                        child: _photoPages(),
+                      ),
+                    ),
                     Positioned(
                       left: 14,
                       top: 0,
@@ -823,12 +887,16 @@ class _ZoomPage extends StatefulWidget {
     required this.highlight,
     this.outlines = false,
     required this.db,
+    this.commands,
     required this.onZoomChanged,
     required this.onFaceTap,
     required this.onMiss,
   });
 
   final String id;
+
+  /// Zoom in, out or back to fit, from the keyboard (desktop).
+  final _ZoomCommand? commands;
 
   /// The page being looked at (videos stop when you swipe away).
   final bool active;
@@ -863,10 +931,43 @@ class _ZoomPageState extends State<_ZoomPage> with SingleTickerProviderStateMixi
       if (_zoomTween != null) _transform.value = _zoomTween!.value;
     });
     _transform.addListener(_report);
+    widget.commands?.addListener(_command);
+  }
+
+  @override
+  void didUpdateWidget(_ZoomPage old) {
+    super.didUpdateWidget(old);
+    if (old.commands != widget.commands) {
+      old.commands?.removeListener(_command);
+      widget.commands?.addListener(_command);
+    }
+  }
+
+  /// + / − / 0 on the keyboard: zoom around the middle of the view, or fit.
+  void _command() {
+    final f = widget.commands?.factor;
+    final size = context.size;
+    if (!widget.active || f == null || size == null) return;
+    final now = _transform.value.getMaxScaleOnAxis();
+    final scale = f == 0 ? 1.0 : (now * f).clamp(1.0, 6.0);
+    Matrix4 target;
+    if (scale <= 1.001) {
+      target = Matrix4.identity();
+    } else {
+      final centre = size.center(Offset.zero);
+      final scene = _transform.toScene(centre);
+      target = Matrix4.identity()
+        ..translateByDouble(centre.dx - scene.dx * scale, centre.dy - scene.dy * scale, 0, 1)
+        ..scaleByDouble(scale, scale, 1, 1);
+    }
+    _zoomTween = Matrix4Tween(begin: _transform.value, end: target)
+        .animate(CurvedAnimation(parent: _zoomAnim, curve: Curves.easeOutCubic));
+    _zoomAnim.forward(from: 0);
   }
 
   @override
   void dispose() {
+    widget.commands?.removeListener(_command);
     _transform.dispose();
     _zoomAnim.dispose();
     super.dispose();
@@ -1574,5 +1675,16 @@ class _VideoPageState extends State<_VideoPage> {
         ],
       ),
     );
+  }
+}
+
+/// Zoom steps sent from the keyboard to the photo on screen: a factor to
+/// multiply the zoom by, or 0 to fit the photo again.
+class _ZoomCommand extends ChangeNotifier {
+  double factor = 1;
+
+  void send(double f) {
+    factor = f;
+    notifyListeners();
   }
 }

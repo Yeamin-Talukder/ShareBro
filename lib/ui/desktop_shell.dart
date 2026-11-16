@@ -168,6 +168,8 @@ class _DesktopShellState extends State<DesktopShell> {
         const SingleActivator(LogicalKeyboardKey.digit2, control: true): () => _go(DesktopPage.photos),
         const SingleActivator(LogicalKeyboardKey.digit3, control: true): () => _go(DesktopPage.explore),
         const SingleActivator(LogicalKeyboardKey.digit4, control: true): () => _go(DesktopPage.share),
+        const SingleActivator(LogicalKeyboardKey.comma, control: true): () => _push(SettingsScreen(controller: c)),
+        const SingleActivator(LogicalKeyboardKey.keyO, control: true): _addFolder,
       },
       child: Focus(
         autofocus: true,

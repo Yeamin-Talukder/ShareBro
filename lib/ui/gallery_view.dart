@@ -9,6 +9,7 @@ import 'package:photo_manager/photo_manager.dart';
 
 import '../data/dates.dart';
 import '../scan/scan_controller.dart';
+import 'desktop_keys.dart';
 import 'desktop_layout.dart';
 import 'face_refresh.dart';
 import 'fast_thumb.dart';
@@ -223,13 +224,279 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
     });
   }
 
-  /// Esc clears the selection (when this grid is the screen in front).
+  /// Desktop: the photo the keyboard is on (drawn with a ring), and where a
+  /// Shift-selection starts.
+  int? _cursor;
+  int? _anchor;
+
+  /// A touchpad pinch is under way (Windows precision touchpads send
+  /// pan-zoom events rather than two pointers).
+  bool _padPinch = false;
+
+  /// The keyboard on desktop (when this grid is the screen in front): arrows
+  /// move, Enter opens, Space selects, Shift extends, Ctrl + A selects all,
+  /// Delete bins, Ctrl + / − / 0 resize, Esc clears the selection.
   bool _key(KeyEvent e) {
-    if (e is! KeyDownEvent || e.logicalKey != LogicalKeyboardKey.escape) return false;
-    if (!mounted || _selected.isEmpty || widget.onPicked != null) return false;
-    if (!(ModalRoute.of(context)?.isCurrent ?? true)) return false;
-    _clearSelection();
+    if (e is KeyUpEvent || !mounted || widget.onPicked != null) return false;
+    if (!(ModalRoute.of(context)?.isCurrent ?? true) || !TickerMode.valuesOf(context).enabled) return false;
+    if (FocusManager.instance.primaryFocus?.context?.widget is EditableText) return false;
+    final k = e.logicalKey;
+    final keys = HardwareKeyboard.instance;
+    final repeat = e is KeyRepeatEvent;
+    if (k == LogicalKeyboardKey.escape) {
+      if (repeat || _selected.isEmpty) return false;
+      _clearSelection();
+      return true;
+    }
+    if (_assets.isEmpty || keys.isAltPressed) return false;
+    if (keys.isControlPressed) {
+      if (k == LogicalKeyboardKey.keyA && !repeat) {
+        _selectAll();
+      } else if (k == LogicalKeyboardKey.equal || k == LogicalKeyboardKey.numpadAdd) {
+        _resize(1.15);
+      } else if (k == LogicalKeyboardKey.minus || k == LogicalKeyboardKey.numpadSubtract) {
+        _resize(1 / 1.15);
+      } else if (k == LogicalKeyboardKey.digit0 || k == LogicalKeyboardKey.numpad0) {
+        GalleryView.tileSize.value = 150;
+      } else {
+        return false;
+      }
+      return true;
+    }
+    final cur = _cursor;
+    int? to;
+    if (k == LogicalKeyboardKey.arrowRight) {
+      to = cur == null ? null : cur + 1;
+    } else if (k == LogicalKeyboardKey.arrowLeft) {
+      to = cur == null ? null : cur - 1;
+    } else if (k == LogicalKeyboardKey.arrowDown) {
+      to = cur == null ? null : _rowStep(cur, 1);
+    } else if (k == LogicalKeyboardKey.arrowUp) {
+      to = cur == null ? null : _rowStep(cur, -1);
+    } else if (k == LogicalKeyboardKey.home) {
+      to = 0;
+    } else if (k == LogicalKeyboardKey.end) {
+      to = _assets.length - 1;
+      _loadMore();
+    } else if (k == LogicalKeyboardKey.pageDown || k == LogicalKeyboardKey.pageUp) {
+      _page(k == LogicalKeyboardKey.pageDown ? 1 : -1);
+      return true;
+    } else if (k == LogicalKeyboardKey.enter || k == LogicalKeyboardKey.numpadEnter) {
+      if (cur == null || repeat) return false;
+      _selecting ? _toggle(cur) : _open(cur);
+      return true;
+    } else if (k == LogicalKeyboardKey.space) {
+      if (cur == null || repeat) return false;
+      _toggle(cur);
+      _anchor = cur;
+      return true;
+    } else if (k == LogicalKeyboardKey.delete) {
+      if (repeat) return false;
+      _deleteKey();
+      return true;
+    } else {
+      return false;
+    }
+    // The first arrow press lands on the first photo on screen.
+    to ??= _firstVisible();
+    if (to == null) return true;
+    to = to.clamp(0, _assets.length - 1);
+    if (to > _assets.length - _pageSize ~/ 2) _loadMore();
+    if (keys.isShiftPressed) {
+      final a = _anchor ??= cur ?? to;
+      final lo = math.min(a, to), hi = math.max(a, to);
+      setState(() => _selected.addAll([for (var i = lo; i <= hi; i++) _assets[i].id]));
+    } else {
+      _anchor = to;
+    }
+    setState(() => _cursor = to);
+    _reveal(to);
     return true;
+  }
+
+  void _resize(double by) {
+    final s = GalleryView.tileSize;
+    s.value = (s.value * by).clamp(deskTileMin, deskTileMax);
+  }
+
+  /// The photo in the same column one row down ([dir] 1) or up (-1), across
+  /// day headers.
+  int _rowStep(int index, int dir) {
+    final rows = _layoutRows;
+    var r = rows.indexWhere((row) => row is _Photos && index >= row.start && index < row.start + row.count);
+    if (r < 0) return index;
+    final col = index - (rows[r] as _Photos).start;
+    for (r += dir; r >= 0 && r < rows.length; r += dir) {
+      final row = rows[r];
+      if (row is _Photos) return row.start + math.min(col, row.count - 1);
+    }
+    return index;
+  }
+
+  /// The first photo whose row is on screen.
+  int? _firstVisible() {
+    if (!_scroll.hasClients) return _assets.isEmpty ? null : 0;
+    final top = _scroll.offset;
+    for (var r = 0; r < _layoutRows.length; r++) {
+      final row = _layoutRows[r];
+      if (row is _Photos && _layoutOffsets[r] >= top) return row.start;
+    }
+    return 0;
+  }
+
+  /// Scrolls just enough to show the row of [index].
+  void _reveal(int index) {
+    if (!_scroll.hasClients) return;
+    final rows = _layoutRows;
+    final r = rows.indexWhere((row) => row is _Photos && index >= row.start && index < row.start + row.count);
+    if (r < 0) return;
+    final pad = MediaQuery.paddingOf(context);
+    final top = _layoutOffsets[r];
+    final p = _scroll.position;
+    final view = p.viewportDimension - pad.top - pad.bottom;
+    double? to;
+    // Leave room for the day header above the first row of a day.
+    final above = r > 0 && rows[r - 1] is _Header ? _headerHeight : 8.0;
+    if (top - above < p.pixels) to = top - above;
+    if (top + _layoutTile + 8 > p.pixels + view) to = top + _layoutTile + 8 - view;
+    if (to == null) return;
+    to = to.clamp(0.0, p.maxScrollExtent);
+    if (reduceMotion) {
+      _scroll.jumpTo(to);
+    } else {
+      _scroll.animateTo(to, duration: 160.ms, curve: Curves.easeOutCubic);
+    }
+  }
+
+  /// Page Up / Page Down: a screenful at a time.
+  void _page(int dir) {
+    if (!_scroll.hasClients) return;
+    final p = _scroll.position;
+    final to = (p.pixels + dir * p.viewportDimension * 0.85).clamp(0.0, p.maxScrollExtent);
+    reduceMotion ? _scroll.jumpTo(to) : _scroll.animateTo(to, duration: 220.ms, curve: Curves.easeOutCubic);
+  }
+
+  /// Delete: the selection, or else the photo the keyboard is on, to the
+  /// Recycle Bin (after asking).
+  Future<void> _deleteKey() async {
+    final cur = _cursor;
+    final sel = _selected.isNotEmpty ? _selectedAssets : [if (cur != null && cur < _assets.length) _assets[cur]];
+    await _trashThese(sel);
+  }
+
+  Future<void> _trashThese(List<AssetEntity> sel) async {
+    if (sel.isEmpty || _busy) return;
+    setState(() => _busy = true);
+    try {
+      final a = MediaActions(context, widget.controller);
+      if (!await a.confirmTrash(sel.length)) return;
+      _dropIds(await a.trash(sel));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// A click on tile [i]: Ctrl adds or removes it, Shift selects the range
+  /// from the last one, otherwise it opens (or toggles while selecting).
+  void _click(int i) {
+    final keys = HardwareKeyboard.instance;
+    if (_desk && keys.isShiftPressed && (_anchor ?? _cursor) != null) {
+      final a = (_anchor ?? _cursor)!.clamp(0, _assets.length - 1);
+      final lo = math.min(a, i), hi = math.max(a, i);
+      Haptics.tick();
+      setState(() {
+        _selected.addAll([for (var k = lo; k <= hi; k++) _assets[k].id]);
+        _cursor = i;
+      });
+      return;
+    }
+    if (_desk) {
+      _cursor = i;
+      _anchor = i;
+    }
+    if (_desk && keys.isControlPressed) {
+      _toggle(i);
+      return;
+    }
+    _selecting ? _toggle(i) : _open(i);
+  }
+
+  /// Right-click on tile [i]: what you can do with it (or with the whole
+  /// selection, when it's part of it).
+  Future<void> _menu(int i, Offset at) async {
+    final id = _assets[i].id;
+    final inSelection = _selected.contains(id);
+    final targets = inSelection ? _selectedAssets : [_assets[i]];
+    setState(() => _cursor = i);
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final scheme = Theme.of(context).colorScheme;
+    PopupMenuItem<String> item(String value, IconData icon, String label, {Color? color}) => PopupMenuItem(
+          value: value,
+          height: 40,
+          child: Row(children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(width: 12),
+            Text(label, style: TextStyle(color: color)),
+          ]),
+        );
+    final n = targets.length;
+    final choice = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(at & const Size(1, 1), Offset.zero & overlay.size),
+      items: [
+        if (!inSelection) item('open', Icons.open_in_full_rounded, 'Open'),
+        item('select', inSelection ? Icons.remove_done_rounded : Icons.check_circle_outline_rounded,
+            inSelection ? 'Deselect' : 'Select'),
+        item('send', Icons.send_rounded, n > 1 ? 'Send $n photos' : 'Send'),
+        item('folder', Icons.folder_open_outlined, 'Show in folder'),
+        const PopupMenuDivider(),
+        item('trash', Icons.delete_outline_rounded, n > 1 ? 'Move $n to the Recycle Bin' : 'Move to the Recycle Bin',
+            color: scheme.error),
+      ],
+    );
+    if (!mounted || choice == null) return;
+    final a = MediaActions(context, widget.controller);
+    switch (choice) {
+      case 'open':
+        _open(i);
+      case 'select':
+        _toggle(i);
+        _anchor = i;
+      case 'send':
+        await a.send(targets);
+      case 'folder':
+        await a.share([targets.first]);
+      case 'trash':
+        await _trashThese(targets);
+    }
+  }
+
+  // ---- Touchpad pinch (desktop) ----
+
+  void _padStart(PointerPanZoomStartEvent e) {
+    _padPinch = false;
+    _focal = e.localPosition;
+  }
+
+  void _padUpdate(PointerPanZoomUpdateEvent e) {
+    if (!_desk) return;
+    // Two fingers moving together is scrolling; only a change in the gap
+    // between them is a pinch.
+    if (!_padPinch && (e.scale - 1).abs() < 0.04) return;
+    if (!_padPinch) {
+      _padPinch = true;
+      _settle.stop();
+      setState(() => _pinching = true);
+    }
+    _pinchScale.value = e.scale.clamp(0.45, 2.2);
+  }
+
+  void _padEnd(PointerPanZoomEndEvent e) {
+    if (!_padPinch) return;
+    _padPinch = false;
+    _resize(_pinchScale.value);
+    _animateScale(from: 1);
+    setState(() => _pinching = false);
   }
 
   @override
@@ -239,6 +506,7 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
       HardwareKeyboard.instance.removeHandler(_key);
     }
     DockVisibility.show(this);
+    DesktopKeys.escClaims.remove(this);
     // After this frame: the tree is locked while widgets are disposed.
     final changed = widget.onSelectingChanged;
     if (_barShown && changed != null) Future.microtask(() => changed(false));
@@ -257,6 +525,7 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
     if (shown == _barShown) return;
     _barShown = shown;
     shown ? DockVisibility.hide(this) : DockVisibility.show(this);
+    shown ? DesktopKeys.escClaims.add(this) : DesktopKeys.escClaims.remove(this);
     widget.onSelectingChanged?.call(shown);
   }
 
@@ -752,8 +1021,13 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
                   small: _byMonth,
                   selecting: _selecting,
                   selected: _selected.contains(_assets[start + k].id),
-                  onTap: () => _selecting ? _toggle(start + k) : _open(start + k),
-                  onSelect: () => _toggle(start + k),
+                  focused: _cursor == start + k,
+                  onTap: () => _click(start + k),
+                  onSelect: () {
+                    _toggle(start + k);
+                    _anchor = _cursor = start + k;
+                  },
+                  onMenu: widget.onPicked == null ? (at) => _menu(start + k, at) : null,
                 ),
               ),
             ],
@@ -902,6 +1176,9 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
           onPointerMove: _pointerMove,
           onPointerUp: _pointerUp,
           onPointerCancel: _pointerUp,
+          onPointerPanZoomStart: _padStart,
+          onPointerPanZoomUpdate: _padUpdate,
+          onPointerPanZoomEnd: _padEnd,
           child: Stack(children: [
             GestureDetector(
               onLongPressStart: _dragStart,
@@ -1119,13 +1396,21 @@ class _Tile extends StatelessWidget {
     required this.px,
     required this.onTap,
     this.onSelect,
+    this.onMenu,
     this.small = false,
     this.selecting = false,
     this.selected = false,
+    this.focused = false,
   });
 
   final AssetEntity asset;
   final VoidCallback onTap;
+
+  /// Desktop: right-click, with where (for the menu).
+  final ValueChanged<Offset>? onMenu;
+
+  /// Desktop: the keyboard is on this photo.
+  final bool focused;
 
   /// Desktop: the tick (shown on hover) selects without opening the photo.
   final VoidCallback? onSelect;
@@ -1166,6 +1451,7 @@ class _Tile extends StatelessWidget {
     );
     return GestureDetector(
       onTap: onTap,
+      onSecondaryTapUp: onMenu == null ? null : (d) => onMenu!(d.globalPosition),
       child: ColoredBox(
         color: selected ? scheme.primaryContainer : Colors.transparent,
         child: Stack(fit: StackFit.expand, children: [
@@ -1218,6 +1504,15 @@ class _Tile extends StatelessWidget {
               left: 6,
               bottom: 5,
               child: Icon(Icons.favorite_rounded, size: 15, color: Colors.white, shadows: shadow),
+            ),
+          if (focused)
+            IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(color: scheme.primary, width: 3),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
             ),
           if (showTick)
             Positioned(

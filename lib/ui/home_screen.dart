@@ -231,6 +231,66 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openScan() => Navigator.push(context,
       MaterialPageRoute(builder: (_) => ScanScreen(controller: c)));
 
+  /// Desktop: right-click on a person's card.
+  Future<void> _personMenu(PersonSummary p, Offset at) async {
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    PopupMenuItem<String> item(String value, IconData icon, String label) => PopupMenuItem(
+          value: value,
+          height: 40,
+          child: Row(children: [Icon(icon, size: 20), const SizedBox(width: 12), Text(label)]),
+        );
+    final choice = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(at & const Size(1, 1), Offset.zero & overlay.size),
+      items: [
+        item('open', Icons.open_in_full_rounded, 'Open'),
+        item('send', Icons.send_rounded, 'Send ${p.photoCount} ${p.photoCount == 1 ? 'photo' : 'photos'}'),
+        item('rename', Icons.edit_rounded, p.name == null ? 'Add a name' : 'Rename'),
+      ],
+    );
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case 'open':
+        await _openPerson(p);
+      case 'send':
+        final ids = await c.db.photosWithAll([p.id], tripId: _tripId);
+        if (!mounted) return;
+        await showSendToSheet(
+          context,
+          controller: c,
+          items: [for (final id in ids) SendItem.asset(id)],
+          title: p.name == null ? null : 'Send to ${p.name}',
+        );
+      case 'rename':
+        final text = TextEditingController(text: p.name ?? '');
+        final name = await showDialog<String>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(p.name == null ? 'Who is this?' : 'Rename ${p.name}'),
+            content: TextField(
+              controller: text,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(hintText: 'Name'),
+              onSubmitted: (v) => Navigator.pop(context, v),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+              FilledButton(onPressed: () => Navigator.pop(context, text.text), child: const Text('Save')),
+            ],
+          ),
+        );
+        text.dispose();
+        if (name == null || name.trim().isEmpty) return;
+        final id = await c.db.renamePerson(p.id, name);
+        c.changed();
+        if (!mounted || id == p.id) return;
+        // The name already existed, so the two were merged.
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Merged with the existing ${AppDb.cleanName(name)}')));
+    }
+  }
+
   Future<void> _openPerson(PersonSummary p) async {
     await Navigator.push(
       context,
@@ -692,6 +752,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: person.name == null ? null : 'Send to ${person.name}',
                   ),
                   onMerge: (dragged) => _dropMerge(dragged, person),
+                  onMenu: (at) => _personMenu(person, at),
                 )
                     .animate(key: ValueKey('in${person.id}'))
                     .fadeIn(delay: (25 * i.clamp(0, 24)).ms, duration: 220.ms)
@@ -955,6 +1016,7 @@ class _PersonCard extends StatefulWidget {
     required this.onTap,
     required this.onSend,
     required this.onMerge,
+    this.onMenu,
   });
 
   final PersonSummary person;
@@ -962,6 +1024,9 @@ class _PersonCard extends StatefulWidget {
   final VoidCallback onTap;
   final ValueChanged<List<String>> onSend;
   final ValueChanged<PersonSummary> onMerge;
+
+  /// Right-click, with where (for the menu).
+  final ValueChanged<Offset>? onMenu;
 
   @override
   State<_PersonCard> createState() => _PersonCardState();
@@ -1080,6 +1145,7 @@ class _PersonCardState extends State<_PersonCard> {
             childWhenDragging: Opacity(opacity: 0.4, child: card),
             child: GestureDetector(
               onTap: widget.onTap,
+              onSecondaryTapUp: widget.onMenu == null ? null : (d) => widget.onMenu!(d.globalPosition),
               child: Stack(children: [
                 Positioned.fill(child: card),
                 Positioned(

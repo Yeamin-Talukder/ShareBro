@@ -7,6 +7,8 @@ import 'package:flutter/rendering.dart';
 import 'data/db.dart';
 import 'scan/scan_controller.dart';
 import 'share/notify.dart';
+import 'platform/device.dart';
+import 'ui/desktop_keys.dart';
 import 'ui/fast_thumb.dart';
 import 'ui/island.dart';
 import 'ui/root_screen.dart';
@@ -121,7 +123,8 @@ class _PhotoOrganizerAppState extends State<PhotoOrganizerApp>
         builder: (context, child) => Island(
           controller: widget.controller,
           child: Stack(children: [
-          RepaintBoundary(key: _screen, child: child),
+          // On a computer: back keys, the mouse's Back button, F1 shortcuts.
+          RepaintBoundary(key: _screen, child: Device.desktop ? DesktopKeys(child: child!) : child),
           if (_old != null)
             Positioned.fill(
               child: IgnorePointer(
