@@ -255,8 +255,22 @@ footer .credits { grid-column: 1 / -1; border-top: 1px solid var(--line); paddin
 .dl-menu .head + a, .dl-menu a + .head { margin-top: 2px; }
 .dl-menu a + .head { border-top: 1px solid var(--line); padding-top: 14px; }
 .dl-menu a em.soft { background: #2f2b36; color: var(--sub); }
-.facts .fact-link { display: inline-flex; align-items: center; gap: 7px; color: inherit; text-decoration: none; border-bottom: 1px dashed currentColor; }
+/* Platform switcher above the download button. */
+.plats { position: relative; display: inline-flex; gap: 2px; padding: 5px; margin-top: clamp(18px, 3vh, 28px); border-radius: 999px; background: #121016; border: 1px solid var(--line); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .03); }
+.plats + .cta-row { margin-top: 16px; }
+.plats button { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; border: 0; border-radius: 999px; background: none; color: var(--dim); font: inherit; font-size: 15px; font-weight: 600; line-height: 1.2; cursor: pointer; transition: color .2s; }
+.plats button .icon { width: 17px; height: 17px; }
+.plats button[aria-selected="true"] { color: var(--text); }
+.plats button:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+.plat-ind { position: absolute; top: 5px; bottom: 5px; left: 0; width: 0; border-radius: 999px; background: #25222b; border: 1px solid #38343f; box-shadow: 0 8px 20px rgba(0, 0, 0, .4); transition: transform .45s var(--ease), width .45s var(--ease); }
+.plat-panel { display: flex; gap: 12px; flex-wrap: wrap; }
+.plat-panel[hidden], .facts > [hidden] { display: none; }
+.plat-panel.enter { animation: plat-in .4s var(--ease); }
+@keyframes plat-in { from { opacity: 0; transform: translateY(6px); } }
+.facts .fact-link { display: inline-flex; align-items: center; gap: 7px; color: inherit; text-decoration: underline dashed; text-decoration-thickness: 1px; text-underline-offset: 4px; transition: color .2s; }
 .facts .fact-link:hover { color: var(--coral); }
+.btn-soon { background: transparent; border: 1px dashed #3d3944; color: var(--sub); cursor: default; }
+@media (hover: hover) and (pointer: fine) { .plats button:hover { color: var(--text); } }
 .dl-menu .all { display: flex; align-items: center; gap: 10px; margin-top: 4px; border-top: 1px solid var(--line); border-radius: 0 0 14px 14px; color: var(--sub); font-size: 15px; font-weight: 600; }
 .dl-menu .all .icon { width: 20px; height: 20px; }
 
@@ -397,6 +411,10 @@ footer li a { display: inline-block; transition: color .2s, transform .25s var(-
   .lead { font-size: 17px; }
   .stage .back { right: -6px; }
   .stage .back.l { left: -6px; }
+  .plats { display: flex; width: 100%; }
+  .plats button { flex: 1; justify-content: center; gap: 6px; padding: 9px 4px; font-size: 14px; }
+  .plat-panel { width: 100%; }
+  .plat-panel > .btn { width: 100%; justify-content: center; }
   .dl-split { width: 100%; }
   .dl-split .dl-main { flex: 1; justify-content: center; }
   .dl-menu { width: 100%; }
@@ -494,6 +512,8 @@ footer li a { display: inline-block; transition: color .2s, transform .25s var(-
   .stat .num { font-size: 40px; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .plat-ind { transition: none; }
+  .plat-panel.enter { animation: none; }
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   .reveal { opacity: 1; transform: none; }
 }

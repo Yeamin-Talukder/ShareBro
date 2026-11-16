@@ -117,6 +117,52 @@
     items.forEach((a) => a.addEventListener('click', () => set(false)));
   });
 
+  // Platform switcher: Android, Windows, macOS, iOS. Starts on the
+  // visitor's own system; arrow keys move between the tabs.
+  const plats = $('.plats');
+  if (plats) {
+    const tabs = $$('[role="tab"]', plats), ind = $('.plat-ind', plats);
+    const place = () => {
+      const on = tabs.find((t) => t.getAttribute('aria-selected') === 'true');
+      if (!on || !ind) return;
+      ind.style.width = `${on.offsetWidth}px`;
+      ind.style.transform = `translateX(${on.offsetLeft}px)`;
+    };
+    const pick = (name, focus) => {
+      tabs.forEach((t) => {
+        const on = t.dataset.plat === name;
+        t.setAttribute('aria-selected', on);
+        t.tabIndex = on ? 0 : -1;
+        const panel = document.getElementById(t.getAttribute('aria-controls'));
+        if (panel) {
+          const was = panel.hidden;
+          panel.hidden = !on;
+          if (on && was) { panel.classList.remove('enter'); void panel.offsetWidth; panel.classList.add('enter'); }
+        }
+        if (on && focus) t.focus();
+      });
+      $$('.facts [data-for]').forEach((f) => (f.hidden = f.dataset.for !== name));
+      place();
+    };
+    tabs.forEach((t) => t.addEventListener('click', () => pick(t.dataset.plat)));
+    plats.addEventListener('keydown', (e) => {
+      const i = tabs.indexOf(document.activeElement);
+      if (i < 0) return;
+      const next = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+      if (next === undefined) return;
+      e.preventDefault();
+      pick(tabs[(next + tabs.length) % tabs.length].dataset.plat, true);
+    });
+    const ua = navigator.userAgent;
+    const os = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'ios'
+      : /Windows/.test(ua) ? 'windows'
+      : /Macintosh|Mac OS X/.test(ua) ? 'macos'
+      : 'android';
+    pick(os);
+    window.addEventListener('resize', place);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(place);
+  }
+
   // Screen recordings play only while on screen (saves battery and data).
   const vids = $$('video[data-auto]');
   if ('IntersectionObserver' in window) {
