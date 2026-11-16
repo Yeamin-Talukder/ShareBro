@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'anim.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
 import '../data/db.dart';
 import 'motion.dart';
@@ -184,12 +183,7 @@ class _KenBurns extends StatelessWidget {
             alignment: focus,
             child: child,
           ),
-          child: AssetEntityImage(
-            asset,
-            isOriginal: false,
-            thumbnailSize: const ThumbnailSize.square(1600),
-            fit: BoxFit.cover,
-          ),
+          child: LibraryImage(asset, size: 1600),
         );
       },
     );

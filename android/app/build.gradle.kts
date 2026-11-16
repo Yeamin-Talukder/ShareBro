@@ -29,6 +29,14 @@ android {
         versionName = flutter.versionName
     }
 
+    // ONNX Runtime is only used by the desktop app (Windows face models);
+    // the plugin would otherwise add ~11 MB per ABI to every APK.
+    packaging {
+        jniLibs {
+            excludes += "**/libonnxruntime.so"
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.

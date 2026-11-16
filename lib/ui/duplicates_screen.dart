@@ -7,6 +7,8 @@ import '../scan/scan_controller.dart';
 import 'motion.dart';
 import 'photo_viewer.dart';
 import 'widgets.dart';
+import '../platform/desktop_library.dart';
+import '../platform/device.dart';
 
 /// Bursts and repeated poses, with the best shot of each picked. Extras can
 /// be hidden inside the app (nothing changes on the phone) or moved to the
@@ -87,10 +89,13 @@ class _DuplicatesScreenState extends State<DuplicatesScreen> {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.delete_outline),
-        title: Text('Move ${ids.length} photos to the phone\'s trash?'),
-        content: const Text(
-            'Android will ask you to confirm. They stay in the trash for 30 days, '
-            'so you can still restore them from your gallery app.'),
+        title: Text(Device.desktop
+            ? 'Move ${ids.length} photos to the Recycle Bin?'
+            : 'Move ${ids.length} photos to the phone\'s trash?'),
+        content: Text(Device.desktop
+            ? 'You can restore them from the Recycle Bin.'
+            : 'Android will ask you to confirm. They stay in the trash for 30 days, '
+                'so you can still restore them from your gallery app.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Continue')),
@@ -98,6 +103,17 @@ class _DuplicatesScreenState extends State<DuplicatesScreen> {
       ),
     );
     if (ok != true) return;
+    if (Device.desktop) {
+      final moved = await moveToRecycleBin(ids.toList());
+      for (final id in moved) {
+        AssetThumb.forget(id);
+      }
+      await c.db.forgetPhotos(moved);
+      if (moved.isNotEmpty) Haptics.remove();
+      c.changed();
+      await _load();
+      return;
+    }
     final assets = [
       for (final id in ids) ?(await AssetThumb.entity(id)),
     ];

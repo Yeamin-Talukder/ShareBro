@@ -59,6 +59,7 @@ dependencies:
   flutter_map: ^8.3.2
   latlong2: ^0.10.1
   sqflite_common_ffi: ^2.4.7
+  onnxruntime: ^1.4.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -81,7 +82,13 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
-    - assets/models/
+    # Phone face models (TensorFlow Lite).
+    - path: assets/models/
+      platforms: [android, ios]
+    # Desktop face models (ONNX Runtime): SCRFD-10G detector and the same
+    # w600k_mbf fingerprint model, from InsightFace (non-commercial).
+    - path: assets/models/desktop/
+      platforms: [windows, linux, macos]
     - assets/geo/
     - assets/icon/app_icon_1024.png
 

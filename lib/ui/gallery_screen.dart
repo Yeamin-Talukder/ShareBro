@@ -18,6 +18,7 @@ import 'sections.dart';
 import 'theme.dart';
 import 'trash_screen.dart';
 import 'widgets.dart';
+import '../platform/device.dart';
 
 /// Shown until the user allows photo access.
 class _AccessGate extends StatefulWidget {
@@ -160,7 +161,24 @@ class _PhotosTabState extends State<PhotosTab> {
           ])),
         ],
       ),
-      body: _AccessGate(
+      body: Device.desktop
+          // Desktop: every scanned photo, from all the scanned folders.
+          // Reloads when a scan starts and when it finishes.
+          ? ListenableBuilder(
+              listenable: widget.controller,
+              builder: (context, _) => GalleryView(
+                key: ValueKey((_dates, widget.controller.running)),
+                controller: widget.controller,
+                source: GallerySource.ids(() => widget.controller.db.photosIn(dates: _dates)),
+                emptyMessage: _dates == null
+                    ? 'No photos yet. Scan a folder from People or Albums.'
+                    : 'No photos taken in these dates.',
+                onSelectingChanged: (v) {
+                  if (mounted) setState(() => _selecting = v);
+                },
+              ),
+            )
+          : _AccessGate(
         child: GalleryView(
           key: ValueKey(_dates),
           controller: widget.controller,

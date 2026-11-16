@@ -8,10 +8,15 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 import 'package:image/image.dart' as img;
+import 'package:onnxruntime/onnxruntime.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 
 import '../data/db.dart';
+import '../platform/device.dart';
 import 'accel.dart';
+import 'scrfd.dart';
+
+part 'face_engine_desktop.dart';
 
 /// InsightFace's MobileFaceNet trained on WebFace600K (`w600k_mbf` from the
 /// buffalo_s pack, converted to TensorFlow Lite): a 512-number fingerprint
@@ -48,12 +53,37 @@ const _warmUpFaces = 4;
 /// (1 is identical) before that chip is trusted with real faces.
 const _sameFace = 0.999;
 
-/// Finds faces with ML Kit and turns each into a 512-number fingerprint with
-/// MobileFaceNet (InsightFace, WebFace600K). Everything runs on the device;
-/// the fingerprints come from the phone's NPU or GPU when one is there and
-/// quicker than the CPU (see [AccelState]).
-class FaceEngine {
-  FaceEngine._(this._detector, this._labeler, this._worker);
+/// Finds faces and turns each into a 512-number fingerprint with
+/// MobileFaceNet (InsightFace, WebFace600K). Everything runs on the device.
+/// Phones find faces with ML Kit ([_PhoneFaceEngine]); desktop uses
+/// InsightFace's SCRFD detector in ONNX Runtime ([_DesktopFaceEngine]).
+/// Both use the same fingerprint model and alignment, so fingerprints match
+/// across devices (trip groups compare them).
+abstract class FaceEngine {
+  /// [chip] is what Settings asks for (phones only): the fastest that
+  /// works, or one.
+  static Future<FaceEngine> load({AccelChoice chip = AccelChoice.auto}) =>
+      Device.desktop ? _DesktopFaceEngine.load() : _PhoneFaceEngine.load(chip: chip);
+
+  /// What's in the picture, most confident first (empty on desktop for now).
+  Future<List<String>> labels(String imagePath);
+
+  /// [imagePath] must point at an upright JPEG (no EXIF rotation needed).
+  Future<List<NewFace>> analyze(String imagePath);
+
+  /// Fingerprints for stored face crops (the 112x112 aligned JPEGs kept
+  /// for every face), in order; null where a crop can't be read. For
+  /// redoing every face after a model change without rescanning photos.
+  Future<List<Float32List?>> embedCrops(List<Uint8List> jpegs);
+
+  void dispose();
+}
+
+/// The phone engine: ML Kit finds faces, and the fingerprints come from the
+/// phone's NPU or GPU when one is there and quicker than the CPU (see
+/// [AccelState]).
+class _PhoneFaceEngine implements FaceEngine {
+  _PhoneFaceEngine._(this._detector, this._labeler, this._worker);
 
   final FaceDetector _detector;
 
@@ -64,10 +94,9 @@ class FaceEngine {
   /// GPU and NPU are only ever touched from one place.
   final _EmbedWorker _worker;
 
-  /// [chip] is what Settings asks for: the fastest that works, or one.
   static Future<FaceEngine> load({AccelChoice chip = AccelChoice.auto}) async {
     final model = await rootBundle.load(_modelAsset);
-    final worker = await _EmbedWorker.start(_WorkerSetup(
+    final worker = await _EmbedWorker.start(_workerMain, _WorkerSetup(
       model: TransferableTypedData.fromList([model.buffer.asUint8List(model.offsetInBytes, model.lengthInBytes)]),
       statePath: await accelStatePath(),
       stateKey: accelStateKey(faceModelId),
@@ -84,17 +113,17 @@ class FaceEngine {
     );
     final labeler = ImageLabeler(
         options: ImageLabelerOptions(confidenceThreshold: _minLabelConfidence));
-    return FaceEngine._(detector, labeler, worker);
+    return _PhoneFaceEngine._(detector, labeler, worker);
   }
 
-  /// What's in the picture, most confident first.
+  @override
   Future<List<String>> labels(String imagePath) async {
     final found = await _labeler.processImage(InputImage.fromFilePath(imagePath));
     found.sort((a, b) => b.confidence.compareTo(a.confidence));
     return [for (final l in found) l.label];
   }
 
-  /// [imagePath] must point at an upright JPEG (no EXIF rotation needed).
+  @override
   Future<List<NewFace>> analyze(String imagePath) async {
     final faces = await _detector.processImage(InputImage.fromFilePath(imagePath));
     final boxes = <_FaceBox>[];
@@ -116,32 +145,48 @@ class FaceEngine {
       ));
     }
     if (boxes.isEmpty) return const [];
-    // Android's own decoder is many times faster than decoding the JPEG in
-    // Dart; only the raw pixels go to the background isolate, without a copy.
-    final bytes = await File(imagePath).readAsBytes();
-    final codec = await ui.instantiateImageCodec(bytes);
-    final frame = await codec.getNextFrame();
-    final image = frame.image;
-    final w = image.width, h = image.height;
-    final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-    image.dispose();
-    codec.dispose();
-    if (data == null) return const [];
-    final pixels = TransferableTypedData.fromList([data.buffer.asUint8List()]);
+    final decoded = await _decodeRgba(imagePath);
+    if (decoded == null) return const [];
+    final (pixels, w, h) = decoded;
     return _worker.ask<List<NewFace>>(_EmbedJob(pixels, w, h, boxes));
   }
 
-  /// Fingerprints for stored face crops (the 112x112 aligned JPEGs kept
-  /// for every face), in order; null where a crop can't be read. For
-  /// redoing every face after a model change without rescanning photos.
+  @override
   Future<List<Float32List?>> embedCrops(List<Uint8List> jpegs) =>
       _worker.ask<List<Float32List?>>(_CropsJob(jpegs));
 
+  @override
   void dispose() {
     _worker.stop();
     _detector.close();
     _labeler.close();
   }
+}
+
+/// The photo's raw RGBA pixels, ready to hand to a background isolate
+/// without a copy. The platform's own decoder is many times faster than
+/// decoding the JPEG in Dart.
+Future<(TransferableTypedData, int, int)?> _decodeRgba(String imagePath) async {
+  final bytes = await File(imagePath).readAsBytes();
+  final codec = await ui.instantiateImageCodec(bytes);
+  final frame = await codec.getNextFrame();
+  final image = frame.image;
+  final w = image.width, h = image.height;
+  final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+  image.dispose();
+  codec.dispose();
+  if (data == null) return null;
+  return (TransferableTypedData.fromList([data.buffer.asUint8List()]), w, h);
+}
+
+/// Something that turns aligned 112x112 faces into fingerprints: the
+/// phone's TFLite model ([_Models]) or the desktop's ONNX one.
+abstract class _Fingerprinter {
+  /// Whether the model wants planes (CHW) rather than pixels (HWC).
+  bool get channelsFirst;
+
+  /// Unit-length fingerprints for [tensors], in order.
+  List<Float32List> run(List<Float32List> tensors);
 }
 
 /// What the background isolate needs to open the model.
@@ -175,9 +220,11 @@ class _EmbedWorker {
 
   final SendPort _inbox;
 
-  static Future<_EmbedWorker> start(_WorkerSetup setup) async {
+  /// Starts [entry] in a new isolate with [setup]; it answers with its
+  /// inbox once its models are open (see [_serve]).
+  static Future<_EmbedWorker> start<T>(void Function((SendPort, T)) entry, T setup) async {
     final hello = ReceivePort();
-    final isolate = await Isolate.spawn(_workerMain, (hello.sendPort, setup), debugName: 'faces');
+    final isolate = await Isolate.spawn(entry, (hello.sendPort, setup), debugName: 'faces');
     final first = await hello.first;
     if (first is SendPort) return _EmbedWorker._(first);
     isolate.kill();
@@ -206,21 +253,31 @@ void _workerMain((SendPort, _WorkerSetup) start) {
     hello.send('$e');
     return;
   }
+  _serve(
+    hello,
+    (job) => switch (job) {
+      _EmbedJob() => _embed(job, models),
+      _CropsJob() => _embedCrops(job.jpegs, models),
+      _ => 'Unknown job',
+    },
+    models.close,
+  );
+}
+
+/// The worker loop: tells [hello] where to send jobs, answers each with
+/// [handle] (or the error, as text), and on null calls [close] and ends.
+void _serve(SendPort hello, Object Function(Object job) handle, void Function() close) {
   final inbox = ReceivePort();
   hello.send(inbox.sendPort);
   inbox.listen((message) {
     if (message == null) {
-      models.close();
+      close();
       inbox.close();
       return;
     }
     final (job, reply) = message as (Object, SendPort);
     try {
-      reply.send(switch (job) {
-        _EmbedJob() => _embed(job, models),
-        _CropsJob() => _embedCrops(job.jpegs, models),
-        _ => 'Unknown job',
-      });
+      reply.send(handle(job));
     } catch (e) {
       reply.send('$e');
     }
@@ -230,7 +287,7 @@ void _workerMain((SendPort, _WorkerSetup) start) {
 /// The face model inside the background isolate: on the CPU from the start,
 /// and on a faster chip once enough faces have come through to be worth
 /// starting one.
-class _Models {
+class _Models implements _Fingerprinter {
   _Models._(this._cpu, this.layout, this._model, this._statePath, this._stateKey, this._chip);
 
   factory _Models.open(_WorkerSetup setup) {
@@ -262,7 +319,11 @@ class _Models {
   Accel _fastChip = Accel.cpu;
   int _faces = 0;
 
+  @override
+  bool get channelsFirst => layout.channelsFirst;
+
   /// Fingerprints for [tensors], on the best chip that's ready.
+  @override
   List<Float32List> run(List<Float32List> tensors) {
     if (tensors.isEmpty) return const [];
     _faces += tensors.length;
@@ -446,15 +507,17 @@ class _FaceBox {
 
 /// Background-isolate work: align each face from the photo's RGBA pixels
 /// and run the model.
-List<NewFace> _embed(_EmbedJob job, _Models models) {
-  final pixels = job.pixels.materialize().asUint8List();
-  final (w, h, boxes) = (job.w, job.h, job.boxes);
+List<NewFace> _embed(_EmbedJob job, _Fingerprinter models) =>
+    _embedPixels(job.pixels.materialize().asUint8List(), job.w, job.h, job.boxes, models);
+
+/// Aligns each of [boxes] out of the RGBA [pixels] (w x h) and fingerprints it.
+List<NewFace> _embedPixels(Uint8List pixels, int w, int h, List<_FaceBox> boxes, _Fingerprinter models) {
   final tensors = <Float32List>[];
   final thumbs = <Uint8List>[];
   final sharpness = <double>[];
   for (final b in boxes) {
     final crop = _alignedCrop(pixels, w, h, b);
-    tensors.add(_toTensor(crop, models.layout.channelsFirst));
+    tensors.add(_toTensor(crop, models.channelsFirst));
     sharpness.add(_sharpness(crop));
     thumbs.add(img.encodeJpg(
       img.Image.fromBytes(
@@ -488,7 +551,7 @@ List<NewFace> _embed(_EmbedJob job, _Models models) {
 }
 
 /// Fingerprints for stored face crops (already aligned 112x112 JPEGs).
-List<Float32List?> _embedCrops(List<Uint8List> jpegs, _Models models) {
+List<Float32List?> _embedCrops(List<Uint8List> jpegs, _Fingerprinter models) {
   final tensors = <Float32List>[];
   final ok = <int>[];
   for (final (i, j) in jpegs.indexed) {
@@ -504,7 +567,7 @@ List<Float32List?> _embedCrops(List<Uint8List> jpegs, _Models models) {
       rgb[o++] = p.g.toInt();
       rgb[o++] = p.b.toInt();
     }
-    tensors.add(_toTensor(rgb, models.layout.channelsFirst));
+    tensors.add(_toTensor(rgb, models.channelsFirst));
     ok.add(i);
   }
   final out = List<Float32List?>.filled(jpegs.length, null);

@@ -8,6 +8,9 @@ import '../data/db.dart';
 import '../scan/scan_controller.dart';
 import 'person_screen.dart';
 import 'widgets.dart';
+import '../platform/desktop_library.dart';
+import '../platform/device.dart';
+import '../scan/scan_item.dart';
 
 /// Bottom sheet with a photo's date, size, resolution, location and the
 /// people recognised in it.
@@ -64,11 +67,12 @@ class _PhotoInfoState extends State<PhotoInfoPanel> {
     final asset = await AssetThumb.entity(widget.assetId);
     if (asset == null) return null;
     final db = widget.controller.db;
-    final file = await asset.file;
-    final ll = await asset.latlngAsync();
+    final file = await asset.localFile;
+    // Desktop reads the GPS tag from the file itself.
+    final ll = Device.desktop ? await DesktopScanItem(asset.id).location() : await asset.latlngAsync();
     return _Info(
       asset: asset,
-      title: await asset.titleAsync,
+      title: Device.desktop ? asset.title ?? '' : await asset.titleAsync,
       bytes: file == null ? null : await file.length(),
       // Photos without GPS report 0,0.
       location: ll == null || (ll.latitude == 0 && ll.longitude == 0) ? null : ll,
@@ -89,8 +93,8 @@ class _PhotoInfoState extends State<PhotoInfoPanel> {
         }
         final info = snap.data;
         if (info == null) {
-          return const SizedBox(
-              height: 160, child: Center(child: Text('This photo is no longer on the phone.')));
+          return SizedBox(
+              height: 160, child: Center(child: Text(Device.desktop ? 'This photo is no longer in its folder.' : 'This photo is no longer on the phone.')));
         }
         final a = info.asset;
         final taken = a.createDateTime;

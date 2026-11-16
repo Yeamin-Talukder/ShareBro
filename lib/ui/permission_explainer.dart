@@ -78,6 +78,8 @@ void showAccessBlocked(BuildContext context, String what) {
 /// True once ShareBro may read the photo library. Explains why first, then
 /// shows Android's prompt; says where to turn it on if that's blocked.
 Future<bool> ensurePhotoAccess(BuildContext context) async {
+  // Desktop reads photo files directly: nothing to allow.
+  if (Device.desktop) return true;
   if (await Gallery.hasAccess()) return true;
   if (!context.mounted) return false;
   await explainPermission(context, icon: Icons.photo_library_rounded, title: photoTitle, body: photoBody);

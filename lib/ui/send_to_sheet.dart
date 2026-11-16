@@ -14,6 +14,7 @@ import 'theme.dart';
 import 'transfer_view.dart';
 import 'web_share_screen.dart';
 import 'widgets.dart';
+import '../platform/desktop_library.dart';
 
 /// "Send 12 items": nearby devices (LocalSend / Nearby), a QR link for any
 /// browser, or Android's share sheet. Works for photos, files and messages.
@@ -71,7 +72,7 @@ Future<void> shareItemsWithApps(List<SendItem> items) async {
     } else if (i.path != null) {
       files.add(XFile(i.path!, mimeType: mimeFor(i.path!)));
     } else if (i.assetId != null) {
-      final f = await (await AssetThumb.entity(i.assetId!))?.file;
+      final f = await (await AssetThumb.entity(i.assetId!))?.localFile;
       if (f != null) files.add(XFile(f.path));
     }
   }

@@ -18,6 +18,7 @@ import 'send_sheet.dart';
 import 'theme.dart';
 import 'together_screen.dart';
 import 'widgets.dart';
+import '../platform/desktop_library.dart';
 
 /// Messaging apps cap how many files one share can carry, so big sets go out
 /// in batches.
@@ -556,7 +557,7 @@ class _PersonScreenState extends State<PersonScreen> {
     final files = <XFile>[];
     var missing = 0;
     for (final id in ids) {
-      final file = await (await AssetThumb.entity(id))?.file;
+      final file = await (await AssetThumb.entity(id))?.localFile;
       if (file == null) {
         missing++;
       } else {

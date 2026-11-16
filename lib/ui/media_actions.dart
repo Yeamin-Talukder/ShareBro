@@ -13,6 +13,8 @@ import 'motion.dart';
 import 'send_to_sheet.dart';
 import 'theme.dart';
 import 'widgets.dart';
+import '../platform/desktop_library.dart';
+import '../platform/device.dart';
 
 /// What a normal gallery can do with photos and videos: share, send to a
 /// nearby device, favourite, put in an album and delete. Used by the grid's
@@ -29,8 +31,13 @@ class MediaActions {
         for (final id in ids) ?await AssetThumb.entity(id),
       ];
 
-  /// Android's share sheet (WhatsApp, Quick Share, Drive, …).
+  /// Android's share sheet (WhatsApp, Quick Share, Drive, …). On desktop:
+  /// shows the photo in its folder, to drag or attach from there.
   Future<void> share(List<AssetEntity> assets) async {
+    if (Device.desktop) {
+      if (assets.isNotEmpty) await revealInFolder(assets.first.id);
+      return;
+    }
     final files = <XFile>[];
     for (final a in assets) {
       final f = await a.file;
@@ -69,6 +76,7 @@ class MediaActions {
   /// that are gone.
   Future<Set<String>> trash(List<AssetEntity> assets) async {
     if (assets.isEmpty) return {};
+    if (Device.desktop) return _recycle(assets);
     List<String> gone;
     try {
       gone = await PhotoManager.editor.android.moveToTrash(assets);
@@ -99,6 +107,22 @@ class MediaActions {
       );
     }
     return gone.toSet();
+  }
+
+  /// Desktop: to the Recycle Bin (restored from there, not from here).
+  Future<Set<String>> _recycle(List<AssetEntity> assets) async {
+    final gone = await moveToRecycleBin([for (final a in assets) a.id]);
+    for (final id in gone) {
+      AssetThumb.forget(id);
+    }
+    await controller.db.forgetPhotos(gone);
+    if (gone.isNotEmpty) {
+      Haptics.success();
+      _toast('${gone.length} to the Recycle Bin', icon: Icons.delete_outline_rounded);
+    } else {
+      _toast('Couldn\'t move to the Recycle Bin', icon: Icons.error_outline_rounded);
+    }
+    return gone;
   }
 
   /// Copy or move into an album (or a new one). Returns true when they
@@ -169,7 +193,9 @@ class MediaActions {
         builder: (context) => AlertDialog(
           icon: const Icon(Icons.delete_outline_rounded),
           title: Text('Move $count ${count == 1 ? 'item' : 'items'} to trash?'),
-          content: const Text('You can restore them from the phone\'s trash for 30 days.'),
+          content: Text(Device.desktop
+              ? 'You can restore them from the Recycle Bin.'
+              : 'You can restore them from the phone\'s trash for 30 days.'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
             FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Move to trash')),
@@ -357,14 +383,20 @@ class MediaActionBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       child: Row(children: [
         ActionButton(icon: Icons.send_rounded, label: 'Send', onTap: onSend, color: Theme.of(context).colorScheme.primary),
-        ActionButton(icon: Icons.share_outlined, label: 'Share', onTap: onShare, color: fg),
-        ActionButton(
-          icon: favourite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-          label: favourite ? 'Unfavourite' : 'Favourite',
-          onTap: onFavourite,
-          color: favourite ? const Color(0xFFE8457A) : fg,
-        ),
-        ActionButton(icon: Icons.photo_album_outlined, label: 'Album', onTap: onAlbum, color: fg),
+        // Desktop has no share sheet, favourites or albums: the photo's
+        // folder stands in for all three.
+        if (Device.desktop)
+          ActionButton(icon: Icons.folder_open_outlined, label: 'Show in folder', onTap: onShare, color: fg)
+        else ...[
+          ActionButton(icon: Icons.share_outlined, label: 'Share', onTap: onShare, color: fg),
+          ActionButton(
+            icon: favourite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+            label: favourite ? 'Unfavourite' : 'Favourite',
+            onTap: onFavourite,
+            color: favourite ? const Color(0xFFE8457A) : fg,
+          ),
+          ActionButton(icon: Icons.photo_album_outlined, label: 'Album', onTap: onAlbum, color: fg),
+        ],
         ActionButton(icon: Icons.delete_outline_rounded, label: 'Delete', onTap: onTrash, color: fg),
       ]),
     );

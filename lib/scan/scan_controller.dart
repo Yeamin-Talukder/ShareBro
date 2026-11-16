@@ -25,8 +25,10 @@ import '../platform/device.dart';
 import '../share/receive.dart' show receivedAlbum;
 import '../share/send_center.dart';
 import '../share/server.dart' show FindLink, WebShare;
-import '../ui/fast_thumb.dart' show FastThumb;
 import 'background.dart';
+import 'desktop_folders.dart';
+import 'scan_item.dart';
+import '../platform/desktop_library.dart';
 
 /// Longest side of the image the face finder looks at. Bigger finds smaller
 /// faces in group shots but is slower.
@@ -189,8 +191,14 @@ class ScanController extends ChangeNotifier {
     autoScanEnabled = (await db.setting(_autoScanKey)) != '0';
     appLock = (await db.setting(_appLockKey)) == '1';
     faceChip = AccelChoice.byName(await db.setting(_faceChipKey));
-    // Desktop has no phone photo library (yet): nothing to backfill, scan
-    // or watch. Sharing works the same.
+    if (Device.desktop) {
+      // Photos are files in folders: dates come from the scan, and the
+      // folders scanned before are checked for new photos.
+      desktopTakenAt = db.takenAt;
+      unawaited(upgradeFaces());
+      _queueAutoScan(const Duration(seconds: 4));
+      return;
+    }
     if (!Device.photoLibrary) return;
     backfillDates();
     unawaited(backfillLocations());
@@ -284,6 +292,7 @@ class ScanController extends ChangeNotifier {
   /// Date-limited trips are left alone: their range is fixed.
   Future<void> autoScan() async {
     if (!autoScanEnabled || running) return;
+    if (Device.desktop) return _autoScanFolders();
     try {
       final ps = await PhotoManager.getPermissionState(
           requestOption: const PermissionRequestOption());
@@ -300,6 +309,25 @@ class ScanController extends ChangeNotifier {
         if (newest.any((a) => !scanned.contains(a.id))) {
           debugPrint('Auto-scanning ${trip.name}');
           await scan(album);
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Auto-scan skipped: $e');
+    }
+  }
+
+  /// Desktop: rescans the first scanned folder that has new photos in it.
+  Future<void> _autoScanFolders() async {
+    try {
+      final scanned = await db.scannedAssetIds();
+      for (final trip in await db.trips()) {
+        final folder = desktopFolderOf(trip.albumId);
+        if (folder == null || !await Directory(folder).exists()) continue;
+        final files = await listPhotoFiles(folder);
+        if (files.any((f) => !scanned.contains(f))) {
+          debugPrint('Auto-scanning ${trip.name}');
+          await scanDesktopFolder(folder);
           return;
         }
       }
@@ -553,9 +581,9 @@ class ScanController extends ChangeNotifier {
       try {
         for (final (i, id) in todo.indexed) {
           onProgress?.call(i, todo.length);
-          final asset = await AssetEntity.fromId(id);
+          final asset = await ScanItem.byId(id);
           if (asset == null) continue;
-          final bytes = await asset.thumbnailDataWithSize(_sizeFor(asset), quality: 90);
+          final bytes = await asset.scanJpeg(_scanSize);
           if (bytes == null) continue;
           await tmp.writeAsBytes(bytes, flush: true);
           try {
@@ -607,7 +635,6 @@ class ScanController extends ChangeNotifier {
   /// A selfie from a "Find my photos" link: open (or reopen) a gallery of
   /// that person's photos.
   Future<({WebShare share, String name})?> _answerSelfie(FindLink link, File selfie) async {
-    if (!Device.photoLibrary) return null; // no faces scanned on desktop yet
     final found = await findInSelfie(selfie, tripId: link.tripId);
     if (found == null || found.photos.isEmpty) return null;
     final name = found.name ?? 'you';
@@ -647,8 +674,25 @@ class ScanController extends ChangeNotifier {
       name: dates == null ? base : '$base · ${formatSpan(dates)}',
       key: key,
       total: await source.assetCountAsync,
-      page: (start, end) => source.getAssetListRange(start: start, end: end),
+      page: (start, end) async => [
+        for (final a in await source.getAssetListRange(start: start, end: end)) PhoneScanItem(a),
+      ],
     );
+  }
+
+  /// Desktop: scans every photo in [folder] and its subfolders. Returns how
+  /// many photos it found (0 if none, or a scan is already running).
+  Future<int> scanDesktopFolder(String folder) async {
+    if (running) return 0;
+    final paths = await listPhotoFiles(folder);
+    if (paths.isEmpty) return 0;
+    unawaited(_scanSource(
+      name: p.basename(folder).isEmpty ? folder : p.basename(folder),
+      key: desktopFolderKey(folder),
+      total: paths.length,
+      page: (start, end) async => [for (final path in paths.sublist(start, end)) DesktopScanItem(path)],
+    ));
+    return paths.length;
   }
 
   /// Scans every photo inside a folder on the phone (and its subfolders),
@@ -673,7 +717,7 @@ class ScanController extends ChangeNotifier {
       name: name,
       key: 'folder:${relative.toLowerCase()}',
       total: matches.length,
-      page: (start, end) async => matches.sublist(start, end),
+      page: (start, end) async => [for (final a in matches.sublist(start, end)) PhoneScanItem(a)],
     ));
     return matches.length;
   }
@@ -682,7 +726,7 @@ class ScanController extends ChangeNotifier {
     required String name,
     required String key,
     required int total,
-    required Future<List<AssetEntity>> Function(int start, int end) page,
+    required Future<List<ScanItem>> Function(int start, int end) page,
   }) async {
     if (running) return;
     running = true;
@@ -767,22 +811,12 @@ class ScanController extends ChangeNotifier {
     }
   }
 
-  /// The scan copy's size: the long side [_scanSize], same shape as the photo.
-  static ThumbnailSize _sizeFor(AssetEntity asset) {
-    final w = asset.width, h = asset.height;
-    return (w <= 0 || h <= 0)
-        ? const ThumbnailSize.square(_scanSize)
-        : w >= h
-            ? ThumbnailSize(_scanSize, _scanSize * h ~/ w)
-            : ThumbnailSize(_scanSize * w ~/ h, _scanSize);
-  }
-
-  Future<void> _scanOne(AssetEntity asset, File tmp,
+  Future<void> _scanOne(ScanItem asset, File tmp,
       {required bool facesDone}) async {
     try {
-      // A downscaled, already-rotated JPEG from the photo library. The
-      // original photo is never touched.
-      final bytes = await asset.thumbnailDataWithSize(_sizeFor(asset), quality: 90);
+      // A downscaled, already-rotated JPEG of the photo. The original photo
+      // is never touched.
+      final bytes = await asset.scanJpeg(_scanSize);
       if (bytes == null) return;
       // Read back by this app only, straight away: no need to force it to disk.
       await tmp.writeAsBytes(bytes);
@@ -790,12 +824,12 @@ class ScanController extends ChangeNotifier {
       // Each settles to "unknown" on failure: nothing waits on them if the
       // faces fail first.
       final labels = _engine!.labels(tmp.path).catchError((Object _) => <String>[]);
-      final where = asset.latlngAsync().then<LatLng?>((v) => v, onError: (Object _) => null);
-      final hash = _hash(asset).catchError((Object _) => null);
+      final where = asset.location();
+      final hash = asset.hash().catchError((Object _) => null);
       final faces = facesDone ? const <NewFace>[] : await _engine!.analyze(tmp.path);
       // The live preview changes in one go, so with several photos in
       // flight one photo never shows another's face boxes.
-      final shown = asset.orientatedSize;
+      final shown = asset.size;
       preview = bytes;
       previewAspect = shown.width > 0 && shown.height > 0 ? shown.width / shown.height : 1;
       previewFaces = [for (final f in faces) Rect.fromLTWH(f.left, f.top, f.width, f.height)];
@@ -812,7 +846,7 @@ class ScanController extends ChangeNotifier {
         if (recentFaces.length > _recentLimit) {
           recentFaces.removeRange(_recentLimit, recentFaces.length);
         }
-        await db.savePhoto(asset.id, faces, takenAt: asset.createDateTime);
+        await db.savePhoto(asset.id, faces, takenAt: asset.takenAt);
       }
       await _tag(asset, labels: await labels, where: await where, hash: await hash);
     } catch (e) {
@@ -867,12 +901,12 @@ class ScanController extends ChangeNotifier {
       : '$n';
 
   /// Works out the photo's categories (selfie, beach, screenshot, …).
-  Future<void> _tag(AssetEntity asset,
+  Future<void> _tag(ScanItem asset,
       {required List<String> labels, required LatLng? where, required int? hash}) async {
     final stats = await db.faceStats(asset.id);
     final ll = where;
     final hasLocation = ll != null && (ll.latitude != 0 || ll.longitude != 0);
-    final size = asset.orientatedSize;
+    final size = asset.size;
     await db.savePhotoMeta(
       asset.id,
       hash: hash,
@@ -891,8 +925,8 @@ class ScanController extends ChangeNotifier {
       minFaceSharpness: stats.minSharpness,
       width: size.width.round(),
       height: size.height.round(),
-      folder: asset.relativePath ?? '',
-      title: asset.title ?? '',
+      folder: asset.folder,
+      title: asset.title,
       hasLocation: hasLocation,
       labels: labels,
       minEyesOpen: stats.minEyes,
@@ -900,36 +934,6 @@ class ScanController extends ChangeNotifier {
       maxYaw: stats.maxYaw,
     ));
     await db.saveTags(asset.id, tags, tagVersion);
-  }
-
-  /// Duplicate fingerprint from a tiny thumbnail (cheap to decode). Uses
-  /// Android's stored thumbnail when it can: the photo library plugin would
-  /// decode the whole photo again just for these 72 pixels.
-  Future<int?> _hash(AssetEntity asset) async {
-    final stored = await FastThumb.pixels(asset.id, 48, video: asset.type == AssetType.video);
-    if (stored != null) {
-      final tiny = img.copyResize(
-          img.Image.fromBytes(
-              width: stored.width, height: stored.height, bytes: stored.rgba.buffer, numChannels: 4),
-          width: 9,
-          height: 8,
-          interpolation: img.Interpolation.average);
-      return differenceHash([
-        for (var y = 0; y < 8; y++)
-          for (var x = 0; x < 9; x++) tiny.getPixel(x, y).luminance.toInt(),
-      ]);
-    }
-    final bytes = await asset.thumbnailDataWithSize(
-        const ThumbnailSize.square(48), quality: 80);
-    if (bytes == null) return null;
-    final small = img.decodeImage(bytes);
-    if (small == null) return null;
-    final tiny = img.copyResize(small, width: 9, height: 8,
-        interpolation: img.Interpolation.average);
-    return differenceHash([
-      for (var y = 0; y < 8; y++)
-        for (var x = 0; x < 9; x++) tiny.getPixel(x, y).luminance.toInt(),
-    ]);
   }
 
   /// Groups every face that isn't in a person yet.

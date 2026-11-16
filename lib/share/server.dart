@@ -8,7 +8,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleState, WidgetsBinding;
 import 'package:photo_manager/photo_manager.dart';
 
+import '../platform/device.dart';
 import '../scan/background.dart';
+import '../ui/desktop_thumbs.dart';
 import '../ui/widgets.dart' show AssetThumb;
 import 'discovery.dart';
 import 'find_page.dart';
@@ -315,8 +317,13 @@ class ShareServer extends ChangeNotifier {
           if (share == null) return;
           final f = _file(share, q['fileId']);
           if (f != null && !f.isAsset) return await _fileTile(res, f);
-          final asset = f == null ? null : await AssetThumb.entity(f.assetId);
-          final bytes = await asset?.thumbnailDataWithSize(const ThumbnailSize.square(360), quality: 80);
+          final Uint8List? bytes;
+          if (f != null && Device.desktop) {
+            bytes = await desktopThumbJpeg(f.assetId, 360, cover: true);
+          } else {
+            final asset = f == null ? null : await AssetThumb.entity(f.assetId);
+            bytes = await asset?.thumbnailDataWithSize(const ThumbnailSize.square(360), quality: 80);
+          }
           if (bytes == null) return await _status(res, HttpStatus.notFound);
           res.headers
             ..contentType = ContentType('image', 'jpeg')
@@ -330,6 +337,15 @@ class ShareServer extends ChangeNotifier {
           if (share == null) return;
           final f = _file(share, q['fileId']);
           if (f != null && !f.isAsset) return await _fileTile(res, f);
+          if (f != null && Device.desktop) {
+            final jpeg = await desktopThumbJpeg(f.assetId, 1800, quality: 85);
+            if (jpeg == null) return await _status(res, HttpStatus.notFound);
+            res.headers
+              ..contentType = ContentType('image', 'jpeg')
+              ..set('Cache-Control', 'max-age=3600');
+            res.add(jpeg);
+            return await res.close();
+          }
           final asset = f == null ? null : await AssetThumb.entity(f.assetId);
           if (asset == null) return await _status(res, HttpStatus.notFound);
           final w = asset.orientatedWidth, h = asset.orientatedHeight;

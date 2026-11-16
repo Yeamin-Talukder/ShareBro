@@ -6,6 +6,8 @@ import 'package:flutter/painting.dart';
 import 'package:flutter/services.dart';
 import 'package:photo_manager/photo_manager.dart';
 
+import '../platform/device.dart';
+import 'desktop_thumbs.dart';
 import 'widgets.dart' show AssetThumb;
 
 /// Thumbnails straight from the photo library, made for speed: keyed by
@@ -41,6 +43,12 @@ class FastThumb extends ImageProvider<FastThumb> {
 
   Future<ui.Codec> _load(FastThumb key, ImageDecoderCallback decode) async {
     try {
+      if (Device.desktop) {
+        // On desktop the id is the photo's path.
+        final bytes = await desktopThumbJpeg(id, size, cover: cover, quality: quality);
+        if (bytes == null) throw StateError('Photo $id is gone');
+        return await decode(await ui.ImmutableBuffer.fromUint8List(bytes));
+      }
       final a = await AssetThumb.entity(id);
       if (a == null) throw StateError('Photo $id is gone');
       final w = a.orientatedWidth, h = a.orientatedHeight;

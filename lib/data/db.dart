@@ -710,6 +710,14 @@ class AppDb {
     return [for (final r in rows) r['asset_id'] as String];
   }
 
+  /// When a scanned photo was taken, if known.
+  Future<DateTime?> takenAt(String assetId) async {
+    final rows = await _db.query('photos',
+        columns: ['taken_at'], where: 'asset_id = ?', whereArgs: [assetId]);
+    final t = rows.firstOrNull?['taken_at'] as int?;
+    return t == null ? null : DateTime.fromMillisecondsSinceEpoch(t);
+  }
+
   Future<void> setTakenAt(Map<String, DateTime> dates) async {
     final batch = _db.batch();
     dates.forEach((id, t) => batch.update(

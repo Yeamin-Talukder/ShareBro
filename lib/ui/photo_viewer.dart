@@ -4,7 +4,6 @@ import 'dart:ui' show ImageFilter, lerpDouble;
 import 'package:flutter/material.dart';
 import 'anim.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:video_player/video_player.dart';
 
 import '../data/db.dart';
@@ -514,13 +513,7 @@ class _BlurredBackdrop extends StatelessWidget {
               // blur, without running a full-screen blur filter every frame
               // while you swipe.
               if (asset != null)
-                AssetEntityImage(
-                  asset,
-                  isOriginal: false,
-                  thumbnailSize: const ThumbnailSize.square(32),
-                  fit: BoxFit.cover,
-                  filterQuality: FilterQuality.medium,
-                ),
+                LibraryImage(asset, size: 32, filterQuality: FilterQuality.medium),
               const ColoredBox(color: Colors.black45),
             ],
           );
@@ -875,12 +868,7 @@ class _SpotlightState extends State<_Spotlight> with SingleTickerProviderStateMi
                         child: SizedBox(
                           width: photo.width * k,
                           height: photo.height * k,
-                          child: AssetEntityImage(
-                            d.asset,
-                            isOriginal: false,
-                            thumbnailSize: const ThumbnailSize.square(2000),
-                            fit: BoxFit.fill,
-                          ),
+                          child: LibraryImage(d.asset, size: 2000, fit: BoxFit.fill),
                         ),
                       ),
                     ),
@@ -1035,12 +1023,7 @@ class _VideoPageState extends State<_VideoPage> {
               aspectRatio: aspect,
               child: v != null && v.value.isInitialized
                   ? VideoPlayer(v)
-                  : AssetEntityImage(
-                      a,
-                      isOriginal: false,
-                      thumbnailSize: const ThumbnailSize.square(1200),
-                      fit: BoxFit.contain,
-                    ),
+                  : LibraryImage(a, size: 1200, fit: BoxFit.contain),
             ),
           ),
           // The big play button fades away while playing.

@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 import 'package:photo_manager/photo_manager.dart';
 
+import '../platform/device.dart';
+import '../ui/desktop_thumbs.dart';
 import '../ui/widgets.dart' show AssetThumb;
 import 'protocol.dart' show mimeFor;
 
@@ -37,7 +39,8 @@ class PreparedFile {
   String? preview;
 
   /// A gallery photo or video (not a picked file or a message).
-  bool get isAsset => !assetId.contains(':');
+  bool get isAsset =>
+      !assetId.startsWith('file:') && !assetId.startsWith('text:') && (Device.desktop || !assetId.contains(':'));
 
   Stream<List<int>> open() => file.openRead();
 }
@@ -106,7 +109,10 @@ Future<List<PreparedFile>> prepareItems(
   for (var i = 0; i < items.length; i++) {
     onProgress?.call(i, items.length);
     final item = items[i];
-    if (item.assetId != null) {
+    if (item.assetId != null && Device.desktop) {
+      final f = await _prepareDesktop(item.assetId!, quality, tmp);
+      if (f != null) add(f);
+    } else if (item.assetId != null) {
       final asset = await AssetThumb.entity(item.assetId!);
       final f = asset == null ? null : await _prepareOne(asset, quality, tmp);
       if (f != null) add(f);
@@ -206,6 +212,43 @@ Future<PreparedFile?> _prepareOne(AssetEntity asset, SendQuality quality, Direct
           ThumbnailSize((w * scale).round(), (h * scale).round()),
           quality: 88);
       return small == null ? null : fromBytes(small, asJpg(title));
+  }
+}
+
+/// Desktop: [path] is the photo file itself.
+Future<PreparedFile?> _prepareDesktop(String path, SendQuality quality, Directory tmp) async {
+  final original = File(path);
+  if (!await original.exists()) return null;
+  final title = p.basename(path);
+  final ext = p.extension(title).toLowerCase();
+  final modified = await original.lastModified();
+
+  Future<PreparedFile?> fromBytes(Uint8List? bytes, String name) async {
+    if (bytes == null) return null;
+    final f = File(p.join(tmp.path, '${path.hashCode}_$name'));
+    await f.writeAsBytes(bytes, flush: true);
+    return PreparedFile(assetId: path, fileName: name, size: bytes.length, mime: 'image/jpeg', file: f, modified: modified);
+  }
+
+  String asJpg(String name) => '${p.basenameWithoutExtension(name)}.jpg';
+
+  switch (quality) {
+    case SendQuality.original:
+      return PreparedFile(
+          assetId: path, fileName: title, size: await original.length(), mime: _mime(ext), file: original, modified: modified);
+    case SendQuality.noLocation:
+      if (ext == '.jpg' || ext == '.jpeg') {
+        final bytes = await original.readAsBytes();
+        if (exifOrientation(bytes) <= 1) return fromBytes(stripJpegMetadata(bytes), title);
+      } else if (ext == '.png') {
+        return _prepareDesktop(path, SendQuality.original, tmp);
+      }
+      // Re-saved upright at full size, without the metadata.
+      return fromBytes(await desktopThumbJpeg(path, 1 << 14, quality: 95), asJpg(title));
+    case SendQuality.smaller:
+      final size = await desktopPhotoSize(path);
+      if (size != null && size.longestSide <= _smallSize) return _prepareDesktop(path, SendQuality.noLocation, tmp);
+      return fromBytes(await desktopThumbJpeg(path, _smallSize, quality: 88), asJpg(title));
   }
 }
 

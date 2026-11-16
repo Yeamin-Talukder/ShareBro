@@ -26,6 +26,7 @@ import 'share_screen.dart';
 import 'motion.dart';
 import 'update_banner.dart';
 import 'update_sheet.dart';
+import 'desktop_gallery.dart';
 
 /// Bottom navigation between People, Photos, Albums, Explore and Share. Tabs keep
 /// their scroll position and filters when you switch.
@@ -146,9 +147,14 @@ class _RootScreenState extends State<RootScreen> {
     final c = widget.controller;
     final tabs = [
       HomeScreen(controller: c),
-      // The gallery tabs need the phone's photo library.
-      if (Device.photoLibrary) PhotosTab(controller: c) else const DesktopSoon(title: 'Photos'),
-      if (Device.photoLibrary) AlbumsTab(controller: c) else const DesktopSoon(title: 'Albums'),
+      // On desktop the gallery is the scanned folders.
+      if (Device.photoLibrary || Device.desktop) PhotosTab(controller: c) else const DesktopSoon(title: 'Photos'),
+      if (Device.photoLibrary)
+        AlbumsTab(controller: c)
+      else if (Device.desktop)
+        DesktopAlbumsTab(controller: c)
+      else
+        const DesktopSoon(title: 'Albums'),
       ExploreTab(controller: c),
       ShareTab(controller: c),
     ];

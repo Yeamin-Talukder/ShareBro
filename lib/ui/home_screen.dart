@@ -33,6 +33,7 @@ import 'settings_screen.dart';
 import 'timeline_screen.dart';
 import 'together_screen.dart';
 import 'widgets.dart';
+import 'package:file_picker/file_picker.dart';
 
 /// Room under the last row for the Scan button floating above the nav bar.
 const _fabClearance = 88.0;
@@ -237,6 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _pickAlbumAndScan() async {
+    if (Device.desktop) return _pickFolderAndScan();
     if (!Device.photoLibrary) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text(desktopSoonMessage)));
       return;
@@ -255,6 +257,20 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } else {
       c.scan(choice.album!, dates: choice.dates);
+    }
+    _openScan();
+  }
+
+  /// Desktop: a folder of photos (and the folders inside it).
+  Future<void> _pickFolderAndScan() async {
+    final folder = await FilePicker.getDirectoryPath(dialogTitle: 'Choose a folder of photos to scan');
+    if (folder == null || !mounted) return;
+    final found = await c.scanDesktopFolder(folder);
+    if (!mounted) return;
+    if (found == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No photos in that folder (JPEG, PNG, WebP, GIF or BMP). Pick another one.')));
+      return;
     }
     _openScan();
   }
@@ -454,7 +470,7 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: EdgeInsets.only(
           bottom: math.max(0, MediaQuery.paddingOf(context).bottom - MediaQuery.viewPaddingOf(context).bottom),
         ),
-        child: !Device.photoLibrary ? null : ListenableBuilder(
+        child: !Device.photoLibrary && !Device.desktop ? null : ListenableBuilder(
           listenable: c,
           builder: (context, _) => _ScanButton(
             controller: c,
@@ -594,13 +610,16 @@ class _HomeScreenState extends State<HomeScreen> {
         else if (people.isEmpty)
           SliverFillRemaining(
             hasScrollBody: false,
-            child: !Device.photoLibrary
+            child: !Device.photoLibrary && !Device.desktop
                 ? const EmptyIllustration(message: desktopSoonMessage)
                 : EmptyIllustration(
               message: c.running
                   ? 'People will appear here when the scan finishes.'
-                  : 'Scan a trip album or folder to group photos by the people in them.\n'
-                      'Everything stays on this phone.',
+                  : Device.desktop
+                      ? 'Scan a folder of photos to group them by the people in them.\n'
+                          'Everything stays on this computer.'
+                      : 'Scan a trip album or folder to group photos by the people in them.\n'
+                          'Everything stays on this phone.',
               action: c.running
                   ? null
                   : FilledButton.icon(

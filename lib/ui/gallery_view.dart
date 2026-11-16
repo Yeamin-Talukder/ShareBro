@@ -15,6 +15,8 @@ import 'motion.dart';
 import 'photo_viewer.dart';
 import 'theme.dart';
 import 'widgets.dart';
+import '../data/gallery.dart';
+import '../platform/device.dart';
 
 const _pageSize = 120;
 const _gap = 2.0;
@@ -44,6 +46,12 @@ abstract class GallerySource {
 
   /// A list of photo ids, e.g. from a category.
   factory GallerySource.ids(Future<List<String>> Function() load) = _IdSource;
+
+  /// Everything there is to pick from: the phone's library, or on desktop
+  /// the photos from the scanned folders.
+  factory GallerySource.everything(ScanController c, {bool media = false}) => Device.desktop
+      ? _IdSource(() => c.db.photosIn())
+      : _AlbumSource(() => Gallery.allPhotos(media: media));
 
   Future<int> open();
   Future<List<AssetEntity>> page(int start, int size);

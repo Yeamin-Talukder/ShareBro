@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 
+import '../platform/device.dart';
+
 /// Small male/female classifier (MIT, github.com/shubham0204/
 /// Age-Gender_Estimation_TF-Android): a 128x128 RGB face in, the chances of
 /// male and female out.
@@ -15,7 +17,9 @@ const _size = 128;
 /// averaged so one odd photo doesn't decide it. Returns the chance (0..1)
 /// that each person is female. Runs off the main isolate.
 Future<Map<int, double>> guessFemaleChance(Map<int, List<Uint8List>> facesByPerson) async {
-  if (facesByPerson.isEmpty) return const {};
+  // The model is TensorFlow Lite, bundled with phone builds only; desktop
+  // leaves gender unknown (people can still set it by hand).
+  if (facesByPerson.isEmpty || Device.desktop) return const {};
   final model = (await rootBundle.load(_modelAsset)).buffer.asUint8List();
   return Isolate.run(() => _guess(model, facesByPerson));
 }

@@ -8,9 +8,12 @@ import 'package:photo_manager/photo_manager.dart';
 
 import '../data/dates.dart';
 import '../data/db.dart';
+import '../platform/desktop_library.dart';
+import '../platform/device.dart';
 import 'fast_thumb.dart';
 import 'motion.dart';
 import 'sections.dart';
+import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
 /// Round face picture. Shares a [Hero] tag with the person page header so it
 /// flies between the two.
@@ -75,7 +78,8 @@ class AssetThumb extends StatelessWidget {
 
   /// Looks an asset up once and reuses it for every rebuild.
   static Future<AssetEntity?> entity(String id) => _cache.putIfAbsent(id, () async {
-        final a = await AssetEntity.fromId(id);
+        // On desktop the id is a file path: an entry made from the file.
+        final a = Device.desktop ? await desktopEntity(id) : await AssetEntity.fromId(id);
         if (a != null) _ready[id] = a;
         return a;
       });
@@ -109,6 +113,37 @@ class AssetThumb extends StatelessWidget {
           ? child
           : AnimatedOpacity(opacity: frame == null ? 0 : 1, duration: 160.ms, child: child),
       errorBuilder: (context, _, _) => const Skeleton(radius: 0),
+    );
+  }
+}
+
+/// A photo-library thumbnail [size] px square at most: from the library
+/// on a phone, from the file (via [FastThumb]) on desktop.
+class LibraryImage extends StatelessWidget {
+  const LibraryImage(this.asset, {super.key, required this.size, this.fit = BoxFit.cover, this.filterQuality});
+
+  final AssetEntity asset;
+  final int size;
+  final BoxFit fit;
+  final FilterQuality? filterQuality;
+
+  @override
+  Widget build(BuildContext context) {
+    if (Device.desktop) {
+      return Image(
+        image: FastThumb(asset.id, FastThumb.step(size.toDouble())),
+        fit: fit,
+        filterQuality: filterQuality ?? FilterQuality.medium,
+        gaplessPlayback: true,
+        errorBuilder: (context, _, _) => const SizedBox.shrink(),
+      );
+    }
+    return AssetEntityImage(
+      asset,
+      isOriginal: false,
+      thumbnailSize: ThumbnailSize.square(size),
+      fit: fit,
+      filterQuality: filterQuality ?? FilterQuality.low,
     );
   }
 }

@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'anim.dart';
 
-import '../data/gallery.dart';
 import '../data/group_match.dart';
 import '../scan/scan_controller.dart';
 import '../share/group.dart';
@@ -156,7 +155,7 @@ class _TripGroupScreenState extends State<TripGroupScreen> {
           appBar: AppBar(title: const Text('Pick photos to share')),
           body: GalleryView(
             controller: c,
-            source: GallerySource.album(Gallery.allPhotos),
+            source: GallerySource.everything(c),
             onPicked: (ids) => Navigator.pop(context, ids),
           ),
         ),

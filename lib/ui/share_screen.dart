@@ -7,7 +7,6 @@ import 'anim.dart';
 
 import '../data/dates.dart';
 import '../data/db.dart';
-import '../data/gallery.dart';
 import '../platform/device.dart';
 import '../scan/scan_controller.dart';
 import '../share/native_files.dart';
@@ -73,7 +72,7 @@ class _ShareTabState extends State<ShareTab> {
           appBar: AppBar(title: const Text('Pick photos & videos')),
           body: GalleryView(
             controller: c,
-            source: GallerySource.album(() => Gallery.allPhotos(media: true)),
+            source: GallerySource.everything(c, media: true),
             onPicked: (ids) => Navigator.pop(context, ids),
           ),
         ),
@@ -205,7 +204,8 @@ class _ShareTabState extends State<ShareTab> {
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 16, 8, 14),
             child: Row(children: [
-              if (Device.photoLibrary) _PickButton(icon: Icons.photo_library_outlined, label: 'Media', onTap: _pickMedia),
+              if (Device.photoLibrary || Device.desktop)
+                _PickButton(icon: Icons.photo_library_outlined, label: Device.desktop ? 'Photos' : 'Media', onTap: _pickMedia),
               _PickButton(icon: Icons.insert_drive_file_outlined, label: 'Files', onTap: _pickFiles),
               _PickButton(icon: Icons.folder_outlined, label: 'Folder', onTap: _pickFolder),
               _PickButton(icon: Icons.notes_rounded, label: 'Text', onTap: _writeText),
@@ -279,8 +279,8 @@ class _ShareTabState extends State<ShareTab> {
           enabled: _items.isNotEmpty,
           onTap: () => shareItemsWithApps(List.of(_items)),
         ),
-        // Both match faces, which needs scanned photos (phone only for now).
-        if (Device.photoLibrary) ...[
+        // Both match faces in the scanned photos.
+        if (Device.photoLibrary || Device.desktop) ...[
         SectionRow(
           leading: const IconTile(icon: Icons.diversity_3_rounded, color: Color(0xFF30D158)),
           title: 'Trip group',

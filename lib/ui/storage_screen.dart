@@ -7,6 +7,7 @@ import '../scan/scan_controller.dart';
 import 'photo_viewer.dart';
 import 'theme.dart';
 import 'widgets.dart';
+import '../platform/desktop_library.dart';
 
 /// How much space scanned photos take: per trip, the biggest photos, and
 /// how much duplicates and screenshots use.
@@ -39,7 +40,7 @@ class _StorageScreenState extends State<StorageScreen> {
     final found = <String, int>{};
     for (final id in missing) {
       try {
-        final file = await (await AssetThumb.entity(id))?.file;
+        final file = await (await AssetThumb.entity(id))?.localFile;
         if (file != null) found[id] = await file.length();
       } catch (_) {}
       _measured++;
