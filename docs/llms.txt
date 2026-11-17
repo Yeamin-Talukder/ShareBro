@@ -8,6 +8,7 @@ Key facts:
 
 - Face recognition runs entirely on the phone: Google ML Kit finds faces, and InsightFace's MobileFaceNet (w600k_mbf, trained on WebFace600K) turns each face into a 512-number fingerprint. Faces are grouped into people, with several "looks" per person, so glasses, angles and age changes stay together.
 - Trip groups: one person starts a group, friends nearby join with a 4-digit code, and each photo is sent only to the members who appear in it. Uncertain faces are asked about; photos with nobody from the group stay on the phone.
+- Sync people: two of your ShareBro devices (phone and computer, or two phones) swap names and face fingerprints, never photos, so people named on one are recognised on the other.
 - Find my photos: friends without the app scan a QR code, take a selfie in their web browser, and get a gallery of only their photos, with Download all. Optional PIN; the link can be stopped at any time.
 - Sharing uses the open LocalSend protocol v2 (HTTPS with mutual TLS), so it works with LocalSend on Android, iPhone, Windows, macOS and Linux. ShareBro phones can also send to each other with no network using Bluetooth / Wi-Fi Direct (Nearby Connections).
 - Search understands people, trips, places (offline place names from GeoNames, e.g. "Kuakata", "Cox's Bazar"), scenes, male/female and dates, combined: "Maya beach June 2026".
@@ -19,7 +20,7 @@ Key facts:
 
 - [README](https://github.com/Yeamin-Talukder/ShareBro/blob/main/README.md): features, how it works, FAQ, comparison with Google Photos, LocalSend and WhatsApp
 - [Download the latest APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest): use the arm64-v8a file for almost every phone
-- [ShareBro for Windows (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.7.0-windows): installer for Windows 10 and 11; scans folders of photos on a PC, groups them by face and sends them to phones
+- [ShareBro for Windows (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.8.0-windows): installer for Windows 10 and 11; scans folders of photos on a PC, groups them by face and sends them to phones
 - [All releases and changelog](https://github.com/Yeamin-Talukder/ShareBro/releases)
 - [Report a bug or request a feature](https://github.com/Yeamin-Talukder/ShareBro/issues)
 
