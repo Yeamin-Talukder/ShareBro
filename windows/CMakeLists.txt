@@ -92,6 +92,15 @@ if(PLUGIN_BUNDLED_LIBRARIES)
     COMPONENT Runtime)
 endif()
 
+# ONNX Runtime's DirectML build (Microsoft, MIT licence) replaces the
+# onnxruntime plugin's CPU-only DLL, so face scanning can run on the
+# graphics chip. Installed after the plugin's copy, so it wins. It uses the
+# DirectML that Windows 10 (recent updates) and 11 ship; without it, or
+# with an old driver, the app falls back to the CPU.
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/third_party/onnxruntime-directml/onnxruntime.dll"
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+  COMPONENT Runtime)
+
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"

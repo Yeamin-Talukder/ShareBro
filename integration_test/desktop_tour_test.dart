@@ -7,7 +7,7 @@
 //     --dart-define=TOUR_SIGNALS=<empty folder>
 //
 // At each stop it writes "<step>.ready" into TOUR_SIGNALS and waits for
-// "<step>.go" (or 90 s). Uses the app's real data folder: back it up first.
+// "<step>.go" (or 90 s). Needs --dart-define=SB_DATA_DIR=<empty scratch folder>.
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -16,12 +16,18 @@ import 'package:integration_test/integration_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:photo_organizer/main.dart' as app;
 import 'package:photo_organizer/ui/root_screen.dart';
+import 'package:photo_organizer/platform/app_dirs.dart';
 
 const _photos = String.fromEnvironment('TOUR_PHOTOS');
 const _signals = String.fromEnvironment('TOUR_SIGNALS');
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  // Never run against the real ShareBro data of whoever uses this PC.
+  if (dataDirOverride.isEmpty) {
+    throw StateError('Pass --dart-define=SB_DATA_DIR=<empty scratch folder>: this test runs the real app.');
+  }
 
   testWidgets('desktop tour', (tester) async {
     Future<void> wait(Duration d) async {

@@ -47,6 +47,16 @@ const _embeddingSize = 512;
 /// Photos scanned at the same time.
 const _inFlight = 3;
 
+/// Desktop: photos are decoded for scanning at a long side of at least
+/// this (by halves, quarters or eighths; see [DesktopScanItem.decodePixels]).
+/// The face finder looks at 640 px and faces are cropped to 112 px.
+const _desktopDecodeAtLeast = 1000;
+
+/// Scanned photos are saved together, this many at a time (or every
+/// couple of seconds), instead of each step of each photo on its own.
+const _saveEvery = 48;
+const _saveAfter = Duration(seconds: 2);
+
 /// Photos whose location is read at the same time.
 const _locateBatch = 24;
 
@@ -115,6 +125,13 @@ class ScanController extends ChangeNotifier {
 
   final AppDb db;
   FaceEngine? _engine;
+
+  /// How faces are being found, for logs: "2 workers, graphics chip".
+  String get engineSummary {
+    final e = _engine;
+    if (e == null) return 'not loaded';
+    return '${e.parallel} worker${e.parallel == 1 ? '' : 's'}${e.onGpu ? ', graphics chip' : ''}';
+  }
 
   /// The chip [_engine] was opened for.
   AccelChoice? _engineChip;
@@ -220,6 +237,18 @@ class ScanController extends ChangeNotifier {
         ..forget(chip)
         ..write(path);
     }
+    notifyListeners();
+  }
+
+  /// Settings › Test the chips again: forgets what the GPU and NPU did, so
+  /// the next scan tries them afresh with a newly opened model.
+  Future<void> retestChips() async {
+    final path = await accelStatePath();
+    AccelState.read(path, accelStateKey(faceModelId))
+      ..forget(Accel.gpu)
+      ..forget(Accel.npu)
+      ..write(path);
+    _engineChip = null;
     notifyListeners();
   }
 
@@ -746,10 +775,12 @@ class ScanController extends ChangeNotifier {
     await ScanNotification.start('Starting…');
 
     final dir = (await getTemporaryDirectory()).path;
-    // One scan copy per photo in flight.
-    final tmps = [for (var i = 0; i < _inFlight; i++) File(p.join(dir, 'scan_$i.jpg'))];
+    // One scan copy per photo in flight (phones; desktop scans from pixels).
+    // Desktop keeps every face worker busy, with one photo decoding ahead.
+    await _readyEngine();
+    final lanes = Device.desktop ? _engine!.parallel + 1 : _inFlight;
+    final tmps = [for (var i = 0; i < lanes; i++) File(p.join(dir, 'scan_$i.jpg'))];
     try {
-      await _readyEngine();
       final scanned = await db.scannedAssetIds();
       final tagged = await db.taggedAssetIds(tagVersion);
       _startedAt = DateTime.now();
@@ -757,6 +788,7 @@ class ScanController extends ChangeNotifier {
       for (var start = 0; start < total && !_cancel; start += _pageSize) {
         final assets = await page(start, (start + _pageSize).clamp(0, total));
         await db.addToTrip(tripId!, assets.map((a) => a.id));
+        if (Device.desktop) await _reuseKnownFiles(assets, scanned, tagged);
         // A few photos at once: while one waits on the photo library,
         // another is in face detection and a third in the labeller.
         var next = 0;
@@ -781,11 +813,13 @@ class ScanController extends ChangeNotifier {
         }
 
         await Future.wait([for (final t in tmps) lane(t)]);
+        await _save();
       }
+      await _save();
       final took = DateTime.now().difference(_startedAt!);
       final work = done - skipped;
       // Kept in release builds: the one line that tells how fast scanning is.
-      debugPrint('Scan done: $work photos scanned ($skipped skipped), $facesFound faces '
+      debugPrint('Scan done ($engineSummary): $work photos scanned ($skipped skipped), $facesFound faces '
           'in ${took.inSeconds}s'
           '${work > 0 ? ' = ${(took.inMilliseconds / work).round()} ms/photo' : ''}');
       ScanNotification.update('Grouping faces…');
@@ -795,6 +829,12 @@ class ScanController extends ChangeNotifier {
       debugPrint('Scan failed: $e\n$st');
       error = '$e';
     } finally {
+      // Whatever was scanned before a stop or an error is kept.
+      try {
+        await _save();
+      } catch (e) {
+        debugPrint('Saving scanned photos failed: $e');
+      }
       for (final tmp in tmps) {
         if (await tmp.exists()) await tmp.delete();
       }
@@ -814,27 +854,21 @@ class ScanController extends ChangeNotifier {
   Future<void> _scanOne(ScanItem asset, File tmp,
       {required bool facesDone}) async {
     try {
-      // A downscaled, already-rotated JPEG of the photo. The original photo
-      // is never touched.
-      final bytes = await asset.scanJpeg(_scanSize);
-      if (bytes == null) return;
-      // Read back by this app only, straight away: no need to force it to disk.
-      await tmp.writeAsBytes(bytes);
-      // Things that don't depend on the faces start now, alongside them.
-      // Each settles to "unknown" on failure: nothing waits on them if the
-      // faces fail first.
-      final labels = _engine!.labels(tmp.path).catchError((Object _) => <String>[]);
-      final where = asset.location();
-      final hash = asset.hash().catchError((Object _) => null);
-      final faces = facesDone ? const <NewFace>[] : await _engine!.analyze(tmp.path);
+      final found = asset is DesktopScanItem && Device.desktop
+          ? await _readDesktop(asset, facesDone: facesDone)
+          : await _readPhone(asset, tmp, facesDone: facesDone);
+      if (found == null) return;
+      final (faces, labels, where, hash, bytes) = found;
       // The live preview changes in one go, so with several photos in
       // flight one photo never shows another's face boxes.
       final shown = asset.size;
-      preview = bytes;
-      previewAspect = shown.width > 0 && shown.height > 0 ? shown.width / shown.height : 1;
-      previewFaces = [for (final f in faces) Rect.fromLTWH(f.left, f.top, f.width, f.height)];
-      previewThumbs = [for (final f in faces) f.thumb];
-      previewId++;
+      if (bytes != null) {
+        preview = bytes;
+        previewAspect = shown.width > 0 && shown.height > 0 ? shown.width / shown.height : 1;
+        previewFaces = [for (final f in faces) Rect.fromLTWH(f.left, f.top, f.width, f.height)];
+        previewThumbs = [for (final f in faces) f.thumb];
+        previewId++;
+      }
       if (!facesDone) {
         facesFound += faces.length;
         for (final f in faces) {
@@ -846,12 +880,171 @@ class ScanController extends ChangeNotifier {
         if (recentFaces.length > _recentLimit) {
           recentFaces.removeRange(_recentLimit, recentFaces.length);
         }
-        await db.savePhoto(asset.id, faces, takenAt: asset.takenAt);
       }
-      await _tag(asset, labels: await labels, where: await where, hash: await hash);
+      // Faces found just now are counted here; ones from an earlier scan
+      // are read back.
+      final stats = facesDone ? await db.faceStats(asset.id) : faceStatsOf(faces);
+      await _queue(_record(asset,
+          faces: facesDone ? null : faces, stats: stats, labels: labels, where: where, hash: hash));
     } catch (e) {
       // One broken photo shouldn't stop a 5,000-photo scan.
       debugPrint('Skipping ${asset.id}: $e');
+    }
+  }
+
+  /// Phone: a downscaled, already-rotated JPEG from the photo library goes
+  /// to ML Kit (which reads files). The original photo is never touched.
+  Future<(List<NewFace>, List<String>, LatLng?, int?, Uint8List?)?> _readPhone(ScanItem asset, File tmp,
+      {required bool facesDone}) async {
+    final bytes = await asset.scanJpeg(_scanSize);
+    if (bytes == null) return null;
+    // Read back by this app only, straight away: no need to force it to disk.
+    await tmp.writeAsBytes(bytes);
+    // Things that don't depend on the faces start now, alongside them.
+    // Each settles to "unknown" on failure: nothing waits on them if the
+    // faces fail first.
+    final labels = _engine!.labels(tmp.path).catchError((Object _) => <String>[]);
+    final where = asset.location();
+    final hash = asset.hash().catchError((Object _) => null);
+    final faces = facesDone ? const <NewFace>[] : await _engine!.analyze(tmp.path);
+    return (faces, await labels, await where, await hash, bytes);
+  }
+
+  /// Desktop: the file is decoded once, straight to pixels at the size the
+  /// face models need, and handed to a face worker, which also makes the
+  /// preview and the duplicate fingerprint. No JPEG is written or read.
+  Future<(List<NewFace>, List<String>, LatLng?, int?, Uint8List?)?> _readDesktop(DesktopScanItem asset,
+      {required bool facesDone}) async {
+    final meta = asset.readMeta();
+    final decoded = await asset.decodePixels(atLeast: _desktopDecodeAtLeast);
+    if (decoded == null) return null;
+    final (pixels, w, h) = decoded;
+    // The phone skips faces under [minFacePx] on its 1600 px copies; the
+    // same faces measure smaller here.
+    final full = math.max(asset.size.width, asset.size.height);
+    final minFace = minFacePx * math.max(w, h) / math.max(1.0, math.min(_scanSize.toDouble(), full));
+    final scan = await _engine!.analyzeRgba(TransferableTypedData.fromList([pixels]), w, h,
+        minFace: minFace, skipFaces: facesDone);
+    await meta;
+    return (scan?.faces ?? const <NewFace>[], const <String>[], await asset.location(), scan?.hash, scan?.preview);
+  }
+
+  /// What gets saved for a photo: its faces (if new), metadata and tags.
+  ScannedPhoto _record(ScanItem asset,
+      {required List<NewFace>? faces,
+      required FaceStats stats,
+      required List<String> labels,
+      required LatLng? where,
+      required int? hash}) {
+    final ll = where;
+    final hasLocation = ll != null && (ll.latitude != 0 || ll.longitude != 0);
+    final size = asset.size;
+    return ScannedPhoto(
+      assetId: asset.id,
+      takenAt: asset.takenAt,
+      faces: faces,
+      hash: hash,
+      lat: hasLocation ? ll.latitude : null,
+      lng: hasLocation ? ll.longitude : null,
+      quality: photoQuality(
+        faceCount: stats.count,
+        avgSharpness: stats.avgSharpness,
+        minEyesOpen: stats.minEyes,
+        maxSmile: stats.maxSmile,
+      ),
+      tags: tagsFor(PhotoFacts(
+        faceCount: stats.count,
+        maxFaceArea: stats.maxArea,
+        minFaceSharpness: stats.minSharpness,
+        width: size.width.round(),
+        height: size.height.round(),
+        folder: asset.folder,
+        title: asset.title,
+        hasLocation: hasLocation,
+        labels: labels,
+        minEyesOpen: stats.minEyes,
+        maxSmile: stats.maxSmile,
+        maxYaw: stats.maxYaw,
+      )),
+      fileKey: asset is DesktopScanItem ? asset.fileKey : null,
+    );
+  }
+
+  final List<ScannedPhoto> _unsaved = [];
+  DateTime _savedAt = DateTime.now();
+  Future<void> _saving = Future.value();
+
+  /// Keeps [photo] to save with others (see [_saveEvery]).
+  Future<void> _queue(ScannedPhoto photo) async {
+    _unsaved.add(photo);
+    if (_unsaved.length >= _saveEvery || DateTime.now().difference(_savedAt) >= _saveAfter) await _save();
+  }
+
+  /// Saves every photo waiting, in one transaction. Saves run one after
+  /// another, in order.
+  Future<void> _save() {
+    if (_unsaved.isEmpty) return _saving;
+    final batch = List.of(_unsaved);
+    _unsaved.clear();
+    _savedAt = DateTime.now();
+    return _saving = _saving.then((_) => db.saveScanned(batch, tagVersion));
+  }
+
+  /// Desktop, before a page of photos is scanned: an unchanged file that
+  /// was scanned before is skipped; one that changed since is scanned
+  /// again; and a new path whose file was already scanned somewhere else
+  /// (moved, copied or renamed) gets that scan copied instead of redone.
+  Future<void> _reuseKnownFiles(List<ScanItem> assets, Set<String> scanned, Set<String> tagged) async {
+    final items = assets.whereType<DesktopScanItem>().toList();
+    if (items.isEmpty) return;
+    final known = await db.fileKeys(items.map((i) => i.id));
+    final missing = <String, FileKey>{};
+    final fresh = <DesktopScanItem>[];
+    await Future.wait([
+      for (final item in items)
+        () async {
+          final saved = known[item.id];
+          if (scanned.contains(item.id) && saved != null) {
+            // Known file: its size and date say whether it changed, without
+            // reading it.
+            final FileStat stat;
+            try {
+              stat = await File(item.id).stat();
+            } catch (_) {
+              return;
+            }
+            if (stat.size == saved.size && stat.modified.millisecondsSinceEpoch == saved.modified) {
+              item.fileKey = saved;
+              return;
+            }
+          }
+          final key = await DesktopScanItem.keyOf(item.id);
+          if (key == null) return;
+          item.fileKey = key;
+          if (!scanned.contains(item.id)) {
+            fresh.add(item);
+          } else if (saved == null) {
+            // Scanned before file keys were kept: remember it now.
+            missing[item.id] = key;
+          } else if (key.content != saved.content || key.size != saved.size) {
+            // The file changed since: scan it again.
+            scanned.remove(item.id);
+            tagged.remove(item.id);
+          } else {
+            // Only its date changed (copied back, touched): keep the scan.
+            missing[item.id] = key;
+          }
+        }(),
+    ]);
+    await db.saveFileKeys(missing);
+    if (fresh.isEmpty) return;
+    final same = await db.scannedByContent(fresh.map((i) => i.fileKey!.content));
+    for (final item in fresh) {
+      final from = same[item.fileKey!.content];
+      if (from == null || from == item.id) continue;
+      await db.copyScan(from, item.id, item.fileKey!);
+      scanned.add(item.id);
+      tagged.add(item.id);
     }
   }
 
@@ -901,41 +1094,6 @@ class ScanController extends ChangeNotifier {
       : '$n';
 
   /// Works out the photo's categories (selfie, beach, screenshot, …).
-  Future<void> _tag(ScanItem asset,
-      {required List<String> labels, required LatLng? where, required int? hash}) async {
-    final stats = await db.faceStats(asset.id);
-    final ll = where;
-    final hasLocation = ll != null && (ll.latitude != 0 || ll.longitude != 0);
-    final size = asset.size;
-    await db.savePhotoMeta(
-      asset.id,
-      hash: hash,
-      lat: hasLocation ? ll.latitude : null,
-      lng: hasLocation ? ll.longitude : null,
-      quality: photoQuality(
-        faceCount: stats.count,
-        avgSharpness: stats.avgSharpness,
-        minEyesOpen: stats.minEyes,
-        maxSmile: stats.maxSmile,
-      ),
-    );
-    final tags = tagsFor(PhotoFacts(
-      faceCount: stats.count,
-      maxFaceArea: stats.maxArea,
-      minFaceSharpness: stats.minSharpness,
-      width: size.width.round(),
-      height: size.height.round(),
-      folder: asset.folder,
-      title: asset.title,
-      hasLocation: hasLocation,
-      labels: labels,
-      minEyesOpen: stats.minEyes,
-      maxSmile: stats.maxSmile,
-      maxYaw: stats.maxYaw,
-    ));
-    await db.saveTags(asset.id, tags, tagVersion);
-  }
-
   /// Groups every face that isn't in a person yet.
   Future<void> regroup({bool fromScratch = false}) async {
     if (fromScratch) await db.resetAutoGroups();

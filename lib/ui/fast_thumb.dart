@@ -44,10 +44,11 @@ class FastThumb extends ImageProvider<FastThumb> {
   Future<ui.Codec> _load(FastThumb key, ImageDecoderCallback decode) async {
     try {
       if (Device.desktop) {
-        // On desktop the id is the photo's path.
-        final bytes = await desktopThumbJpeg(id, size, cover: cover, quality: quality);
-        if (bytes == null) throw StateError('Photo $id is gone');
-        return await decode(await ui.ImmutableBuffer.fromUint8List(bytes));
+        // On desktop the id is the photo's path. Decoded straight at this
+        // size (or read from the disk cache); never waits for an encode.
+        final codec = await desktopThumbCodec(id, size, cover: cover, quality: quality);
+        if (codec == null) throw StateError('Photo $id is gone');
+        return codec;
       }
       final a = await AssetThumb.entity(id);
       if (a == null) throw StateError('Photo $id is gone');

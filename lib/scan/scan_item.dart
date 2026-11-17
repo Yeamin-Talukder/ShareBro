@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:isolate';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -11,6 +10,10 @@ import 'package:photo_manager/photo_manager.dart';
 import '../face/tags.dart' show differenceHash;
 import '../platform/device.dart';
 import '../ui/fast_thumb.dart' show FastThumb;
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+import '../data/db.dart' show FileKey;
+import '../platform/worker_pool.dart';
 
 /// One photo to scan: from the phone's photo library ([PhoneScanItem]) or,
 /// on desktop, a file on disk ([DesktopScanItem], whose id is its path).
@@ -123,6 +126,10 @@ class DesktopScanItem implements ScanItem {
   /// The small copy [scanJpeg] made, reused for [hash].
   img.Image? _small;
 
+  /// What the file was when it was looked at (see [FileKey]); saved with
+  /// the scan.
+  FileKey? fileKey;
+
   @override
   String get id => path;
 
@@ -146,10 +153,72 @@ class DesktopScanItem implements ScanItem {
   @override
   String get title => p.basename(path);
 
-  /// Reads the EXIF block (date taken, GPS). Call before [takenAt].
+  Future<_Exif?>? _reading;
+
+  /// Reads the EXIF block (date taken, GPS) on a background worker. Call
+  /// before [takenAt].
   Future<void> readMeta() async {
-    _exif ??= await Isolate.run(() => _Exif.read(path));
+    if (_exif != null) return;
+    _exif = await (_reading ??= WorkerPool.shared.run(_exifJob(path)));
   }
+
+  /// The photo decoded straight from its file to upright RGBA pixels, its
+  /// long side at least [atLeast] (or the whole photo, if smaller). Shrinks
+  /// by a half, a quarter or an eighth only: JPEG decoders do those while
+  /// decoding, almost for free, where any other size means decoding bigger
+  /// and resizing. A 12 MP photo (4000 px) comes out at 1000 px, a 24 MP one
+  /// at 1500. Sets [size] to the full photo's upright size. Null if it can't
+  /// be read.
+  Future<(Uint8List, int, int)?> decodePixels({int atLeast = 1000}) async {
+    final buffer = await ui.ImmutableBuffer.fromFilePath(path);
+    final codec = await ui.instantiateImageCodecWithSize(buffer, getTargetSize: (w, h) {
+      _size = ui.Size(w.toDouble(), h.toDouble());
+      final long = math.max(w, h);
+      var shrink = 1;
+      while (shrink < 8 && (long / (shrink * 2)).ceil() >= atLeast) {
+        shrink *= 2;
+      }
+      return ui.TargetImageSize(width: math.max(1, (w / shrink).ceil()), height: math.max(1, (h / shrink).ceil()));
+    });
+    try {
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      final w = image.width, h = image.height;
+      final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      image.dispose();
+      if (data == null) return null;
+      return (data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes), w, h);
+    } finally {
+      codec.dispose();
+    }
+  }
+
+  /// The file's [FileKey]: its size and date from the file system, and a
+  /// hash of its first and last 64 KB (enough to tell photos apart; far
+  /// cheaper than reading the whole file).
+  static Future<FileKey?> keyOf(String path) => WorkerPool.shared.run(() {
+        try {
+          final f = File(path);
+          final stat = f.statSync();
+          final raf = f.openSync();
+          try {
+            const part = 64 * 1024;
+            final head = raf.readSync(part);
+            final len = stat.size;
+            List<int> tail = const [];
+            if (len > part) {
+              raf.setPositionSync(math.max(part, len - part));
+              tail = raf.readSync(part);
+            }
+            final digest = md5.convert([...utf8.encode('$len|'), ...head, ...tail]);
+            return FileKey(size: len, modified: stat.modified.millisecondsSinceEpoch, content: digest.toString());
+          } finally {
+            raf.closeSync();
+          }
+        } catch (_) {
+          return null;
+        }
+      });
 
   @override
   Future<Uint8List?> scanJpeg(int longSide) async {
@@ -171,10 +240,7 @@ class DesktopScanItem implements ScanItem {
       image.dispose();
       if (data == null) return null;
       final rgba = data.buffer.asUint8List();
-      final (jpeg, small) = await Isolate.run(() {
-        final im = img.Image.fromBytes(width: w, height: h, bytes: rgba.buffer, numChannels: 4);
-        return (img.encodeJpg(im, quality: 90), img.copyResize(im, width: 48, height: 48));
-      });
+      final (jpeg, small) = await WorkerPool.shared.run(_encodeJob(rgba, w, h));
       _small = small;
       return jpeg;
     } finally {
@@ -235,3 +301,14 @@ class _Exif {
     return DateTime.tryParse('${s.substring(0, 10).replaceAll(':', '-')}T${s.substring(11, 19)}');
   }
 }
+
+// Jobs for the worker pool are built here, outside any method, so they
+// capture only the plain values passed in (never the photo object, which
+// holds things that can't be sent to another isolate).
+
+_Exif? Function() _exifJob(String path) => () => _Exif.read(path);
+
+(Uint8List, img.Image) Function() _encodeJob(Uint8List rgba, int w, int h) => () {
+      final im = img.Image.fromBytes(width: w, height: h, bytes: rgba.buffer, numChannels: 4);
+      return (img.encodeJpg(im, quality: 90), img.copyResize(im, width: 48, height: 48));
+    };

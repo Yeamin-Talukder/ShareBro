@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.6.0+9
+version: 1.7.0+10
 
 environment:
   sdk: ^3.13.2
@@ -51,6 +51,8 @@ dependencies:
   file_picker: ^13.3.0
   qr_flutter: ^4.1.0
   crypto: ^3.0.8
+  # Direct ONNX Runtime calls for the desktop face models (lib/face/ort_lite.dart).
+  ffi: ^2.2.0
   basic_utils: ^5.8.2
   nearby_connections: ^4.3.0
   permission_handler: 12.0.1
@@ -64,6 +66,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   integration_test:
+    sdk: flutter
+  flutter_driver:
     sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to

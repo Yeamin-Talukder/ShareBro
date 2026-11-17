@@ -15,6 +15,9 @@ import '../data/db.dart';
 import '../platform/device.dart';
 import 'accel.dart';
 import 'scrfd.dart';
+import 'dart:async';
+import 'ort_lite.dart';
+import 'tags.dart' show differenceHash;
 
 part 'face_engine_desktop.dart';
 
@@ -50,7 +53,10 @@ const _minLabelConfidence = 0.7;
 const _warmUpFaces = 4;
 
 /// Fingerprints from another chip must point the same way as the CPU's
-/// (1 is identical) before that chip is trusted with real faces.
+/// (1 is identical) before that chip is trusted with real faces. GPUs and
+/// NPUs work in half precision, which lands around 0.995 for this model;
+/// two photos of the same person are about 0.5, so 0.99 changes nothing
+/// about who matches whom, while 0.999 turned down every working chip.
 const _sameFace = 0.999;
 
 /// Finds faces and turns each into a 512-number fingerprint with
@@ -63,7 +69,7 @@ abstract class FaceEngine {
   /// [chip] is what Settings asks for (phones only): the fastest that
   /// works, or one.
   static Future<FaceEngine> load({AccelChoice chip = AccelChoice.auto}) =>
-      Device.desktop ? _DesktopFaceEngine.load() : _PhoneFaceEngine.load(chip: chip);
+      Device.desktop ? _DesktopFaceEngine.load(chip: chip) : _PhoneFaceEngine.load(chip: chip);
 
   /// What's in the picture, most confident first (empty on desktop for now).
   Future<List<String>> labels(String imagePath);
@@ -76,8 +82,39 @@ abstract class FaceEngine {
   /// redoing every face after a model change without rescanning photos.
   Future<List<Float32List?>> embedCrops(List<Uint8List> jpegs);
 
+  /// Desktop: faces in already-decoded, upright RGBA pixels, plus the scan
+  /// preview and the duplicate fingerprint made in the same pass (no JPEG
+  /// written or read). Faces narrower than [minFace] pixels are skipped;
+  /// with [skipFaces] only the preview and hash are made. Null on phones,
+  /// which scan through [analyze].
+  Future<RgbaScan?> analyzeRgba(TransferableTypedData pixels, int w, int h,
+      {required double minFace, bool skipFaces = false});
+
+  /// How many photos the engine works on at once (desktop runs several).
+  int get parallel => 1;
+
+  /// Desktop: one of the face workers runs on the graphics chip.
+  bool get onGpu => false;
+
   void dispose();
 }
+
+/// What [FaceEngine.analyzeRgba] found in one photo.
+class RgbaScan {
+  RgbaScan(this.faces, this.preview, this.hash);
+
+  final List<NewFace> faces;
+
+  /// A small JPEG for the live scan view.
+  final Uint8List? preview;
+
+  /// Duplicate fingerprint (see [differenceHash]).
+  final int? hash;
+}
+
+/// Faces narrower than this are skipped, measured on a [scanLongSide]
+/// copy. Exposed so desktop scans of smaller copies can scale it.
+const minFacePx = _minFacePx;
 
 /// The phone engine: ML Kit finds faces, and the fingerprints come from the
 /// phone's NPU or GPU when one is there and quicker than the CPU (see
@@ -154,6 +191,17 @@ class _PhoneFaceEngine implements FaceEngine {
   @override
   Future<List<Float32List?>> embedCrops(List<Uint8List> jpegs) =>
       _worker.ask<List<Float32List?>>(_CropsJob(jpegs));
+
+  @override
+  Future<RgbaScan?> analyzeRgba(TransferableTypedData pixels, int w, int h,
+          {required double minFace, bool skipFaces = false}) async =>
+      null;
+
+  @override
+  bool get onGpu => false;
+
+  @override
+  int get parallel => 1;
 
   @override
   void dispose() {
@@ -374,6 +422,7 @@ class _Models implements _Fingerprinter {
           throw StateError('Different fingerprints');
         }
         state.ms[chip] = _msPerFace(opened.interpreter, probe, layout);
+        state.finished(chip);
         open[chip] = opened;
       } catch (_) {
         try {

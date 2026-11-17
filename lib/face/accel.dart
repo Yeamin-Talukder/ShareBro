@@ -3,8 +3,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
+import '../platform/app_dirs.dart';
 
 /// The chips that can run the face model.
 enum Accel {
@@ -143,7 +143,7 @@ class AccelState {
 }
 
 /// Where [AccelState] is kept.
-Future<String> accelStatePath() async => p.join((await getApplicationSupportDirectory()).path, 'face_chips.json');
+Future<String> accelStatePath() async => p.join((await appDataDir()).path, 'face_chips.json');
 
 /// Changes with the model and the system: a new driver deserves a new try.
 String accelStateKey(String modelId) => '$modelId|${Platform.operatingSystem}|${Platform.operatingSystemVersion}';

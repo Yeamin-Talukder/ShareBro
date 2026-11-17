@@ -3,11 +3,11 @@ import 'dart:ui' show Rect;
 
 import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart' show databaseFactoryFfi, sqfliteFfiInit;
 
 import '../platform/device.dart';
+import '../platform/app_dirs.dart';
 
 /// Faces narrower than this share of the photo are too small for ML Kit's
 /// eye-open, smile and head-turn readings to be trusted.
@@ -326,13 +326,13 @@ class AppDb {
       // keep the database in the app's own data folder.
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
-      path = p.join((await getApplicationSupportDirectory()).path, 'photo_organizer.db');
+      path = p.join((await appDataDir()).path, 'photo_organizer.db');
     } else {
       path = p.join(await getDatabasesPath(), 'photo_organizer.db');
     }
     final db = await openDatabase(
       path,
-      version: 8,
+      version: 9,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, _) async {
         await db.execute('''
@@ -372,6 +372,7 @@ class AppDb {
         await _upgradeTo6(db);
         await _upgradeTo7(db);
         await _upgradeTo8(db);
+        await _upgradeTo9(db);
       },
       onUpgrade: (db, from, _) async {
         if (from < 2) {
@@ -394,6 +395,7 @@ class AppDb {
         if (from < 6) await _upgradeTo6(db);
         if (from < 7) await _upgradeTo7(db);
         if (from < 8) await _upgradeTo8(db);
+        if (from < 9) await _upgradeTo9(db);
       },
     );
     return AppDb._(db);
@@ -504,6 +506,19 @@ class AppDb {
   static Future<void> _upgradeTo8(Database db) async {
     await db.execute('ALTER TABLE persons ADD COLUMN gender TEXT');
     await db.execute('ALTER TABLE persons ADD COLUMN gender_guess REAL');
+  }
+
+  /// Desktop: which file each scanned photo was, so an unchanged file is
+  /// never scanned twice and a moved or copied one reuses its faces.
+  static Future<void> _upgradeTo9(Database db) async {
+    await db.execute('''
+      CREATE TABLE file_keys (
+        asset_id TEXT PRIMARY KEY,
+        size INTEGER NOT NULL,
+        modified INTEGER NOT NULL,
+        content TEXT NOT NULL
+      )''');
+    await db.execute('CREATE INDEX file_keys_content ON file_keys(content)');
   }
 
   // ---- Transfer history ----
@@ -703,6 +718,116 @@ class AppDb {
     });
   }
 
+  /// Saves many scanned photos in one transaction: their faces, metadata,
+  /// tags and file keys. Far fewer disk commits than saving each photo (and
+  /// each step of it) on its own.
+  Future<void> saveScanned(List<ScannedPhoto> photos, int tagVersion) async {
+    if (photos.isEmpty) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await _db.transaction((txn) async {
+      final b = txn.batch();
+      for (final ph in photos) {
+        final faces = ph.faces;
+        if (faces != null) {
+          // Replacing the row also drops any faces from an earlier scan.
+          b.insert('photos', {
+            'asset_id': ph.assetId,
+            'scanned_at': now,
+            'face_count': faces.length,
+            'taken_at': ph.takenAt.millisecondsSinceEpoch,
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
+          for (final f in faces) {
+            b.insert('faces', {
+              'asset_id': ph.assetId,
+              'left': f.left,
+              'top': f.top,
+              'width': f.width,
+              'height': f.height,
+              'embedding': f.embedding.buffer.asUint8List(),
+              'thumb': f.thumb,
+              'sharpness': f.sharpness,
+              'eyes_open': f.eyesOpen,
+              'smile': f.smile,
+              'yaw': f.yaw,
+            });
+          }
+        }
+        b.update('photos', {
+          'dhash': ph.hash,
+          'lat': ph.lat,
+          'lng': ph.lng,
+          'quality': ph.quality,
+          'tag_version': tagVersion,
+        }, where: 'asset_id = ?', whereArgs: [ph.assetId]);
+        b.delete('photo_tags', where: 'asset_id = ?', whereArgs: [ph.assetId]);
+        for (final t in ph.tags) {
+          b.insert('photo_tags', {'asset_id': ph.assetId, 'tag': t}, conflictAlgorithm: ConflictAlgorithm.ignore);
+        }
+        final key = ph.fileKey;
+        if (key != null) b.insert('file_keys', key.row(ph.assetId), conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      await b.commit(noResult: true);
+    });
+  }
+
+  /// Saved file keys for [assetIds] (desktop).
+  Future<Map<String, FileKey>> fileKeys(Iterable<String> assetIds) async {
+    final out = <String, FileKey>{};
+    final ids = assetIds.toList();
+    for (var i = 0; i < ids.length; i += 500) {
+      final chunk = ids.sublist(i, (i + 500).clamp(0, ids.length));
+      final rows = await _db.query('file_keys',
+          where: 'asset_id IN (${List.filled(chunk.length, '?').join(',')})', whereArgs: chunk);
+      for (final r in rows) {
+        out[r['asset_id'] as String] =
+            FileKey(size: r['size'] as int, modified: r['modified'] as int, content: r['content'] as String);
+      }
+    }
+    return out;
+  }
+
+  /// Saves keys for photos scanned before keys were kept.
+  Future<void> saveFileKeys(Map<String, FileKey> keys) async {
+    if (keys.isEmpty) return;
+    final b = _db.batch();
+    keys.forEach((id, k) => b.insert('file_keys', k.row(id), conflictAlgorithm: ConflictAlgorithm.replace));
+    await b.commit(noResult: true);
+  }
+
+  /// A scanned photo with each of these contents, if there is one.
+  Future<Map<String, String>> scannedByContent(Iterable<String> contents) async {
+    final out = <String, String>{};
+    final list = contents.toSet().toList();
+    for (var i = 0; i < list.length; i += 500) {
+      final chunk = list.sublist(i, (i + 500).clamp(0, list.length));
+      final rows = await _db.rawQuery('''
+        SELECT k.content, k.asset_id FROM file_keys k JOIN photos ph ON ph.asset_id = k.asset_id
+        WHERE k.content IN (${List.filled(chunk.length, '?').join(',')})''', chunk);
+      for (final r in rows) {
+        out[r['content'] as String] = r['asset_id'] as String;
+      }
+    }
+    return out;
+  }
+
+  /// [to] is the same file as the already-scanned [from] (moved, copied or
+  /// renamed): copies its scan (faces, people, tags) instead of scanning
+  /// it again.
+  Future<void> copyScan(String from, String to, FileKey key) async {
+    await _db.transaction((txn) async {
+      Future<List<String>> columns(String table) async =>
+          [for (final r in await txn.rawQuery('PRAGMA table_info($table)')) r['name'] as String];
+      final photo = (await columns('photos')).where((c) => c != 'asset_id').join(', ');
+      final face = (await columns('faces')).where((c) => c != 'id' && c != 'asset_id').join(', ');
+      await txn.rawInsert(
+          'INSERT OR REPLACE INTO photos (asset_id, $photo) SELECT ?, $photo FROM photos WHERE asset_id = ?', [to, from]);
+      await txn.rawInsert('INSERT INTO faces (asset_id, $face) SELECT ?, $face FROM faces WHERE asset_id = ?', [to, from]);
+      await txn.rawInsert(
+          'INSERT OR IGNORE INTO photo_tags (asset_id, tag) SELECT ?, tag FROM photo_tags WHERE asset_id = ?', [to, from]);
+      await txn.insert('file_keys', key.row(to), conflictAlgorithm: ConflictAlgorithm.replace);
+    });
+  }
+
   /// Photos scanned before dates were stored.
   Future<List<String>> photosWithoutDate() async {
     final rows = await _db.query('photos',
@@ -782,16 +907,7 @@ class AppDb {
 
   /// Face facts for a photo scanned earlier, so it can be tagged without
   /// running face detection again.
-  Future<
-      ({
-        int count,
-        double maxArea,
-        double? minSharpness,
-        double? avgSharpness,
-        double? minEyes,
-        double? maxSmile,
-        double? maxYaw,
-      })> faceStats(String assetId) async {
+  Future<FaceStats> faceStats(String assetId) async {
     final rows = await _db.rawQuery('''
       SELECT COUNT(*) AS n, MAX(width * height) AS area, MIN(sharpness) AS sharp,
         AVG(sharpness) AS avg_sharp,
@@ -1642,4 +1758,88 @@ class AppDb {
 
   static Float32List _floats(Object? blob) => Float32List.fromList(
       Uint8List.fromList(blob as Uint8List).buffer.asFloat32List());
+}
+
+/// Face facts for tagging and quality: the same numbers [AppDb.faceStats]
+/// reads back from the database.
+typedef FaceStats = ({
+  int count,
+  double maxArea,
+  double? minSharpness,
+  double? avgSharpness,
+  double? minEyes,
+  double? maxSmile,
+  double? maxYaw,
+});
+
+/// [FaceStats] for faces not saved yet (same rules as the SQL).
+FaceStats faceStatsOf(List<NewFace> faces) {
+  double? minOf(Iterable<double?> v) {
+    double? m;
+    for (final x in v) {
+      if (x != null && (m == null || x < m)) m = x;
+    }
+    return m;
+  }
+
+  double? maxOf(Iterable<double?> v) {
+    double? m;
+    for (final x in v) {
+      if (x != null && (m == null || x > m)) m = x;
+    }
+    return m;
+  }
+
+  final readable = [for (final f in faces) if (f.width >= eyeReadableWidth) f];
+  return (
+    count: faces.length,
+    maxArea: maxOf([for (final f in faces) f.width * f.height]) ?? 0,
+    minSharpness: minOf([for (final f in faces) f.sharpness]),
+    avgSharpness: faces.isEmpty ? null : faces.fold<double>(0, (s, f) => s + f.sharpness) / faces.length,
+    minEyes: minOf([for (final f in readable) f.eyesOpen]),
+    maxSmile: maxOf([for (final f in readable) f.smile]),
+    maxYaw: maxOf([for (final f in readable) f.yaw?.abs()]),
+  );
+}
+
+/// One scanned photo waiting to be saved with [AppDb.saveScanned].
+class ScannedPhoto {
+  ScannedPhoto({
+    required this.assetId,
+    required this.takenAt,
+    required this.faces,
+    required this.hash,
+    required this.lat,
+    required this.lng,
+    required this.quality,
+    required this.tags,
+    this.fileKey,
+  });
+
+  final String assetId;
+  final DateTime takenAt;
+
+  /// Null when the faces were saved by an earlier scan (only re-tagged).
+  final List<NewFace>? faces;
+  final int? hash;
+  final double? lat, lng;
+  final double quality;
+  final Set<String> tags;
+  final FileKey? fileKey;
+}
+
+/// Desktop: what a photo file was when scanned. [size] and [modified] tell
+/// if it changed; [content] (a hash of its start and end) finds it again
+/// after a move, copy or rename.
+class FileKey {
+  const FileKey({required this.size, required this.modified, required this.content});
+
+  final int size;
+
+  /// Milliseconds since 1970.
+  final int modified;
+  final String content;
+
+  Map<String, Object> row(String assetId) =>
+      {'asset_id': assetId, 'size': size, 'modified': modified, 'content': content};
 }
