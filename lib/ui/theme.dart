@@ -154,12 +154,12 @@ ThemeData buildTheme(ColorScheme scheme) {
     ),
     dialogTheme: DialogThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-      backgroundColor: dark ? const Color(0xF21C1A22) : const Color(0xF7FFFFFF),
+      backgroundColor: dark ? const Color(0xFF1C1A22) : Colors.white,
     ),
     bottomSheetTheme: BottomSheetThemeData(
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-      backgroundColor: dark ? const Color(0xF51C1A22) : const Color(0xF7FFFFFF),
+      backgroundColor: dark ? const Color(0xFF1C1A22) : Colors.white,
       // On a computer a sheet is a panel of readable width, not the whole
       // window's width.
       constraints: Device.desktop ? const BoxConstraints(maxWidth: 640) : null,
@@ -168,7 +168,7 @@ ThemeData buildTheme(ColorScheme scheme) {
     ),
     popupMenuTheme: PopupMenuThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      color: dark ? const Color(0xF51C1A22) : const Color(0xF7FFFFFF),
+      color: dark ? const Color(0xFF1C1A22) : Colors.white,
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,

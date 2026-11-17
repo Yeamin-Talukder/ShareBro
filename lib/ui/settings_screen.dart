@@ -71,6 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final chips = _chips;
     if (chips == null) return null;
     if (chips.bad.contains(chip)) return "didn't work on this phone";
+    if (chips.unfinished(chip)) return 'last try was cut short · tries again on the next scan';
     final ms = chips.ms[chip];
     if (ms == null) return null;
     return '${ms < 10 ? ms.toStringAsFixed(1) : ms.round()} ms a face';
@@ -88,7 +89,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _pickChip() async {
-    final picked = await showModalBottomSheet<AccelChoice>(
+    final picked = await showModalBottomSheet<Object>(
       context: context,
       showDragHandle: true,
       builder: (context) => SafeArea(
@@ -105,10 +106,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
               trailing: c.faceChip == choice ? const Icon(Icons.check) : null,
               onTap: () => Navigator.pop(context, choice),
             ),
+          const Divider(indent: 16, endIndent: 16),
+          ListTile(
+            leading: const Icon(Icons.refresh_rounded),
+            title: const Text('Test the chips again'),
+            subtitle: const Text('The next scan tries the GPU and NPU afresh'),
+            onTap: () => Navigator.pop(context, 'retest'),
+          ),
         ]),
       ),
     );
-    if (picked == null) return;
+    if (picked == 'retest') {
+      await c.retestChips();
+      await _loadChips();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('The GPU and NPU will be tried again on the next scan.')),
+      );
+      return;
+    }
+    if (picked is! AccelChoice) return;
     await c.setFaceChip(picked);
     await _loadChips();
   }

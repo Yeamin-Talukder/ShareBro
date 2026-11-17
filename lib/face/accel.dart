@@ -50,9 +50,10 @@ const _worthIt = 0.9;
 /// each chip is tried out once, and again after a system update or a new
 /// model ([key] changes).
 class AccelState {
-  AccelState(this.key, {Map<Accel, double>? ms, Set<Accel>? bad, this.trying})
+  AccelState(this.key, {Map<Accel, double>? ms, Set<Accel>? bad, Map<Accel, int>? strikes, this.trying})
       : ms = ms ?? {},
-        bad = bad ?? {};
+        bad = bad ?? {},
+        strikes = strikes ?? {};
 
   final String key;
 
@@ -63,8 +64,17 @@ class AccelState {
   final Set<Accel> bad;
 
   /// The chip being tried for the first time right now. Still set when the
-  /// app next starts: the try took the whole app down.
+  /// app next starts: the try never finished.
   Accel? trying;
+
+  /// Tries that never finished, for chips not yet given up on. A GPU's
+  /// first start compiles its programs for a few seconds, and the app may
+  /// simply have been closed meanwhile; only a second unfinished try in a
+  /// row counts as the chip taking the app down.
+  final Map<Accel, int> strikes;
+
+  /// Unfinished tries before a chip is given up on.
+  static const maxStrikes = 2;
 
   bool tried(Accel a) => ms.containsKey(a) || bad.contains(a);
 
@@ -82,21 +92,34 @@ class AccelState {
     return pick;
   }
 
-  /// A try that never finished crashed the app: don't go there again.
-  /// True if there was one.
+  /// Counts a try that never finished; the second in a row means the chip
+  /// takes the app down, so it isn't tried again. True if there was one.
   bool settleCrash() {
-    final crashed = trying;
-    if (crashed == null) return false;
-    bad.add(crashed);
-    ms.remove(crashed);
+    final unfinished = trying;
+    if (unfinished == null) return false;
     trying = null;
+    final n = (strikes[unfinished] ?? 0) + 1;
+    if (n >= maxStrikes) {
+      strikes.remove(unfinished);
+      bad.add(unfinished);
+      ms.remove(unfinished);
+    } else {
+      strikes[unfinished] = n;
+    }
     return true;
   }
+
+  /// [a] was started and measured: earlier unfinished tries don't count.
+  void finished(Accel a) => strikes.remove(a);
+
+  /// Its last try didn't finish and it will be tried again.
+  bool unfinished(Accel a) => !bad.contains(a) && (trying == a || strikes.containsKey(a));
 
   /// Forgets what's known about [a], so it's tried afresh.
   void forget(Accel a) {
     bad.remove(a);
     ms.remove(a);
+    strikes.remove(a);
     if (trying == a) trying = null;
   }
 
@@ -104,6 +127,7 @@ class AccelState {
         'key': key,
         'ms': {for (final e in ms.entries) e.key.name: e.value},
         'bad': [for (final a in bad) a.name],
+        'strikes': {for (final e in strikes.entries) e.key.name: e.value},
         'trying': trying?.name,
       };
 
@@ -119,6 +143,12 @@ class AccelState {
     }
     if (json['bad'] case final List bad) {
       state.bad.addAll(bad.map(Accel.byName).nonNulls);
+    }
+    if (json['strikes'] case final Map strikes) {
+      for (final e in strikes.entries) {
+        final a = Accel.byName(e.key);
+        if (a != null && e.value is int) state.strikes[a] = e.value as int;
+      }
     }
     return state;
   }

@@ -26,27 +26,46 @@ void main() {
     expect(s.best, Accel.cpu);
   });
 
-  test('a try that never finished marks the chip as crashed', () {
-    final s = AccelState('k', ms: {Accel.cpu: 10}, trying: Accel.npu);
+  test('one unfinished try is forgiven; the second in a row gives up on the chip', () {
+    final s = AccelState('k', ms: {Accel.cpu: 10}, trying: Accel.gpu);
+    // The app may just have been closed while the GPU was starting.
     expect(s.settleCrash(), isTrue);
-    expect(s.bad, {Accel.npu});
     expect(s.trying, isNull);
+    expect(s.bad, isEmpty);
+    expect(s.unfinished(Accel.gpu), isTrue);
+    expect(s.tried(Accel.gpu), isFalse, reason: 'so the next scan tries it again');
+    // Cut short again: it takes the app down, so it isn't tried any more.
+    s.trying = Accel.gpu;
+    expect(s.settleCrash(), isTrue);
+    expect(s.bad, {Accel.gpu});
+    expect(s.unfinished(Accel.gpu), isFalse);
     expect(s.settleCrash(), isFalse);
-    // Asking for it by name in Settings gives it another go.
-    s.forget(Accel.npu);
-    expect(s.tried(Accel.npu), isFalse);
+    // Asking for it by name in Settings (or Test again) gives it another go.
+    s.forget(Accel.gpu);
+    expect(s.tried(Accel.gpu), isFalse);
+    expect(s.strikes, isEmpty);
+  });
+
+  test('a chip that starts and measures clears its strike', () {
+    final s = AccelState('k', ms: {Accel.cpu: 10}, trying: Accel.npu)..settleCrash();
+    s.ms[Accel.npu] = 4;
+    s.finished(Accel.npu);
+    expect(s.strikes, isEmpty);
+    expect(s.best, Accel.npu);
   });
 
   test('what was learned survives a restart, but not a system update', () {
     final dir = Directory.systemTemp.createTempSync('accel_test');
     addTearDown(() => dir.deleteSync(recursive: true));
     final path = '${dir.path}/chips.json';
-    AccelState('model|android|15', ms: {Accel.cpu: 11.5, Accel.gpu: 4.25}, bad: {Accel.npu}, trying: Accel.gpu)
+    AccelState('model|android|15',
+            ms: {Accel.cpu: 11.5, Accel.gpu: 4.25}, bad: {Accel.npu}, strikes: {Accel.gpu: 1}, trying: Accel.gpu)
         .write(path);
 
     final back = AccelState.read(path, 'model|android|15');
     expect(back.ms, {Accel.cpu: 11.5, Accel.gpu: 4.25});
     expect(back.bad, {Accel.npu});
+    expect(back.strikes, {Accel.gpu: 1});
     expect(back.trying, Accel.gpu);
 
     final updated = AccelState.read(path, 'model|android|16');

@@ -57,7 +57,7 @@ const _warmUpFaces = 4;
 /// NPUs work in half precision, which lands around 0.995 for this model;
 /// two photos of the same person are about 0.5, so 0.99 changes nothing
 /// about who matches whom, while 0.999 turned down every working chip.
-const _sameFace = 0.999;
+const _sameFace = 0.99;
 
 /// Finds faces and turns each into a 512-number fingerprint with
 /// MobileFaceNet (InsightFace, WebFace600K). Everything runs on the device.
