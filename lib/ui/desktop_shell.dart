@@ -14,6 +14,7 @@ import 'search_screen.dart';
 import 'settings_screen.dart';
 import 'theme.dart';
 import 'widgets.dart';
+import 'people_sync_screen.dart';
 
 /// The pages the sidebar switches between. Folders get a page each.
 enum DesktopPage { people, photos, explore, share, folder }
@@ -236,6 +237,15 @@ class _DesktopShellState extends State<DesktopShell> {
                 selected: false,
                 tooltip: 'Trip group',
                 onTap: () => _push(TripGroupScreen(controller: c)),
+              ),
+              _NavItem(
+                icon: Icons.sync_alt_rounded,
+                selectedIcon: Icons.sync_alt_rounded,
+                label: 'Sync people',
+                wide: wide,
+                selected: false,
+                tooltip: "Swap who's who with your other devices",
+                onTap: () => _push(PeopleSyncScreen(controller: c)),
               ),
               _Group('Folders', wide: wide),
               for (final f in _folders)

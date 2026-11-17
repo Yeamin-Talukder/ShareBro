@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../data/db.dart';
 import 'protocol.dart';
 import 'tls.dart';
+import '../platform/device.dart';
 
 const _multicast = MethodChannel('photo_organizer/multicast');
 
@@ -75,7 +76,8 @@ class ShareIdentity {
         alias: alias,
         fingerprint: fingerprint,
         deviceModel: 'ShareBro',
-        deviceType: LsDeviceType.mobile,
+        // Computers show as computers in LocalSend and in ShareBro's lists.
+        deviceType: Device.desktop ? LsDeviceType.desktop : LsDeviceType.mobile,
         port: port,
         protocol: 'https',
         download: download,

@@ -29,6 +29,7 @@ import 'update_sheet.dart';
 import 'desktop_gallery.dart';
 import 'desktop_layout.dart';
 import 'desktop_shell.dart';
+import 'people_sync_screen.dart';
 
 /// Bottom navigation between People, Photos, Albums, Explore and Share. Tabs keep
 /// their scroll position and filters when you switch.
@@ -180,7 +181,9 @@ class _RootScreenState extends State<RootScreen> {
       ),
     );
     return Stack(children: [
-      AppLockGate(controller: c, child: IncomingWatcher(controller: c, child: app)),
+      AppLockGate(
+          controller: c,
+          child: IncomingWatcher(controller: c, child: PeopleSyncWatcher(controller: c, child: app))),
       if (_launching)
         LaunchClink(onDone: () => setState(() => _launching = false)),
     ]);
@@ -267,7 +270,9 @@ class _RootScreenState extends State<RootScreen> {
       ),
     );
     return Stack(children: [
-      AppLockGate(controller: c, child: IncomingWatcher(controller: c, child: app)),
+      AppLockGate(
+          controller: c,
+          child: IncomingWatcher(controller: c, child: PeopleSyncWatcher(controller: c, child: app))),
       if (_launching)
         LaunchClink(onDone: () => setState(() => _launching = false)),
     ]);

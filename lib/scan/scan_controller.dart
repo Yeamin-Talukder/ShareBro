@@ -29,6 +29,8 @@ import 'background.dart';
 import 'desktop_folders.dart';
 import 'scan_item.dart';
 import '../platform/desktop_library.dart';
+import '../data/people_sync.dart';
+import '../share/people_link.dart';
 
 /// Longest side of the image the face finder looks at. Bigger finds smaller
 /// faces in group shots but is slower.
@@ -193,11 +195,17 @@ class ScanController extends ChangeNotifier {
   /// Sending to friends' phones and web galleries (LocalSend protocol).
   late final SendCenter sharing;
 
+  /// Swapping who's who (names and face fingerprints, never photos) with
+  /// your other devices.
+  late final PeopleSyncHub peopleSync;
+
   /// Your face, set up once in Profile.
   FaceProfile profile = FaceProfile(faces: const []);
 
   Future<void> load() async {
     sharing = await SendCenter.create(db);
+    peopleSync = PeopleSyncHub(sharing.identity, build: peoplePackage, take: takePeople);
+    sharing.server.people = peopleSync;
     // Photos friends send us get scanned like any other album.
     sharing.receiver.onSaved = (_) => scanReceived();
     sharing.server.onSelfie = _answerSelfie;
@@ -1094,6 +1102,62 @@ class ScanController extends ChangeNotifier {
       : '$n';
 
   /// Works out the photo's categories (selfie, beach, screenshot, …).
+  /// This device's named people, to send to another of your devices.
+  Future<PeoplePackage> peoplePackage() async => PeoplePackage(
+        from: sharing.identity.alias,
+        model: faceModelId,
+        people: [for (final r in await db.peopleForSync()) SyncPerson.fromRow(r)],
+      );
+
+  /// Takes in people from another of your devices: someone already here
+  /// (synced before, or with faces alike enough) gets their faces from the
+  /// other device and, if unnamed here, their name; anyone else is added,
+  /// to be recognised in scans from now on. Then faces are regrouped.
+  Future<PeopleSyncResult> takePeople(PeoplePackage package) async {
+    if (package.model != faceModelId) return PeopleSyncResult(from: package.from, wrongModel: true);
+    final local = await db.peopleForMatching();
+    // A little stricter than grouping: joining two people is worse than
+    // keeping them apart (that's one merge to fix).
+    final matches = matchPeople(package.people, local, thresholds.merge + 0.05);
+    var added = 0, matched = 0, named = 0;
+    final conflicts = <NameConflict>[];
+    for (final (i, p) in package.people.indexed) {
+      final m = matches[i];
+      final id = await db.addKnownPerson(
+        personId: m.localId,
+        syncId: p.syncId,
+        name: p.name,
+        nickname: p.nickname,
+        gender: p.gender,
+        thumb: p.thumb,
+        embeddings: p.embeddings,
+        source: package.from,
+      );
+      if (m.localId == null) {
+        added++;
+        continue;
+      }
+      matched++;
+      final here = local[id]?.name?.trim();
+      if (here == null || here.isEmpty) {
+        await db.setPersonNames(id, name: p.name, nickname: p.nickname, gender: p.gender);
+        named++;
+      } else if (here.toLowerCase() != p.name.toLowerCase()) {
+        conflicts.add(NameConflict(localId: id, localName: here, theirName: p.name, thumb: p.thumb));
+      }
+    }
+    // A running scan regroups when it ends.
+    if (!running) await regroup();
+    changed();
+    return PeopleSyncResult(
+      from: package.from,
+      added: added,
+      matched: matched,
+      named: named,
+      conflicts: conflicts,
+    );
+  }
+
   /// Groups every face that isn't in a person yet.
   Future<void> regroup({bool fromScratch = false}) async {
     if (fromScratch) await db.resetAutoGroups();
@@ -1128,11 +1192,18 @@ class ScanController extends ChangeNotifier {
             (f.personId != null && named.contains(f.personId))
         ? f.personId
         : null;
+    // Faces learned from your other devices join in as already-placed
+    // faces of their person (made-up ids below zero, never written back),
+    // so new faces here that look like them are filed under them.
+    final known = [
+      for (final e in (await db.knownFaces()).entries)
+        for (final v in e.value) (person: e.key, embedding: v),
+    ];
     return GroupingInput(
-      [for (final f in faces) f.id],
-      [for (final f in faces) f.embedding],
-      [for (final f in faces) keep(f)],
-      [for (final f in faces) f.locked],
+      [for (final f in faces) f.id, for (var i = 0; i < known.length; i++) -1 - i],
+      [for (final f in faces) f.embedding, for (final k in known) k.embedding],
+      [for (final f in faces) keep(f), for (final k in known) k.person],
+      [for (final f in faces) f.locked, for (final _ in known) true],
       t,
     );
   }

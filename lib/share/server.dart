@@ -21,6 +21,7 @@ import 'protocol.dart';
 import 'receive.dart';
 import 'web_page.dart';
 import 'zip_stream.dart';
+import 'people_link.dart';
 
 /// Port for the browser gallery (plain HTTP: browsers reject self-made
 /// certificates, so LocalSend serves its browser mode over HTTP too).
@@ -99,6 +100,9 @@ class ShareServer extends ChangeNotifier {
 
   /// Trip groups (ShareBro's own API on the HTTPS port).
   GroupHub? groups;
+
+  /// Swapping who's who with your other devices (same port).
+  PeopleSyncHub? people;
 
   int get webServerPort => _web?.port ?? webPort;
   bool get running => _secure != null;
@@ -214,6 +218,7 @@ class ShareServer extends ChangeNotifier {
           return await _status(res, HttpStatus.ok);
         default:
           if (await groups?.handle(req, ip) ?? false) return;
+          if (await people?.handle(req, ip) ?? false) return;
           return await _status(res, HttpStatus.notFound);
       }
     } catch (e) {

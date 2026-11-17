@@ -37,6 +37,7 @@ import 'package:file_picker/file_picker.dart';
 import 'desktop_layout.dart';
 import 'send_to_sheet.dart';
 import '../share/prepare.dart' show SendItem;
+import 'people_sync_screen.dart';
 
 /// Room under the last row for the Scan button floating above the nav bar.
 const _fabClearance = 88.0;
@@ -582,6 +583,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             builder: (_) => FindMeScreen(controller: c, tripId: trip?.id, tripName: trip?.name)));
                   case 'unmatched':
                     _openUnmatched();
+                  case 'syncpeople':
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => PeopleSyncScreen(controller: c)));
                   case 'settings':
                     Navigator.push(context,
                         MaterialPageRoute(builder: (_) => SettingsScreen(controller: c)));
@@ -623,6 +627,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       trailing: Text('$_unmatched'),
                     ),
                   ),
+                const PopupMenuItem(
+                  value: 'syncpeople',
+                  child: ListTile(
+                      leading: Icon(Icons.sync_alt_rounded), title: Text('Sync people with another device')),
+                ),
                 const PopupMenuItem(
                   value: 'settings',
                   child: ListTile(leading: Icon(Icons.tune), title: Text('Settings')),

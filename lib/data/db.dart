@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' show Rect;
 
@@ -332,7 +333,7 @@ class AppDb {
     }
     final db = await openDatabase(
       path,
-      version: 9,
+      version: 10,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, _) async {
         await db.execute('''
@@ -373,6 +374,7 @@ class AppDb {
         await _upgradeTo7(db);
         await _upgradeTo8(db);
         await _upgradeTo9(db);
+        await _upgradeTo10(db);
       },
       onUpgrade: (db, from, _) async {
         if (from < 2) {
@@ -396,6 +398,7 @@ class AppDb {
         if (from < 7) await _upgradeTo7(db);
         if (from < 8) await _upgradeTo8(db);
         if (from < 9) await _upgradeTo9(db);
+        if (from < 10) await _upgradeTo10(db);
       },
     );
     return AppDb._(db);
@@ -510,6 +513,25 @@ class AppDb {
 
   /// Desktop: which file each scanned photo was, so an unchanged file is
   /// never scanned twice and a moved or copied one reuses its faces.
+  /// People synced from your other devices: a stable id per person, so a
+  /// second sync updates instead of duplicating, and their faces from the
+  /// other device ("known faces": fingerprints only, no photos), so this
+  /// device's scans recognise them.
+  static Future<void> _upgradeTo10(Database db) async {
+    await db.execute('ALTER TABLE persons ADD COLUMN sync_id TEXT');
+    await db.execute('CREATE INDEX persons_sync ON persons(sync_id)');
+    await db.execute('''
+      CREATE TABLE known_faces (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        person_id INTEGER NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
+        embedding BLOB NOT NULL,
+        thumb BLOB,
+        source TEXT,
+        created_at INTEGER NOT NULL
+      )''');
+    await db.execute('CREATE INDEX known_faces_person ON known_faces(person_id)');
+  }
+
   static Future<void> _upgradeTo9(Database db) async {
     await db.execute('''
       CREATE TABLE file_keys (
@@ -1649,6 +1671,13 @@ class AppDb {
           [target, ...ids]);
       // More faces now: guess again.
       await txn.update('persons', {'gender_guess': null}, where: 'id = ?', whereArgs: [target]);
+      // Faces learned from other devices go along, and the person keeps a
+      // sync id (theirs if it had none).
+      final otherMarks = List.filled(others.length, '?').join(',');
+      await txn.rawUpdate('UPDATE known_faces SET person_id = ? WHERE person_id IN ($otherMarks)', [target, ...others]);
+      await txn.rawUpdate('''
+        UPDATE persons SET sync_id = (SELECT sync_id FROM persons o WHERE o.id IN ($otherMarks) AND o.sync_id IS NOT NULL LIMIT 1)
+        WHERE id = ? AND sync_id IS NULL''', [...others, target]);
     });
     return before;
   }
@@ -1719,6 +1748,7 @@ class AppDb {
       await txn.delete('person_group_members');
       await txn.delete('person_groups');
       await txn.delete('dismissed_pairs');
+      await txn.delete('known_faces');
       await txn.delete('persons');
       await txn.delete('trip_photos');
       await txn.delete('trips');
@@ -1732,7 +1762,8 @@ class AppDb {
   Future<void> close() => _db.close();
 
   Future<void> _deleteEmptyPersons(Transaction txn) => txn.rawDelete(
-      'DELETE FROM persons WHERE id NOT IN (SELECT DISTINCT person_id FROM faces WHERE person_id IS NOT NULL)');
+      'DELETE FROM persons WHERE id NOT IN (SELECT DISTINCT person_id FROM faces WHERE person_id IS NOT NULL) '
+      'AND id NOT IN (SELECT person_id FROM known_faces)');
 
   // Copy into an aligned buffer; BLOB bytes may not be 4-byte aligned.
   // ---- Face model upgrades ----
@@ -1758,6 +1789,181 @@ class AppDb {
 
   static Float32List _floats(Object? blob) => Float32List.fromList(
       Uint8List.fromList(blob as Uint8List).buffer.asFloat32List());
+
+  // ---- People sync (between your own devices) ----
+
+  /// Every person's faces learned from other devices, for grouping.
+  Future<Map<int, List<Float32List>>> knownFaces() async {
+    final out = <int, List<Float32List>>{};
+    for (final r in await _db.query('known_faces', columns: ['person_id', 'embedding'])) {
+      out.putIfAbsent(r['person_id'] as int, () => []).add(_floats(r['embedding']));
+    }
+    return out;
+  }
+
+  /// Named people to send to another device: who they are, their best
+  /// face crop, and up to [perPerson] fingerprints (their clearest faces
+  /// first, then faces this device learned from others, so a sync passes
+  /// on what it learned).
+  Future<List<SyncPersonRow>> peopleForSync({int perPerson = 20}) async {
+    final rows = await _db.rawQuery('''
+      SELECT p.id, p.name, p.nickname, p.gender, p.sync_id FROM persons p
+      WHERE p.name IS NOT NULL AND TRIM(p.name) != '' AND p.ignored = 0
+        AND (EXISTS (SELECT 1 FROM faces f WHERE f.person_id = p.id)
+             OR EXISTS (SELECT 1 FROM known_faces k WHERE k.person_id = p.id))
+      ORDER BY p.name''');
+    final out = <SyncPersonRow>[];
+    for (final r in rows) {
+      final id = r['id'] as int;
+      final faces = await _db.rawQuery('''
+        SELECT f.embedding, f.thumb FROM faces f JOIN photos ph ON ph.asset_id = f.asset_id AND ph.hidden = 0
+        WHERE f.person_id = ? ORDER BY ${_faceScore('f')} DESC LIMIT ?''', [id, perPerson]);
+      final embeddings = [for (final f in faces) _floats(f['embedding'])];
+      Uint8List? thumb = faces.isEmpty ? null : faces.first['thumb'] as Uint8List?;
+      if (embeddings.length < perPerson) {
+        final known = await _db.query('known_faces',
+            columns: ['embedding', 'thumb'], where: 'person_id = ?', whereArgs: [id], limit: perPerson - embeddings.length);
+        embeddings.addAll([for (final k in known) _floats(k['embedding'])]);
+        thumb ??= known.map((k) => k['thumb'] as Uint8List?).firstWhere((t) => t != null, orElse: () => null);
+      }
+      if (embeddings.isEmpty) continue;
+      var syncId = r['sync_id'] as String?;
+      if (syncId == null) {
+        // Given on first sync and kept: the same person on every device.
+        syncId = _newSyncId();
+        await _db.update('persons', {'sync_id': syncId}, where: 'id = ?', whereArgs: [id]);
+      }
+      out.add(SyncPersonRow(
+        localId: id,
+        syncId: syncId,
+        name: (r['name'] as String).trim(),
+        nickname: r['nickname'] as String?,
+        gender: r['gender'] as String?,
+        thumb: thumb,
+        embeddings: embeddings,
+      ));
+    }
+    return out;
+  }
+
+  /// Each person's faces (from photos here and from other devices), for
+  /// matching an incoming person to someone already on this device.
+  Future<Map<int, ({String? name, String? syncId, List<Float32List> embeddings})>> peopleForMatching() async {
+    final out = <int, ({String? name, String? syncId, List<Float32List> embeddings})>{};
+    final persons = await _db.query('persons', columns: ['id', 'name', 'sync_id'], where: 'ignored = 0');
+    final faces = <int, List<Float32List>>{};
+    for (final r in await _db.query('faces', columns: ['person_id', 'embedding'], where: 'person_id IS NOT NULL')) {
+      faces.putIfAbsent(r['person_id'] as int, () => []).add(_floats(r['embedding']));
+    }
+    final known = await knownFaces();
+    for (final p in persons) {
+      final id = p['id'] as int;
+      final e = [...?faces[id], ...?known[id]];
+      if (e.isEmpty) continue;
+      out[id] = (name: p['name'] as String?, syncId: p['sync_id'] as String?, embeddings: e);
+    }
+    return out;
+  }
+
+  /// Adds faces learned from another device to [personId] (new person if
+  /// null: [name] and friends are set on it). Fingerprints this person
+  /// already has (almost identical) are skipped. Returns the person's id.
+  Future<int> addKnownPerson({
+    int? personId,
+    required String syncId,
+    String? name,
+    String? nickname,
+    String? gender,
+    Uint8List? thumb,
+    required List<Float32List> embeddings,
+    required String source,
+  }) async {
+    return _db.transaction((txn) async {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      var id = personId;
+      if (id == null) {
+        id = await txn.insert('persons', {
+          'name': name,
+          'nickname': nickname,
+          'gender': gender,
+          'sync_id': syncId,
+          'created_at': now,
+        });
+      } else {
+        await txn.rawUpdate('UPDATE persons SET sync_id = COALESCE(sync_id, ?) WHERE id = ?', [syncId, id]);
+      }
+      final have = [
+        for (final r in await txn.query('known_faces', columns: ['embedding'], where: 'person_id = ?', whereArgs: [id]))
+          _floats(r['embedding']),
+      ];
+      final b = txn.batch();
+      var first = true;
+      for (final e in embeddings) {
+        if (have.any((h) => _cosine(h, e) > 0.995)) continue;
+        have.add(e);
+        b.insert('known_faces', {
+          'person_id': id,
+          'embedding': e.buffer.asUint8List(e.offsetInBytes, e.lengthInBytes),
+          'thumb': first ? thumb : null,
+          'source': source,
+          'created_at': now,
+        });
+        first = false;
+      }
+      await b.commit(noResult: true);
+      return id;
+    });
+  }
+
+  /// Names a person (used when a synced name is taken over).
+  Future<void> setPersonNames(int personId, {String? name, String? nickname, String? gender}) async {
+    await _db.update(
+        'persons',
+        {
+          'name': ?name,
+          'nickname': ?nickname,
+          'gender': ?gender,
+        },
+        where: 'id = ?',
+        whereArgs: [personId]);
+  }
+
+  static double _cosine(Float32List a, Float32List b) {
+    if (a.length != b.length) return -1;
+    var dot = 0.0, na = 0.0, nb = 0.0;
+    for (var i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      na += a[i] * a[i];
+      nb += b[i] * b[i];
+    }
+    return na == 0 || nb == 0 ? 0 : dot / math.sqrt(na * nb);
+  }
+
+  static String _newSyncId() {
+    final r = math.Random.secure();
+    return List.generate(16, (_) => r.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+  }
+}
+
+/// A named person as it goes to another device (see [AppDb.peopleForSync]).
+class SyncPersonRow {
+  SyncPersonRow({
+    required this.localId,
+    required this.syncId,
+    required this.name,
+    required this.nickname,
+    required this.gender,
+    required this.thumb,
+    required this.embeddings,
+  });
+
+  final int localId;
+  final String syncId;
+  final String name;
+  final String? nickname;
+  final String? gender;
+  final Uint8List? thumb;
+  final List<Float32List> embeddings;
 }
 
 /// Face facts for tagging and quality: the same numbers [AppDb.faceStats]
