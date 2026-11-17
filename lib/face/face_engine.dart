@@ -53,11 +53,8 @@ const _minLabelConfidence = 0.7;
 const _warmUpFaces = 4;
 
 /// Fingerprints from another chip must point the same way as the CPU's
-/// (1 is identical) before that chip is trusted with real faces. GPUs and
-/// NPUs work in half precision, which lands around 0.995 for this model;
-/// two photos of the same person are about 0.5, so 0.99 changes nothing
-/// about who matches whom, while 0.999 turned down every working chip.
-const _sameFace = 0.99;
+/// (1 is identical) before that chip is trusted with real faces.
+const _sameFace = 0.999;
 
 /// Finds faces and turns each into a 512-number fingerprint with
 /// MobileFaceNet (InsightFace, WebFace600K). Everything runs on the device.
@@ -422,7 +419,6 @@ class _Models implements _Fingerprinter {
           throw StateError('Different fingerprints');
         }
         state.ms[chip] = _msPerFace(opened.interpreter, probe, layout);
-        state.finished(chip);
         open[chip] = opened;
       } catch (_) {
         try {
