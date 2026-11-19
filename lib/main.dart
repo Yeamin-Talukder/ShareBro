@@ -1,10 +1,13 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:path/path.dart' as p;
 
 import 'data/db.dart';
+import 'platform/app_dirs.dart';
 import 'scan/scan_controller.dart';
 import 'share/notify.dart';
 import 'platform/device.dart';
@@ -18,13 +21,120 @@ import 'update/updater.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   tuneImageCache();
-  final db = await AppDb.open();
-  final controller = ScanController(db);
-  await controller.load();
-  await Island.load(db);
-  await Appearance.load(db);
-  await Updater.instance.load(db);
-  runApp(PhotoOrganizerApp(controller: controller));
+  // The window opens straight away (on Windows it only appears once
+  // something is drawn): if getting ready fails, it says so and offers to
+  // try again, instead of ShareBro running invisibly.
+  runApp(const _Startup());
+}
+
+/// Gets everything ready, then shows the app; a short "Starting" screen
+/// meanwhile, and what went wrong if it couldn't.
+class _Startup extends StatefulWidget {
+  const _Startup();
+
+  @override
+  State<_Startup> createState() => _StartupState();
+}
+
+class _StartupState extends State<_Startup> {
+  ScanController? _controller;
+  Object? _error;
+  String? _logPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _boot();
+  }
+
+  Future<void> _boot() async {
+    setState(() {
+      _error = null;
+      _logPath = null;
+    });
+    try {
+      final db = await AppDb.open();
+      final controller = ScanController(db);
+      await controller.load();
+      await Island.load(db);
+      await Appearance.load(db);
+      await Updater.instance.load(db);
+      if (mounted) setState(() => _controller = controller);
+    } catch (e, st) {
+      debugPrint('ShareBro could not start: $e\n$st');
+      final log = await _saveLog(e, st);
+      if (mounted) {
+        setState(() {
+          _error = e;
+          _logPath = log;
+        });
+      }
+    }
+  }
+
+  /// Writes what went wrong next to ShareBro's data, for reporting it.
+  static Future<String?> _saveLog(Object e, StackTrace st) async {
+    try {
+      final dir = await appDataDir();
+      final file = File(p.join(dir.path, 'startup_error.log'));
+      await file.writeAsString('${DateTime.now()}\n$e\n$st\n', mode: FileMode.append);
+      return file.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    if (controller != null) return PhotoOrganizerApp(controller: controller);
+    final dark = WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
+    final error = _error;
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'ShareBro',
+      theme: ThemeData(brightness: dark ? Brightness.dark : Brightness.light, colorSchemeSeed: Brand.accentLight),
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Builder(builder: (context) {
+                final scheme = Theme.of(context).colorScheme;
+                return Column(mainAxisSize: MainAxisSize.min, children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Image.asset('assets/icon/app_icon_1024.png', width: 72, height: 72),
+                  ),
+                  const SizedBox(height: 18),
+                  if (error == null) ...[
+                    const SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2.5)),
+                    const SizedBox(height: 14),
+                    Text('Starting ShareBro…', style: TextStyle(color: scheme.onSurfaceVariant)),
+                  ] else ...[
+                    const Text("ShareBro couldn't start",
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 10),
+                    SelectableText('$error',
+                        textAlign: TextAlign.center, style: TextStyle(color: scheme.onSurfaceVariant)),
+                    if (_logPath != null) ...[
+                      const SizedBox(height: 8),
+                      SelectableText('Details: $_logPath',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                    ],
+                    const SizedBox(height: 18),
+                    FilledButton(onPressed: _boot, child: const Text('Try again')),
+                  ],
+                ]);
+              }),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class PhotoOrganizerApp extends StatefulWidget {

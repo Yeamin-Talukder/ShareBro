@@ -6,7 +6,9 @@ import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 
 import '../data/db.dart';
 import '../data/gallery.dart';
+import '../scan/scan_controller.dart';
 import 'motion.dart';
+import 'scan_helper_ui.dart';
 import 'widgets.dart';
 
 /// What to scan: a phone album (optionally only some dates), or any folder.
@@ -23,7 +25,10 @@ class ScanChoice {
 
 /// "What should I scan?" — any folder on the phone, or one of its albums,
 /// optionally limited to certain dates.
-Future<ScanChoice?> showScanSheet(BuildContext context) {
+///
+/// With a [controller], it also offers scanning with your computer, so the
+/// feature is found where scans start.
+Future<ScanChoice?> showScanSheet(BuildContext context, {ScanController? controller}) {
   return showModalBottomSheet<ScanChoice>(
     context: context,
     showDragHandle: true,
@@ -32,15 +37,16 @@ Future<ScanChoice?> showScanSheet(BuildContext context) {
       expand: false,
       initialChildSize: 0.72,
       maxChildSize: 0.95,
-      builder: (context, scroll) => _ScanSheet(scroll: scroll),
+      builder: (context, scroll) => _ScanSheet(scroll: scroll, controller: controller),
     ),
   );
 }
 
 class _ScanSheet extends StatefulWidget {
-  const _ScanSheet({required this.scroll});
+  const _ScanSheet({required this.scroll, this.controller});
 
   final ScrollController scroll;
+  final ScanController? controller;
 
   @override
   State<_ScanSheet> createState() => _ScanSheetState();
@@ -71,6 +77,10 @@ class _ScanSheetState extends State<_ScanSheet> {
       const SizedBox(height: 4),
       Text('Only photos the app hasn\'t seen yet are scanned; the rest are skipped.',
           style: text.bodySmall),
+      if (widget.controller case final c?) ...[
+        const SizedBox(height: 12),
+        _ComputerHelpCard(controller: c).animate().fadeIn().moveY(begin: 8),
+      ],
       const SizedBox(height: 16),
       Pressable(
         onTap: _pickFolder,
@@ -169,6 +179,54 @@ class _AlbumRowState extends State<_AlbumRow> {
                   ? '$n photos in these dates'
                   : '$n photos'),
           trailing: const Icon(Icons.chevron_right),
+        );
+      },
+    );
+  }
+}
+
+/// "Scan with my computer" where scans start: set it up, or turn it on or
+/// off for this scan.
+class _ComputerHelpCard extends StatelessWidget {
+  const _ComputerHelpCard({required this.controller});
+
+  final ScanController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    void open() => Navigator.push(context, MaterialPageRoute(builder: (_) => ScanHelperScreen(controller: controller)));
+    return ListenableBuilder(
+      listenable: controller,
+      builder: (context, _) {
+        final c = controller;
+        final paired = c.helperPc != null;
+        final name = c.helperPcName ?? 'your computer';
+        return Pressable(
+          onTap: open,
+          child: Card(
+            child: ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: Color(0xFF5E5CE6),
+                child: Icon(Icons.memory_rounded, color: Colors.white),
+              ),
+              title: Text(paired ? 'Scan with $name' : 'Scan faster with your computer',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(
+                !paired
+                    ? 'Pair ShareBro on your PC once; it then finds faces alongside your phone'
+                    : !c.helperOn
+                        ? 'Off: this phone scans alone'
+                        : c.helperNearby != null
+                            ? 'On this Wi‑Fi: it will help with this scan'
+                            : "Helps whenever it's on the same Wi‑Fi",
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
+              trailing: paired
+                  ? Switch(value: c.helperOn, onChanged: c.setHelperOn)
+                  : const Icon(Icons.chevron_right),
+            ),
+          ),
         );
       },
     );

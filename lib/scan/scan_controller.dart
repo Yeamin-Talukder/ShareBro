@@ -337,6 +337,8 @@ class ScanController extends ChangeNotifier {
     if (_helperKey != null) await db.setSetting(_helperKeyKey, _helperKey!);
     await db.setSetting(_helperOnKey, '1');
     notifyListeners();
+    // Paired during a scan: it starts helping with this one.
+    if (running) unawaited(joinHelperMidScan());
   }
 
   Future<void> forgetHelper() async {
@@ -351,6 +353,50 @@ class ScanController extends ChangeNotifier {
     helperOn = on;
     notifyListeners();
     await db.setSetting(_helperOnKey, on ? '1' : '0');
+    if (!running) return;
+    if (on) {
+      // Turned on mid-scan: the computer joins this scan now.
+      unawaited(joinHelperMidScan());
+    } else if (helper != null) {
+      // Turned off mid-scan: the phone carries on alone.
+      helper!.close();
+      helper = null;
+      notifyListeners();
+    }
+  }
+
+  /// While a page of a scan runs: adds the computer's lanes to it.
+  void Function()? _joinComputer;
+  bool _joining = false;
+
+  /// Looking for the computer to join the running scan.
+  bool get joiningHelper => _joining;
+  DateTime _lastJoinTry = DateTime.fromMillisecondsSinceEpoch(0);
+  static const _rejoinEvery = Duration(seconds: 30);
+
+  /// Phone, during a scan: connects to the paired computer and lets it
+  /// start helping straight away (it was just turned on or paired, or it
+  /// wasn't there when the scan started).
+  Future<void> joinHelperMidScan() async {
+    if (Device.desktop || !running || helper != null || _joining) return;
+    _joining = true;
+    notifyListeners();
+    try {
+      final h = await _connectHelper();
+      if (h == null) return;
+      if (!running || !helperOn || helper != null) {
+        h.close();
+        return;
+      }
+      helper = h;
+      debugPrint('Scan helper joined mid-scan: ${h.alias}');
+      _joinComputer?.call();
+      notifyListeners();
+    } finally {
+      _joining = false;
+      _lastJoinTry = DateTime.now();
+      notifyListeners();
+    }
   }
 
   /// How long the computer may remember face results. Takes effect on the
@@ -1054,18 +1100,19 @@ class ScanController extends ChangeNotifier {
     _speedPhotos = 0;
     _speedMark = null;
     _rateTimes.clear();
-    // Phone lanes: ML Kit on the CPU, then the graphics-chip face finder,
-    // then the computer. Each takes the next photo when it's free.
+    // Phone lanes: ML Kit on the CPU, then the graphics-chip face finder.
+    // Each takes the next photo when it's free. The computer's lanes are
+    // added while it's connected, even if it joins halfway through.
     final gpuLanes = Device.desktop ? 0 : _engine!.gpuLanes;
     final vias = Device.desktop
         ? List.filled(_engine!.parallel + 1, _Via.here)
         : [
             for (var i = 0; i < _inFlight; i++) _Via.here,
             for (var i = 0; i < gpuLanes; i++) _Via.gpu,
-            if (helper != null)
-              for (var i = 0; i < _helperLanes; i++) _Via.computer,
           ];
     final tmps = [for (var i = 0; i < vias.length; i++) File(p.join(dir, 'scan_$i.jpg'))];
+    final helperTmps = [for (var i = 0; i < _helperLanes; i++) File(p.join(dir, 'scan_c$i.jpg'))];
+    _lastJoinTry = DateTime.now();
     try {
       final scanned = await db.scannedAssetIds();
       final tagged = await db.taggedAssetIds(tagVersion);
@@ -1080,6 +1127,9 @@ class ScanController extends ChangeNotifier {
         var next = 0;
         Future<void> lane(File tmp, _Via via) async {
           while (!_cancel && next < assets.length) {
+            // The computer's lanes stop when it goes away or is turned
+            // off; the phone's carry on with the rest.
+            if (via == _Via.computer && helper == null) return;
             final asset = assets[next++];
             if (tagged.contains(asset.id)) {
               skipped++;
@@ -1104,8 +1154,31 @@ class ScanController extends ChangeNotifier {
           }
         }
 
-        await Future.wait([for (final (i, t) in tmps.indexed) lane(t, vias[i])]);
+        final lanes = [for (final (i, t) in tmps.indexed) lane(t, vias[i])];
+        var computerLanes = false;
+        void addComputerLanes() {
+          if (computerLanes || helper == null) return;
+          computerLanes = true;
+          for (final t in helperTmps) {
+            lanes.add(lane(t, _Via.computer));
+          }
+        }
+
+        addComputerLanes();
+        // A computer that connects during this page starts helping on it.
+        _joinComputer = addComputerLanes;
+        for (var waited = 0; waited < lanes.length;) {
+          final upTo = lanes.length;
+          await Future.wait(lanes.sublist(waited, upTo));
+          waited = upTo;
+        }
+        _joinComputer = null;
         await _save();
+        // Not helping yet (it wasn't there, or it dropped out)? Look for it
+        // again now and then: it may have come onto the Wi‑Fi since.
+        if (helper == null && DateTime.now().difference(_lastJoinTry) > _rejoinEvery) {
+          unawaited(joinHelperMidScan());
+        }
       }
       await _save();
       final took = DateTime.now().difference(_startedAt!);
@@ -1129,9 +1202,10 @@ class ScanController extends ChangeNotifier {
       } catch (e) {
         debugPrint('Saving scanned photos failed: $e');
       }
-      for (final tmp in tmps) {
+      for (final tmp in [...tmps, ...helperTmps]) {
         if (await tmp.exists()) await tmp.delete();
       }
+      _joinComputer = null;
       helper?.close();
       helper = null;
       await ScanNotification.stop();

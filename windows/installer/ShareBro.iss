@@ -64,7 +64,7 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 [Run]
 ; Phones find the PC over the local network (LocalSend protocol, port 53317).
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""{#AppName}"" dir=in action=allow program=""{app}\{#AppExe}"" enable=yes profile=private"; Flags: runhidden; Check: IsAdminInstallMode; StatusMsg: "Allowing ShareBro on private networks..."
-Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent runasoriginaluser
 ; An update from inside the app runs this installer silently: open ShareBro
 ; again afterwards (as the person, not as admin).
 Filename: "{app}\{#AppExe}"; Flags: nowait runasoriginaluser; Check: WizardSilent

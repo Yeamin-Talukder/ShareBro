@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../platform/device.dart';
 import '../scan/scan_controller.dart';
 import '../share/protocol.dart';
 import '../share/scan_helper.dart';
@@ -263,7 +264,9 @@ class _ScanHelperScreenState extends State<ScanHelperScreen> {
   }
 }
 
-/// While scanning on a phone: "Your computer is helping · 240 photos".
+/// While scanning on a phone: "Your computer is helping · 240 photos", and
+/// a switch to bring the computer in (or leave it out) mid-scan. Unpaired,
+/// a way to set it up.
 class ScanHelperBadge extends StatelessWidget {
   const ScanHelperBadge({super.key, required this.controller});
 
@@ -272,28 +275,56 @@ class ScanHelperBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = controller;
-    final h = c.helper;
-    if (h == null) return const SizedBox.shrink();
+    if (Device.desktop) return const SizedBox.shrink();
     final scheme = Theme.of(context).colorScheme;
+    final h = c.helper;
+    final name = c.helperPcName ?? 'your computer';
+    final paired = c.helperPc != null;
+    final String text;
+    if (!paired) {
+      text = 'Scan faster with your computer';
+    } else if (h != null) {
+      text = '${h.alias} is helping'
+          '${c.helperPhotos == 0 ? '' : ' · ${c.helperPhotos} ${c.helperPhotos == 1 ? 'photo' : 'photos'} scanned there'}';
+    } else if (c.joiningHelper) {
+      text = 'Looking for $name…';
+    } else if (c.helperOn) {
+      text = "$name isn't on this Wi‑Fi yet · checking again soon";
+    } else {
+      text = 'Use $name for this scan';
+    }
+    void open() => Navigator.push(context, MaterialPageRoute(builder: (_) => ScanHelperScreen(controller: c)));
     return Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
-        decoration: BoxDecoration(
-          color: const Color(0xFF5E5CE6).withValues(alpha: 0.12),
+      child: Material(
+        color: const Color(0xFF5E5CE6).withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
           borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(children: [
-          const Icon(Icons.memory_rounded, size: 18, color: Color(0xFF5E5CE6)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '${h.alias} is helping'
-              '${c.helperPhotos == 0 ? '' : ' · ${c.helperPhotos} ${c.helperPhotos == 1 ? 'photo' : 'photos'} scanned there'}',
-              style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurface),
-            ),
+          onTap: paired ? () => c.setHelperOn(!c.helperOn) : open,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 6, 4),
+            child: Row(children: [
+              const Icon(Icons.memory_rounded, size: 18, color: Color(0xFF5E5CE6)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(text, style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurface)),
+              ),
+              if (c.joiningHelper)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  child: SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                ),
+              if (paired)
+                Switch(value: c.helperOn, onChanged: c.setHelperOn)
+              else
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+                  child: Icon(Icons.chevron_right_rounded, size: 20),
+                ),
+            ]),
           ),
-        ]),
+        ),
       ),
     );
   }

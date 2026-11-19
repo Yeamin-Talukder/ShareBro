@@ -309,7 +309,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     if (!await ensurePhotoAccess(context) || !mounted) return;
-    final choice = await showScanSheet(context);
+    final choice = await showScanSheet(context, controller: c);
     if (choice == null || !mounted) return;
     final folder = choice.folder;
     if (folder != null) {

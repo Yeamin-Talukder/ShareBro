@@ -334,7 +334,12 @@ class AppDb {
     final db = await openDatabase(
       path,
       version: 11,
-      onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON');
+        // On a computer another ShareBro (one closing for an update, say)
+        // can hold the file for a moment: wait for it instead of failing.
+        if (Device.desktop) await db.rawQuery('PRAGMA busy_timeout = 10000');
+      },
       onCreate: (db, _) async {
         await db.execute('''
           CREATE TABLE photos (
@@ -538,8 +543,10 @@ class AppDb {
   /// from their clearest photos (see lib/face/face_shape.dart). Worked out
   /// on this device, never sent anywhere.
   static Future<void> _upgradeTo11(Database db) async {
+    // "If not exists": test builds of 1.9.0 made this table before the
+    // version said so, and failing here kept ShareBro from opening at all.
     await db.execute('''
-      CREATE TABLE person_shapes (
+      CREATE TABLE IF NOT EXISTS person_shapes (
         person_id INTEGER PRIMARY KEY REFERENCES persons(id) ON DELETE CASCADE,
         points BLOB NOT NULL,
         faces_used INTEGER NOT NULL,
