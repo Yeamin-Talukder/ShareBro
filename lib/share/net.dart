@@ -22,6 +22,31 @@ Future<void> releaseMulticast() async {
   } catch (_) {}
 }
 
+/// A local network this device is on: its address there and the interface.
+typedef LanAddress = ({InternetAddress address, NetworkInterface interface});
+
+/// Every local network this device is on (private IPv4 addresses): Wi-Fi,
+/// the phone's own hotspot, a computer's Wi-Fi or cable. Not mobile data
+/// or loopback. A phone sharing its hotspot is on two at once (mobile data
+/// out, the hotspot in), and finding devices has to use the hotspot one.
+Future<List<LanAddress>> lanAddresses() async {
+  final List<NetworkInterface> interfaces;
+  try {
+    interfaces = await NetworkInterface.list(type: InternetAddressType.IPv4);
+  } catch (_) {
+    return const [];
+  }
+  return [
+    for (final i in interfaces)
+      if (!i.name.toLowerCase().startsWith('rmnet'))
+        for (final a in i.addresses)
+          if (!a.isLoopback && _isPrivate(a.address)) (address: a, interface: i),
+  ];
+}
+
+bool _isPrivate(String ip) =>
+    ip.startsWith('192.168.') || ip.startsWith('10.') || RegExp(r'^172\.(1[6-9]|2\d|3[01])\.').hasMatch(ip);
+
 /// This phone's address on the local network: Wi-Fi first, then its own
 /// hotspot, then anything private. Null when offline.
 Future<String?> localIp() async {
@@ -32,9 +57,7 @@ Future<String?> localIp() async {
     for (final a in i.addresses) {
       if (a.isLoopback) continue;
       final ip = a.address;
-      final private = ip.startsWith('192.168.') ||
-          ip.startsWith('10.') ||
-          RegExp(r'^172\.(1[6-9]|2\d|3[01])\.').hasMatch(ip);
+      final private = _isPrivate(ip);
       final name = i.name.toLowerCase();
       final score = (private ? 10 : 0) +
           (name.startsWith('wlan') ? 5 : 0) +

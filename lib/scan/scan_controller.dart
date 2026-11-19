@@ -367,6 +367,35 @@ class ScanController extends ChangeNotifier {
 
   /// While a page of a scan runs: adds the computer's lanes to it.
   void Function()? _joinComputer;
+
+  bool _searchingHelper = false;
+
+  /// The computer wasn't heard and isn't at its last address (a phone
+  /// sharing its own hotspot is on a different network, and some hotspots
+  /// block multicast): knock on every address of every network this phone
+  /// is on, in the background, and bring it into the running scan as soon
+  /// as it answers.
+  void _searchForHelper() {
+    if (_searchingHelper || Device.desktop || helperPc == null) return;
+    _searchingHelper = true;
+    unawaited(() async {
+      try {
+        await sharing.discovery.scanSubnet();
+        final pc = helperNearby;
+        if (pc != null) {
+          await _saveHelperAddress(pc);
+          if (running && helper == null) {
+            _lastJoinTry = DateTime.fromMillisecondsSinceEpoch(0);
+            await joinHelperMidScan();
+          }
+        }
+      } catch (e) {
+        debugPrint('Looking for the computer failed: $e');
+      } finally {
+        _searchingHelper = false;
+      }
+    }());
+  }
   bool _joining = false;
 
   /// Looking for the computer to join the running scan.
@@ -424,9 +453,20 @@ class ScanController extends ChangeNotifier {
       }
       final heard = pc != null;
       pc ??= await _lastKnownHelper();
-      if (pc == null) return null;
-      final client = await ScanHelperClient.connect(pc,
-          me: sharing.identity, faceModel: faceModelId, key: _helperKey, keepDays: helperKeepDays);
+      if (pc == null) {
+        _searchForHelper();
+        return null;
+      }
+      final ScanHelperClient client;
+      try {
+        client = await ScanHelperClient.connect(pc,
+            me: sharing.identity, faceModel: faceModelId, key: _helperKey, keepDays: helperKeepDays);
+      } catch (_) {
+        // Not at its last address (a different network, say this phone's
+        // own hotspot): look for it on every network we're on.
+        if (!heard) _searchForHelper();
+        rethrow;
+      }
       if (heard) await _saveHelperAddress(pc);
       // The computer shows how the whole scan is going, and follows this
       // phone's setting for remembering results.

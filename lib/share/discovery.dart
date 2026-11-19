@@ -55,7 +55,20 @@ class Discovery extends ChangeNotifier {
       final socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, lsPort,
           // Dart has no SO_REUSEPORT on Android; reuseAddress is enough there.
           reuseAddress: true, reusePort: Platform.isMacOS || Platform.isIOS);
-      socket.joinMulticast(InternetAddress(lsMulticastGroup));
+      // Listen on every local network, not just the default one: a phone
+      // sharing its hotspot (mobile data is its default) or a computer
+      // with virtual adapters would otherwise miss announcements.
+      final group = InternetAddress(lsMulticastGroup);
+      var joined = 0;
+      for (final lan in await lanAddresses()) {
+        try {
+          socket.joinMulticast(group, lan.interface);
+          joined++;
+        } catch (_) {
+          // Already joined on this interface (two addresses), or no multicast.
+        }
+      }
+      if (joined == 0) socket.joinMulticast(group);
       socket.listen((event) {
         if (event == RawSocketEvent.read) {
           final dg = socket.receive();
@@ -81,12 +94,34 @@ class Discovery extends ChangeNotifier {
     await releaseMulticast();
   }
 
-  void _announce() {
-    final msg = utf8.encode(jsonEncode(identity.info(download: true).toJson(announce: true)));
-    try {
-      _socket?.send(msg, InternetAddress(lsMulticastGroup), lsPort);
-    } catch (e) {
-      debugPrint('Announce failed: $e');
+  void _announce() =>
+      unawaited(_sendEverywhere(utf8.encode(jsonEncode(identity.info(download: true).toJson(announce: true)))));
+
+  /// Multicasts [msg] on every local network, each through its own
+  /// interface (otherwise it only leaves on the default one: mobile data on
+  /// a phone sharing its hotspot).
+  Future<void> _sendEverywhere(List<int> msg) async {
+    final socket = _socket;
+    if (socket == null) return;
+    final group = InternetAddress(lsMulticastGroup);
+    final lans = await lanAddresses();
+    var sent = false;
+    for (final lan in lans) {
+      try {
+        socket.setRawOption(RawSocketOption(
+            RawSocketOption.levelIPv4, RawSocketOption.IPv4MulticastInterface, lan.address.rawAddress));
+        socket.send(msg, group, lsPort);
+        sent = true;
+      } catch (_) {
+        // This interface can't multicast; the others still can.
+      }
+    }
+    if (!sent) {
+      try {
+        socket.send(msg, group, lsPort);
+      } catch (e) {
+        debugPrint('Announce failed: $e');
+      }
     }
   }
 
@@ -106,11 +141,7 @@ class Discovery extends ChangeNotifier {
       final device = _devices[info.fingerprint]!;
       final ok = await _register(device);
       if (!ok) {
-        _socket?.send(
-          utf8.encode(jsonEncode(identity.info(download: true).toJson(announce: false))),
-          InternetAddress(lsMulticastGroup),
-          lsPort,
-        );
+        await _sendEverywhere(utf8.encode(jsonEncode(identity.info(download: true).toJson(announce: false))));
       }
     }
   }
@@ -155,17 +186,23 @@ class Discovery extends ChangeNotifier {
   }
 
   /// When multicast is blocked (some routers and hotspots), knock on every
-  /// address in our /24 subnet.
+  /// address in the /24 of each local network we're on (a phone sharing its
+  /// hotspot and on Wi-Fi too is on two).
   Future<void> scanSubnet() async {
     if (scanning) return;
-    final me = await localIp();
-    if (me == null) return;
+    final mine = {for (final lan in await lanAddresses()) lan.address.address};
+    if (mine.isEmpty) {
+      final me = await localIp();
+      if (me == null) return;
+      mine.add(me);
+    }
     scanning = true;
     notifyListeners();
-    final prefix = me.substring(0, me.lastIndexOf('.') + 1);
+    final prefixes = {for (final me in mine) me.substring(0, me.lastIndexOf('.') + 1)};
     final targets = [
-      for (var i = 1; i < 255; i++)
-        if ('$prefix$i' != me) '$prefix$i',
+      for (final prefix in prefixes)
+        for (var i = 1; i < 255; i++)
+          if (!mine.contains('$prefix$i')) '$prefix$i',
     ];
     // 32 at a time keeps the scan to a few seconds without flooding.
     for (var i = 0; i < targets.length; i += 32) {
