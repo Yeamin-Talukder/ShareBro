@@ -14,6 +14,7 @@ import 'fast_thumb.dart';
 import 'motion.dart';
 import 'sections.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
+import 'face_image.dart';
 
 /// Round face picture. Shares a [Hero] tag with the person page header so it
 /// flies between the two.
@@ -37,7 +38,7 @@ class FaceAvatar extends StatelessWidget {
     final avatar = CircleAvatar(
       radius: radius,
       backgroundColor: scheme.surfaceContainerHighest,
-      backgroundImage: thumb == null ? null : MemoryImage(thumb!),
+      backgroundImage: thumb == null ? null : FaceImage(thumb!),
       child: thumb == null
           ? Icon(Icons.person, size: radius, color: scheme.outline)
           : null,
@@ -375,6 +376,25 @@ class DateChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final v = value;
+    Future<void> pick() async {
+      final picked = await pickDays(context, v);
+      if (picked != null) onChanged(picked);
+    }
+
+    if (Device.desktop) {
+      // Only as wide as the button, so it sits in a row of filters.
+      return Center(
+        widthFactor: 1,
+        child: PopupButton(
+          icon: Icons.calendar_month_rounded,
+          label: v == null ? 'Any date' : formatSpan(v),
+          active: v != null,
+          tooltip: 'Only photos from these dates',
+          onTap: (_) => pick(),
+          onClear: v == null ? null : () => onChanged(null),
+        ),
+      );
+    }
     return Center(
       child: CapsuleChip(
         icon: Icons.calendar_month_rounded,
@@ -425,7 +445,7 @@ class _LivingAvatarState extends State<LivingAvatar> {
     super.didUpdateWidget(old);
     // A new cover means the faces changed (a merge, a new scan, a chosen
     // picture): pick the set again.
-    if (old.cover != widget.cover) _load();
+    if (!listEquals(old.cover, widget.cover)) _load();
   }
 
   void _load() {

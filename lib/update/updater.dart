@@ -14,6 +14,7 @@ import '../data/db.dart';
 import '../platform/device.dart';
 import '../share/notify.dart';
 import 'release.dart';
+import 'windows_version.dart';
 
 enum UpdateStage { idle, checking, upToDate, available, downloading, verifying, ready, failed }
 
@@ -24,6 +25,11 @@ enum InstallResult { started, needsPermission, failed }
 /// once a day, shows what's new, downloads the APK built for this phone
 /// (picking up where it stopped if the connection drops), checks it against
 /// the release's SHA256SUMS.txt, and hands it to Android's installer.
+///
+/// On Windows the same steps fetch the newest release that has a Windows
+/// installer (those are tagged "vX.Y.Z-windows" and marked pre-release, so
+/// they never reach phones), then run it quietly: it closes ShareBro,
+/// updates it in place and opens it again.
 class Updater extends ChangeNotifier {
   Updater._();
 
@@ -31,6 +37,7 @@ class Updater extends ChangeNotifier {
 
   static const repo = 'Yeamin-Talukder/ShareBro';
   static const _latest = 'https://api.github.com/repos/$repo/releases/latest';
+  static const _recent = 'https://api.github.com/repos/$repo/releases?per_page=20';
   static const _channel = MethodChannel('photo_organizer/update');
   static const _notifyId = 5000;
 
@@ -57,6 +64,9 @@ class Updater extends ChangeNotifier {
 
   UpdateStage stage = UpdateStage.idle;
   Release? release;
+
+  /// The file that installs [release] here: the APK built for this phone,
+  /// or the Windows installer.
   ReleaseAsset? apk;
   DateTime? checkedAt;
 
@@ -112,7 +122,9 @@ class Updater extends ChangeNotifier {
       final a = (info['abis'] as List?)?.cast<String>();
       if (a != null && a.isNotEmpty) abis = a;
     } on MissingPluginException {
-      // Not on Android (tests).
+      // Not on Android: Windows stamps the version into the .exe.
+      final v = windowsAppVersion();
+      if (v != null) current = Version.tryParse(v) ?? current;
     } on PlatformException {
       // Keep the defaults.
     }
@@ -142,8 +154,6 @@ class Updater extends ChangeNotifier {
 
   /// The once-a-day check, when the app opens or comes back.
   Future<void> maybeCheck() async {
-    // Releases are Android APKs; desktop updates come later (see
-    // design/windows-port-plan.md).
     if (!Device.selfUpdate || !autoCheck || busy || hasUpdate) return;
     final last = checkedAt;
     if (last != null && DateTime.now().difference(last) < const Duration(hours: 20)) return;
@@ -159,7 +169,7 @@ class Updater extends ChangeNotifier {
       final r = await fetchLatest();
       checkedAt = DateTime.now();
       unawaited(_db?.setSetting(_lastKey, checkedAt!.toIso8601String()));
-      final asset = r.apkFor(abis);
+      final asset = Device.windows ? r.windowsSetup : r.apkFor(abis);
       final newer = r.version > current && asset != null;
       if (newer && release?.tag != r.tag) {
         // A different version than one half downloaded: start again.
@@ -188,18 +198,28 @@ class Updater extends ChangeNotifier {
     }
   }
 
-  /// The latest release from the GitHub API.
+  /// The latest release from the GitHub API. On Windows: the newest one
+  /// with a Windows installer, pre-releases included.
   Future<Release> fetchLatest() async {
     final client = _newClient();
     try {
-      final req = await client.getUrl(Uri.parse(_latest));
+      final req = await client.getUrl(Uri.parse(Device.windows ? _recent : _latest));
       req.headers
         ..set(HttpHeaders.acceptHeader, 'application/vnd.github+json')
         ..set('X-GitHub-Api-Version', '2022-11-28');
       final res = await req.close().timeout(const Duration(seconds: 20));
       if (res.statusCode != 200) throw HttpException('GitHub answered ${res.statusCode}');
       final body = await res.transform(utf8.decoder).join().timeout(const Duration(seconds: 20));
-      return Release.fromGitHub((jsonDecode(body) as Map).cast<String, Object?>());
+      if (!Device.windows) return Release.fromGitHub((jsonDecode(body) as Map).cast<String, Object?>());
+      Release? best;
+      for (final j in (jsonDecode(body) as List).cast<Map>()) {
+        if (j['draft'] == true) continue;
+        final r = Release.fromGitHub(j.cast<String, Object?>());
+        if (r.windowsSetup == null) continue;
+        if (best == null || r.version > best.version) best = r;
+      }
+      if (best == null) throw const HttpException('No Windows release found');
+      return best;
     } finally {
       client.close(force: true);
     }
@@ -428,7 +448,9 @@ class Updater extends ChangeNotifier {
   }
 
   /// Can ShareBro open Android's installer? (Settings › Install unknown apps.)
+  /// Always on Windows.
   static Future<bool> canInstall() async {
+    if (Device.windows) return true;
     try {
       return await _channel.invokeMethod<bool>('canInstall') ?? false;
     } on MissingPluginException {
@@ -461,6 +483,7 @@ class Updater extends ChangeNotifier {
     }
     if (!await canInstall()) return InstallResult.needsPermission;
     await _db?.setSetting(_installingKey, r.version.toString());
+    if (Device.windows) return _installOnWindows(file);
     try {
       final ok = await _channel.invokeMethod<bool>('install', {'path': file.path}) ?? false;
       return ok ? InstallResult.started : InstallResult.failed;
@@ -470,6 +493,34 @@ class Updater extends ChangeNotifier {
     } on MissingPluginException {
       return InstallResult.failed;
     }
+  }
+
+  /// Runs the downloaded installer quietly and closes ShareBro so its files
+  /// can be replaced. The installer keeps the install it finds (for you or
+  /// for everyone, asking Windows for permission if needed) and opens
+  /// ShareBro again when it's done.
+  Future<InstallResult> _installOnWindows(File file) async {
+    try {
+      await Process.start(
+        file.path,
+        const ['/SILENT', '/SP-', '/SUPPRESSMSGBOXES', '/NOCANCEL', '/CLOSEAPPLICATIONS', '/NORESTART'],
+        mode: ProcessStartMode.detached,
+      );
+    } catch (e) {
+      debugPrint('Install failed: $e');
+      await _db?.setSetting(_installingKey, '');
+      return InstallResult.failed;
+    }
+    // A moment for the installer to start, then get out of its way.
+    unawaited(Future<void>.delayed(const Duration(milliseconds: 800), () async {
+      try {
+        await _db?.close();
+      } catch (_) {
+        // Closing anyway.
+      }
+      exit(0);
+    }));
+    return InstallResult.started;
   }
 
   /// After a failed check or download.

@@ -49,14 +49,16 @@ class ScrfdFace {
 class Letterbox {
   Letterbox(this.tensor, this.scale);
 
-  /// 1x3x640x640, RGB, (v - 127.5) / 128, as SCRFD was trained.
+  /// 1x3x640x640 (or 1x640x640x3 with `channelsLast`), RGB,
+  /// (v - 127.5) / 128, as SCRFD was trained.
   final Float32List tensor;
   final double scale;
 }
 
 /// Fits RGBA [pixels] (w x h) into the model's square input, keeping the
-/// aspect ratio (bilinear resize).
-Letterbox scrfdLetterbox(Uint8List pixels, int w, int h) {
+/// aspect ratio (bilinear resize). [channelsLast] for TensorFlow Lite's
+/// pixel-by-pixel layout (the phone's copy of the model).
+Letterbox scrfdLetterbox(Uint8List pixels, int w, int h, {bool channelsLast = false}) {
   final scale = math.min(scrfdInput / w, scrfdInput / h);
   final nw = math.max(1, (w * scale).round()), nh = math.max(1, (h * scale).round());
   const plane = scrfdInput * scrfdInput;
@@ -78,7 +80,7 @@ Letterbox scrfdLetterbox(Uint8List pixels, int w, int h) {
       for (var c = 0; c < 3; c++) {
         final top = pixels[i00 + c] + (pixels[i10 + c] - pixels[i00 + c]) * dx;
         final bottom = pixels[i01 + c] + (pixels[i11 + c] - pixels[i01 + c]) * dx;
-        t[c * plane + o] = (top + (bottom - top) * dy - 127.5) / 128;
+        t[channelsLast ? o * 3 + c : c * plane + o] = (top + (bottom - top) * dy - 127.5) / 128;
       }
     }
   }

@@ -107,6 +107,16 @@ class Release {
     return null;
   }
 
+  /// The Windows installer ("ShareBro-1.8.0-windows-setup.exe"); null if
+  /// the release has none.
+  ReleaseAsset? get windowsSetup {
+    for (final a in assets) {
+      final n = a.name.toLowerCase();
+      if (n.endsWith('.exe') && n.contains('setup')) return a;
+    }
+    return null;
+  }
+
   ReleaseAsset? get checksums {
     for (final a in assets) {
       if (a.name.toLowerCase().startsWith('sha256sums')) return a;

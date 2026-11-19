@@ -22,6 +22,7 @@ import 'photo_info.dart';
 import 'photo_side_panel.dart';
 import 'theme.dart';
 import 'widgets.dart';
+import 'face_image.dart';
 
 /// Screen-sized photo step: sharp at 1x, without decoding the original.
 int _viewStep(BuildContext context) {
@@ -324,6 +325,8 @@ class _PhotoViewerState extends State<PhotoViewer> with TickerProviderStateMixin
   bool _swipePinch = false;
 
   void _swipeStart(PointerPanZoomStartEvent e) {
+    // Sideways swipes here change the photo, not the page.
+    NavSwipe.claim();
     _swipeDx = 0;
     _swipeFrom = _index;
     _swipePinch = false;
@@ -920,6 +923,16 @@ class _ZoomPageState extends State<_ZoomPage> with SingleTickerProviderStateMixi
   final _transform = TransformationController();
   late final AnimationController _zoomAnim = AnimationController(vsync: this, duration: 280.ms);
   Animation<Matrix4>? _zoomTween;
+
+  /// Computer: a quick glide for each wheel step, zooming around the mouse.
+  late final AnimationController _wheelAnim = AnimationController(vsync: this, duration: 160.ms);
+  Matrix4 _wheelFrom = Matrix4.identity();
+  Offset _wheelAt = Offset.zero;
+  double _wheelScale0 = 1, _wheelScale1 = 1;
+
+  /// Computer: a touchpad pinch, zooming around where it started.
+  Matrix4? _pinchFrom;
+  Offset _pinchAt = Offset.zero;
   Offset _tapAt = Offset.zero;
   final _photoKey = GlobalKey();
   late final Future<List<({Rect box, PhotoPerson? person})>> _faces = widget.db.facesInPhoto(widget.id);
@@ -929,6 +942,10 @@ class _ZoomPageState extends State<_ZoomPage> with SingleTickerProviderStateMixi
     super.initState();
     _zoomAnim.addListener(() {
       if (_zoomTween != null) _transform.value = _zoomTween!.value;
+    });
+    _wheelAnim.addListener(() {
+      final t = Curves.easeOutCubic.transform(_wheelAnim.value);
+      _transform.value = _around(_wheelFrom, _wheelAt, lerpDouble(_wheelScale0, _wheelScale1, t)!);
     });
     _transform.addListener(_report);
     widget.commands?.addListener(_command);
@@ -970,6 +987,7 @@ class _ZoomPageState extends State<_ZoomPage> with SingleTickerProviderStateMixi
     widget.commands?.removeListener(_command);
     _transform.dispose();
     _zoomAnim.dispose();
+    _wheelAnim.dispose();
     super.dispose();
   }
 
@@ -994,9 +1012,55 @@ class _ZoomPageState extends State<_ZoomPage> with SingleTickerProviderStateMixi
     }
   }
 
+  /// [from] zoomed to [scale] (1 to 6) so the spot under [focal] stays
+  /// under it, kept inside the view so no empty edge slides in.
+  Matrix4 _around(Matrix4 from, Offset focal, double scale) {
+    final size = context.size ?? Size.zero;
+    final s = scale.clamp(1.0, 6.0);
+    if (s <= 1.001 || size.isEmpty) return Matrix4.identity();
+    final scene = MatrixUtils.transformPoint(Matrix4.inverted(from), focal);
+    final tx = (focal.dx - scene.dx * s).clamp(size.width - size.width * s, 0.0);
+    final ty = (focal.dy - scene.dy * s).clamp(size.height - size.height * s, 0.0);
+    return Matrix4.identity()
+      ..translateByDouble(tx, ty, 0, 1)
+      ..scaleByDouble(s, s, 1, 1);
+  }
+
+  /// Computer: the mouse wheel zooms in and out around the pointer. Steps
+  /// that come while one is still gliding add up.
+  void _wheel(PointerSignalEvent e) {
+    // A touchpad's two-finger scroll pans the photo (InteractiveViewer).
+    if (e is! PointerScrollEvent || e.kind == PointerDeviceKind.trackpad) return;
+    final dy = e.scrollDelta.dy;
+    if (dy == 0) return;
+    final now = _transform.value.getMaxScaleOnAxis();
+    final aim = (_wheelAnim.isAnimating ? _wheelScale1 : now) * math.exp(-dy / 260);
+    _zoomAnim.stop();
+    _wheelFrom = _transform.value.clone();
+    _wheelAt = e.localPosition;
+    _wheelScale0 = now;
+    _wheelScale1 = aim.clamp(1.0, 6.0);
+    _wheelAnim.forward(from: 0);
+  }
+
+  void _pinchStart(PointerPanZoomStartEvent e) {
+    _wheelAnim.stop();
+    _pinchFrom = _transform.value.clone();
+    _pinchAt = e.localPosition;
+  }
+
+  void _pinchUpdate(PointerPanZoomUpdateEvent e) {
+    final from = _pinchFrom;
+    if (from == null || (e.scale - 1).abs() < 0.01) return;
+    _transform.value = _around(from, _pinchAt, from.getMaxScaleOnAxis() * e.scale);
+  }
+
   void _doubleTap() {
     const scale = 2.5;
-    final target = _isZoomed
+    final desk = DesktopLayout.on;
+    final target = desk
+        ? (_isZoomed ? Matrix4.identity() : _around(Matrix4.identity(), _tapAt, scale))
+        : _isZoomed
         ? Matrix4.identity()
         : (Matrix4.identity()
             ..translateByDouble(-_tapAt.dx * (scale - 1), -_tapAt.dy * (scale - 1), 0, 1)
@@ -1058,24 +1122,41 @@ class _ZoomPageState extends State<_ZoomPage> with SingleTickerProviderStateMixi
               : GestureDetector(
                   onDoubleTapDown: (d) => _tapAt = d.localPosition,
                   onDoubleTap: _doubleTap,
-                  child: InteractiveViewer(
+                  child: _zoomByPointer(InteractiveViewer(
                     transformationController: _transform,
                     panEnabled: _panning,
+                    // On a computer the wheel and pinch are handled here,
+                    // so they always zoom where the pointer is.
+                    scaleEnabled: !DesktopLayout.on,
                     maxScale: 6,
                     // Lets go of the edges smoothly instead of stopping dead.
                     interactionEndFrictionCoefficient: 0.0001,
                     child: LayoutBuilder(builder: (context, box) => _photo(asset, box)),
-                  ),
+                  )),
                 ),
         );
       },
     );
   }
 
+  Widget _zoomByPointer(Widget viewer) => !DesktopLayout.on
+      ? viewer
+      : Listener(
+          onPointerSignal: _wheel,
+          onPointerPanZoomStart: _pinchStart,
+          onPointerPanZoomUpdate: _pinchUpdate,
+          onPointerPanZoomEnd: (_) => _pinchFrom = null,
+          child: viewer,
+        );
+
   Widget _photo(AssetEntity asset, BoxConstraints box) {
     // As shown (turned upright), not as stored.
     final ow = asset.orientatedWidth, oh = asset.orientatedHeight;
-    final aspect = ow > 0 && oh > 0 ? ow / oh : 1.0;
+    var aspect = ow > 0 && oh > 0 ? ow / oh : 1.0;
+    // A size that can't be right (a misread file): fill the screen and let
+    // the picture fit itself, rather than squash it into a line.
+    final sure = aspect >= 0.1 && aspect <= 10;
+    if (!sure) aspect = box.maxWidth / math.max(1.0, box.maxHeight);
     // Size of the photo once fitted inside the screen.
     var w = box.maxWidth, h = w / aspect;
     if (h > box.maxHeight) {
@@ -1294,7 +1375,7 @@ class _SpotlightState extends State<_Spotlight> with SingleTickerProviderStateMi
                       child: person == null
                           ? const Chip(label: Text('Not recognised yet'))
                           : ActionChip(
-                              avatar: CircleAvatar(backgroundImage: MemoryImage(person.thumb)),
+                              avatar: CircleAvatar(backgroundImage: FaceImage(person.thumb)),
                               label: Text(person.displayName),
                               onPressed: () {
                                 Navigator.push(

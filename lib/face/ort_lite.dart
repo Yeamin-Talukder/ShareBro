@@ -35,18 +35,21 @@ class LiteSession {
 
   /// Opens [model]. With [gpu], tries DirectML first and falls back to the
   /// CPU if the runtime, the driver or the model can't use it.
-  static LiteSession open(Uint8List model, {required int threads, bool gpu = false}) {
+  ///
+  /// Without [spin], idle CPU threads sleep instead of spin-waiting for the
+  /// next run: slower alone, but they stop taking CPU from other work.
+  static LiteSession open(Uint8List model, {required int threads, bool gpu = false, bool spin = true}) {
     if (gpu) {
       try {
-        return _open(model, threads: threads, gpu: true);
+        return _open(model, threads: threads, gpu: true, spin: spin);
       } catch (_) {
         // No DirectML build, no suitable graphics chip, or an old driver.
       }
     }
-    return _open(model, threads: threads, gpu: false);
+    return _open(model, threads: threads, gpu: false, spin: spin);
   }
 
-  static LiteSession _open(Uint8List model, {required int threads, required bool gpu}) {
+  static LiteSession _open(Uint8List model, {required int threads, required bool gpu, bool spin = true}) {
     final api = _api.ref;
     final optionsOut = calloc<ffi.Pointer<bg.OrtSessionOptions>>();
     _check(api.CreateSessionOptions.asFunction<bg.OrtStatusPtr Function(ffi.Pointer<ffi.Pointer<bg.OrtSessionOptions>>)>()(
@@ -59,6 +62,17 @@ class LiteSession {
           options, threads));
       _check(api.SetSessionGraphOptimizationLevel
           .asFunction<bg.OrtStatusPtr Function(ffi.Pointer<bg.OrtSessionOptions>, int)>()(options, 99));
+      if (!spin) {
+        final key = 'session.intra_op.allow_spinning'.toNativeUtf8(), off = '0'.toNativeUtf8();
+        try {
+          _check(api.AddSessionConfigEntry.asFunction<
+              bg.OrtStatusPtr Function(ffi.Pointer<bg.OrtSessionOptions>, ffi.Pointer<ffi.Char>,
+                  ffi.Pointer<ffi.Char>)>()(options, key.cast(), off.cast()));
+        } finally {
+          malloc.free(key);
+          malloc.free(off);
+        }
+      }
       if (gpu) {
         // DirectML wants one run at a time and no memory-pattern planning.
         _check(api.DisableMemPattern.asFunction<bg.OrtStatusPtr Function(ffi.Pointer<bg.OrtSessionOptions>)>()(options));

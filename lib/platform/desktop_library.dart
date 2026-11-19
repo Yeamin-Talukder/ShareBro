@@ -66,23 +66,66 @@ Future<({int width, int height, int rotation})?> _shape(File file) async {
   try {
     final raf = await file.open();
     final Uint8List head;
+    ({int width, int height})? jpeg;
     try {
       head = await raf.read(256 * 1024);
+      // JPEG: find the frame header by walking the file's segments, since
+      // it can sit well past the first 256 KB (Pixel portrait photos carry
+      // megabytes of depth data before it). Reading only the start once
+      // gave sizes like 18761 × 42, and the viewer squashed the photo into
+      // a thin line.
+      if (head.length > 2 && head[0] == 0xFF && head[1] == 0xD8) jpeg = await _jpegSize(raf);
     } finally {
       await raf.close();
     }
     final decoder = img.findDecoderForData(head);
-    final info = decoder?.startDecode(head);
-    if (info == null || info.width <= 0 || info.height <= 0) return null;
     var rotation = 0;
-    if (decoder is img.JpegDecoder) {
+    if (decoder is img.JpegDecoder || jpeg != null) {
       final o = img.decodeJpgExif(head)?.imageIfd.orientation ?? 1;
       rotation = switch (o) { 3 || 4 => 180, 5 || 6 => 90, 7 || 8 => 270, _ => 0 };
     }
+    if (jpeg != null) return (width: jpeg.width, height: jpeg.height, rotation: rotation);
+    final info = decoder?.startDecode(head);
+    if (info == null || info.width <= 0 || info.height <= 0) return null;
     return (width: info.width, height: info.height, rotation: rotation);
   } catch (_) {
     return null;
   }
+}
+
+/// A JPEG's width and height from its frame (SOF) header, found by jumping
+/// from segment to segment without reading what's in them.
+Future<({int width, int height})?> _jpegSize(RandomAccessFile raf) async {
+  final length = await raf.length();
+  var pos = 2;
+  for (var guard = 0; guard < 4096 && pos + 4 <= length; guard++) {
+    await raf.setPosition(pos);
+    final h = await raf.read(4);
+    if (h.length < 4 || h[0] != 0xFF) return null;
+    final marker = h[1];
+    // Fill bytes, and markers that have no length.
+    if (marker == 0xFF) {
+      pos += 1;
+      continue;
+    }
+    if (marker == 0x01 || (marker >= 0xD0 && marker <= 0xD8)) {
+      pos += 2;
+      continue;
+    }
+    // The image data or the end came before any frame header.
+    if (marker == 0xDA || marker == 0xD9) return null;
+    final size = (h[2] << 8) | h[3];
+    if (size < 2) return null;
+    final frame = marker >= 0xC0 && marker <= 0xCF && marker != 0xC4 && marker != 0xC8 && marker != 0xCC;
+    if (frame) {
+      final b = await raf.read(5); // precision, height, width
+      if (b.length < 5) return null;
+      final height = (b[1] << 8) | b[2], width = (b[3] << 8) | b[4];
+      return width > 0 && height > 0 ? (width: width, height: height) : null;
+    }
+    pos += 2 + size;
+  }
+  return null;
 }
 
 extension AssetFile on AssetEntity {

@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as p;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'anim.dart';
@@ -15,6 +18,7 @@ import '../share/prepare.dart';
 import '../share/protocol.dart';
 import '../share/receive.dart';
 import '../share/send_center.dart' show JobStatus;
+import 'active_shares.dart';
 import 'app_picker.dart';
 import 'desktop_layout.dart';
 import 'devices.dart';
@@ -50,6 +54,34 @@ class ShareTab extends StatefulWidget {
 class _ShareTabState extends State<ShareTab> {
   bool _receive = false;
   final List<SendItem> _items = [];
+
+  /// Desktop: files are being dragged over the window.
+  bool _dropping = false;
+
+  /// Desktop: files and folders dropped on the page join what's picked
+  /// (and the page turns to Send if it was on Receive).
+  Future<void> _dropped(DropDoneDetails d) async {
+    setState(() {
+      _dropping = false;
+      _receive = false;
+    });
+    final items = <SendItem>[];
+    for (final f in d.files) {
+      final path = f.path;
+      if (path.isEmpty) continue;
+      if (await FileSystemEntity.isDirectory(path)) {
+        items.addAll(await SendItem.folder(path));
+      } else {
+        items.add(SendItem.file(path, name: p.basename(path)));
+      }
+    }
+    if (!mounted) return;
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nothing to send in what was dropped.')));
+      return;
+    }
+    _add(items);
+  }
 
   ScanController get c => widget.controller;
 
@@ -140,6 +172,28 @@ class _ShareTabState extends State<ShareTab> {
 
   @override
   Widget build(BuildContext context) {
+    final page = _page(context);
+    if (!DesktopLayout.on) return page;
+    return DropTarget(
+      onDragEntered: (_) => setState(() => _dropping = true),
+      onDragExited: (_) => setState(() => _dropping = false),
+      onDragDone: _dropped,
+      child: Stack(children: [
+        page,
+        Positioned.fill(
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: _dropping ? 1 : 0,
+              duration: 150.ms,
+              child: const _DropOverlay(),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _page(BuildContext context) {
     final s = c.sharing;
     final desk = DesktopLayout.on;
     return GlassScrollView(
@@ -181,6 +235,12 @@ class _ShareTabState extends State<ShareTab> {
         ]),
       ],
       slivers: [
+        // Desktop: links, sends and receives going on now, each with Stop.
+        if (desk)
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            sliver: SliverToBoxAdapter(child: SharingNowSection(controller: c)),
+          ),
         if (desk)
           SliverPadding(
             padding: EdgeInsets.fromLTRB(24, 4, 24, MediaQuery.paddingOf(context).bottom + 24),
@@ -191,14 +251,16 @@ class _ShareTabState extends State<ShareTab> {
                   switchInCurve: Curves.easeOutCubic,
                   switchOutCurve: Curves.easeInCubic,
                   child: _receive
-                      // Receiving is one centred column at any width.
-                      ? Center(
-                          key: const ValueKey('receive'),
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 720),
-                            child: _ReceivePanel(controller: c),
-                          ),
-                        )
+                      // Wide: two columns like Send; narrow: one centred column.
+                      ? box.maxWidth >= DesktopLayout.twoColumnsFrom
+                          ? _ReceivePanel(key: const ValueKey('receive'), controller: c, wide: true)
+                          : Center(
+                              key: const ValueKey('receive'),
+                              child: ConstrainedBox(
+                                constraints: const BoxConstraints(maxWidth: 720),
+                                child: _ReceivePanel(controller: c),
+                              ),
+                            )
                       : box.maxWidth >= DesktopLayout.twoColumnsFrom
                           ? _deskSend(context)
                           : _sendPanel(context),
@@ -211,6 +273,8 @@ class _ShareTabState extends State<ShareTab> {
           // Clear the floating nav bar so the last buttons stay reachable.
           padding: EdgeInsets.fromLTRB(16, 4, 16, MediaQuery.paddingOf(context).bottom + 24),
           sliver: SliverList.list(children: [
+            // Links, sends and receives going on now, each with Stop.
+            SharingNowSection(controller: c),
             CapsuleSwitch<bool>(
               value: _receive,
               options: const [(false, 'Send', null), (true, 'Receive', null)],
@@ -240,13 +304,21 @@ class _ShareTabState extends State<ShareTab> {
   /// Desktop, wide: what to send and how on the left; nearby devices and
   /// what's being sent or received on the right.
   Widget _deskSend(BuildContext context) {
+    final picked = _items.isEmpty ? null : describeItems(_items);
     return Row(key: const ValueKey('send-desk'), crossAxisAlignment: CrossAxisAlignment.start, children: [
       Expanded(
         flex: 10,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const SizedBox(height: 12),
-          _pickCard(context, hint: true),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+          _Step(
+            number: 1,
+            title: 'Choose what to send',
+            done: _items.isNotEmpty,
+            subtitle: picked == null ? 'Drop files here, or pick them' : '${picked[0].toUpperCase()}${picked.substring(1)} ready',
+          ),
+          _deskPickCard(context),
+          const SizedBox(height: 22),
+          const SectionHeader(title: 'More ways to share', top: 0),
           _optionsCard(context),
           const SectionFooter(
             'Works with the free LocalSend app on Android, iPhone, Windows, Mac and Linux on the same Wi‑Fi or hotspot. '
@@ -254,16 +326,94 @@ class _ShareTabState extends State<ShareTab> {
           ),
         ]),
       ),
-      const SizedBox(width: 16),
+      const SizedBox(width: 20),
       Expanded(
         flex: 11,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const SizedBox(height: 8),
+          _Step(
+            number: 2,
+            title: 'Pick a device',
+            subtitle: _items.isEmpty
+                ? 'Devices on this Wi‑Fi show up here'
+                : 'Click a device to send ${describeItems(_items)}',
+          ),
           _devicePicker(context),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           _ActivityCard(controller: c),
         ]),
       ),
     ]);
+  }
+
+  /// Desktop: what to send. Empty, a drop zone with the pick buttons in it;
+  /// with things picked, those things and buttons to add more.
+  Widget _deskPickCard(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    Widget buttons({bool compact = false}) =>
+        Wrap(spacing: compact ? 6 : 10, runSpacing: compact ? 6 : 10, alignment: WrapAlignment.center, children: [
+          _AddTile(
+              icon: Icons.photo_library_rounded, color: const Color(0xFFFF9500), label: 'Photos', compact: compact, onTap: _pickMedia),
+          _AddTile(
+              icon: Icons.description_rounded, color: const Color(0xFF0A84FF), label: 'Files', compact: compact, onTap: _pickFiles),
+          _AddTile(icon: Icons.folder_rounded, color: const Color(0xFF30B0C7), label: 'Folder', compact: compact, onTap: _pickFolder),
+          _AddTile(icon: Icons.notes_rounded, color: const Color(0xFF34C759), label: 'Text', compact: compact, onTap: _writeText),
+          _AddTile(
+              icon: Icons.content_paste_rounded, color: const Color(0xFFAF52DE), label: 'Paste', compact: compact, onTap: _paste),
+        ]);
+    if (_items.isEmpty) {
+      return SectionCard(
+        padding: const EdgeInsets.all(14),
+        child: CustomPaint(
+          painter: _DashedBorder(scheme.onSurfaceVariant.withValues(alpha: _dropping ? 0.8 : 0.3)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+            child: Column(children: [
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.file_download_outlined, size: 20, color: scheme.primary),
+                const SizedBox(width: 8),
+                const Flexible(
+                  child: Text('Drop photos, files or folders here',
+                      textAlign: TextAlign.center, style: TextStyle(fontSize: TextSize.callout, fontWeight: FontWeight.w600)),
+                ),
+              ]),
+              const SizedBox(height: 3),
+              Text('or pick what to send',
+                  textAlign: TextAlign.center, style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
+              const SizedBox(height: 18),
+              buttons(),
+            ]),
+          ),
+        ),
+      );
+    }
+    final picked = describeItems(_items);
+    return SectionCard(
+      padding: const EdgeInsets.fromLTRB(16, 10, 10, 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(
+            child: Text('${picked[0].toUpperCase()}${picked.substring(1)}',
+                style: const TextStyle(fontSize: TextSize.label, fontWeight: FontWeight.w600)),
+          ),
+          TextButton(
+            onPressed: () {
+              Haptics.remove();
+              setState(_items.clear);
+            },
+            child: const Text('Clear all'),
+          ),
+        ]),
+        const SizedBox(height: 4),
+        ItemStrip(items: List.of(_items), onRemove: (i) => setState(() => _items.remove(i)), height: 72),
+        const SizedBox(height: 12),
+        Row(children: [
+          Text('Add more', style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
+          const SizedBox(width: 10),
+          Expanded(child: Align(alignment: Alignment.centerLeft, child: buttons(compact: true))),
+        ]),
+      ]),
+    );
   }
 
   Widget _devicePicker(BuildContext context) => DevicePicker(
@@ -282,7 +432,7 @@ class _ShareTabState extends State<ShareTab> {
   Widget _sendPanel(BuildContext context) {
     return Column(key: const ValueKey('send'), crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const SizedBox(height: 18),
-      _pickCard(context),
+      if (DesktopLayout.on) ...[_deskPickCard(context), const SizedBox(height: 12)] else _pickCard(context),
       _devicePicker(context),
       const SizedBox(height: 22),
       _optionsCard(context),
@@ -408,6 +558,157 @@ class _ShareTabState extends State<ShareTab> {
   }
 }
 
+/// Desktop Share: a numbered step ("1 Choose what to send") with a line
+/// saying where it stands; the number turns into a tick once it's done.
+class _Step extends StatelessWidget {
+  const _Step({required this.number, required this.title, required this.subtitle, this.done = false});
+
+  final int number;
+  final String title, subtitle;
+  final bool done;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 0, 0, 10),
+      child: Row(children: [
+        AnimatedContainer(
+          duration: 200.ms,
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: done ? const Color(0xFF34C759) : scheme.primary,
+          ),
+          child: Center(
+            child: done
+                ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+                : Text('$number',
+                    style: TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w700, color: scheme.onPrimary)),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontSize: TextSize.callout, fontWeight: FontWeight.w700)),
+            Text(subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+/// Desktop: one kind of thing to send (Photos, Files, Folder…), as a tile
+/// with its own coloured icon; [compact] is a small chip for "Add more".
+class _AddTile extends StatefulWidget {
+  const _AddTile({required this.icon, required this.color, required this.label, required this.onTap, this.compact = false});
+
+  final IconData icon;
+  final Color color;
+  final String label;
+  final VoidCallback onTap;
+  final bool compact;
+
+  @override
+  State<_AddTile> createState() => _AddTileState();
+}
+
+class _AddTileState extends State<_AddTile> {
+  bool _hover = false, _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final w = widget;
+    final scheme = Theme.of(context).colorScheme;
+    final glyph = Container(
+      width: w.compact ? 20 : 38,
+      height: w.compact ? 20 : 38,
+      decoration: BoxDecoration(color: w.color, borderRadius: BorderRadius.circular(w.compact ? 5 : 10)),
+      child: Icon(w.icon, size: w.compact ? 13 : 21, color: Colors.white),
+    );
+    final body = w.compact
+        ? Row(mainAxisSize: MainAxisSize.min, children: [
+            glyph,
+            const SizedBox(width: 7),
+            Text(w.label, style: const TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w500)),
+          ])
+        : Column(mainAxisSize: MainAxisSize.min, children: [
+            glyph,
+            const SizedBox(height: 7),
+            Text(w.label, style: const TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w500)),
+          ]);
+    return Semantics(
+      button: true,
+      label: w.label,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          onTapDown: (_) => setState(() => _down = true),
+          onTapUp: (_) => setState(() => _down = false),
+          onTapCancel: () => setState(() => _down = false),
+          onTap: w.onTap,
+          child: AnimatedScale(
+            scale: _down ? 0.96 : 1,
+            duration: const Duration(milliseconds: 100),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              width: w.compact ? null : 92,
+              padding: w.compact ? const EdgeInsets.fromLTRB(6, 5, 10, 5) : const EdgeInsets.fromLTRB(6, 12, 6, 10),
+              decoration: BoxDecoration(
+                color: _hover ? Mac.hover(context) : scheme.onSurface.withValues(alpha: 0.03),
+                borderRadius: BorderRadius.circular(w.compact ? 8 : 12),
+                border: Border.all(color: _hover ? w.color.withValues(alpha: 0.5) : Mac.hairline(context), width: 0.8),
+              ),
+              child: body,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Desktop: what the page looks like while files are dragged over it.
+class _DropOverlay extends StatelessWidget {
+  const _DropOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ColoredBox(
+      color: scheme.surface.withValues(alpha: 0.82),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: CustomPaint(
+          painter: _DashedBorder(scheme.primary, width: 2.5, radius: 18),
+          child: Center(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
+                child: Icon(Icons.file_download_outlined, size: 36, color: scheme.onPrimary),
+              ),
+              const SizedBox(height: 16),
+              const Text('Drop to send', style: TextStyle(fontSize: TextSize.title2, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Text('Photos, files and whole folders',
+                  style: TextStyle(fontSize: TextSize.label, color: scheme.onSurfaceVariant)),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// A dashed, rounded box with an icon and two lines: what can be added
 /// (desktop Share's empty pick card).
 class _DashedHint extends StatelessWidget {
@@ -439,17 +740,18 @@ class _DashedHint extends StatelessWidget {
 }
 
 class _DashedBorder extends CustomPainter {
-  _DashedBorder(this.color);
+  _DashedBorder(this.color, {this.width = 1.5, this.radius = 14});
 
   final Color color;
+  final double width, radius;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    final path = Path()..addRRect(RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(14)));
+      ..strokeWidth = width;
+    final path = Path()..addRRect(RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)));
     for (final m in path.computeMetrics()) {
       for (var d = 0.0; d < m.length; d += 10) {
         canvas.drawPath(m.extractPath(d, math.min(d + 5, m.length)), paint);
@@ -458,7 +760,7 @@ class _DashedBorder extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_DashedBorder old) => old.color != color;
+  bool shouldRepaint(_DashedBorder old) => old.color != color || old.width != width || old.radius != radius;
 }
 
 /// Desktop Share: what's being received and sent right now, and the last
@@ -575,10 +877,11 @@ class _ActivityRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(Mac.controlRadius),
+      mouseCursor: SystemMouseCursors.click,
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(children: [
           IconTile(icon: icon, color: color),
           const SizedBox(width: 12),
@@ -651,9 +954,12 @@ class _PickButton extends StatelessWidget {
 /// Being findable: you in the middle of the orbit, on/off, quick save and
 /// PIN, the transfer in progress and what arrived lately.
 class _ReceivePanel extends StatefulWidget {
-  const _ReceivePanel({super.key, required this.controller});
+  const _ReceivePanel({super.key, required this.controller, this.wide = false});
 
   final ScanController controller;
+
+  /// Desktop, wide window: two columns that fit one screen, like Send.
+  final bool wide;
 
   @override
   State<_ReceivePanel> createState() => _ReceivePanelState();
@@ -768,14 +1074,13 @@ class _ReceivePanelState extends State<_ReceivePanel> {
           await s.setReceiving(!on);
         }
 
-        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const SizedBox(height: 18),
-          SectionCard(
+        final wide = widget.wide;
+        final inbox = SectionCard(
             padding: const EdgeInsets.only(bottom: 20),
             child: Column(children: [
               Orbit(
-                height: 300,
-                centreY: 150,
+                height: wide ? 250 : 300,
+                centreY: wide ? 125 : 150,
                 centreSize: 96,
                 scanning: on,
                 inflow: true,
@@ -810,14 +1115,14 @@ class _ReceivePanelState extends State<_ReceivePanel> {
                       child: const Text('Start receiving'),
                     ),
             ]),
-          ),
-          if (session != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 14),
-              child: _LiveSession(session: session, onTap: _openLive),
-            ).animate().fadeIn().moveY(begin: 8),
-          const SectionHeader(title: 'Options'),
-          SectionCard.rows(rows: [
+          );
+        final live = session == null
+            ? null
+            : Padding(
+                padding: const EdgeInsets.only(top: 14),
+                child: _LiveSession(session: session, onTap: _openLive),
+              ).animate().fadeIn().moveY(begin: 8);
+        final options = SectionCard.rows(rows: [
             SectionRow(
               leading: const IconTile(icon: Icons.bolt_rounded, color: Color(0xFFFF9F0A)),
               title: 'Quick save',
@@ -838,11 +1143,11 @@ class _ReceivePanelState extends State<_ReceivePanel> {
               chevron: true,
               onTap: () => _editPin(r),
             ),
-          ]),
-          SectionFooter(r.quickSave
+          ]);
+        final optionsNote = SectionFooter(r.quickSave
               ? 'Everything is saved without asking.'
-              : 'You\'re asked before anything is saved. Favourites and paired phones skip the question.'),
-          FutureBuilder<List<Transfer>>(
+              : 'You\'re asked before anything is saved. Favourites and paired phones skip the question.');
+        final recent = FutureBuilder<List<Transfer>>(
             future: _recent,
             builder: (context, snap) {
               final list = snap.data ?? const <Transfer>[];
@@ -866,11 +1171,58 @@ class _ReceivePanelState extends State<_ReceivePanel> {
                 ]),
               ]);
             },
-          ),
-          SectionFooter(
-            'Photos and videos go to the "$receivedAlbum" album and are scanned for faces; other files go to '
-            'Download/$receivedAlbum; messages pop up so you can copy them. Receiving keeps working in the background.',
-          ),
+          );
+        final where = SectionFooter(DesktopLayout.on
+            ? 'Everything is saved to Downloads\\$receivedAlbum, and photos are scanned for faces. '
+                'Messages pop up so you can copy them. Receiving works while ShareBro is open.'
+            : 'Photos and videos go to the "$receivedAlbum" album and are scanned for faces; other files go to '
+                'Download/$receivedAlbum; messages pop up so you can copy them. Receiving keeps working in the background.');
+
+        if (wide) {
+          // Two columns like Send: being visible on the left, how files
+          // arrive (and what arrived) on the right.
+          return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              flex: 11,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                const SizedBox(height: 8),
+                _Step(
+                  number: 1,
+                  title: 'Be visible',
+                  done: on,
+                  subtitle: on ? 'Nearby devices can send to "${s.identity.alias}"' : 'Turn on so others can send to you',
+                ),
+                inbox,
+                ?live,
+              ]),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              flex: 10,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                const SizedBox(height: 8),
+                _Step(
+                  number: 2,
+                  title: 'Choose how files arrive',
+                  subtitle: r.quickSave ? 'Saved straight away, without asking' : 'You approve each transfer first',
+                ),
+                options,
+                optionsNote,
+                recent,
+                where,
+              ]),
+            ),
+          ]);
+        }
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const SizedBox(height: 18),
+          inbox,
+          ?live,
+          const SectionHeader(title: 'Options'),
+          options,
+          optionsNote,
+          recent,
+          where,
         ]);
       },
     );

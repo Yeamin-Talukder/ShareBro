@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'anim.dart';
 
+import 'desktop_layout.dart';
 import 'motion.dart';
 
 /// Pull-to-refresh with a little face that stretches as you pull down and
@@ -78,6 +79,9 @@ class _FaceRefreshState extends State<FaceRefresh> with TickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
+    // A computer has no pull-to-refresh (a touchpad's scroll past the top
+    // would set it off); F5 or Ctrl + R refreshes instead.
+    if (DesktopLayout.on) return widget.child;
     final scheme = Theme.of(context).colorScheme;
     final stretch = 1 + (_pull / 220).clamp(0.0, 0.5);
     final ready = _pull >= _trigger || _refreshing;

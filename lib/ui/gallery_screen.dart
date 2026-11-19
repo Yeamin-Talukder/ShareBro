@@ -140,16 +140,28 @@ class _PhotosTabState extends State<PhotosTab> {
   late Future<String> _meta = _loadMeta();
   bool _wasRunning = false;
 
+  /// Desktop: the scanned folders, and the one shown (null: all of them).
+  List<TripSummary> _folders = const [];
+  int? _folderId;
+
   Future<String> _loadMeta() async {
     final db = widget.controller.db;
     final photos = (await db.photosIn()).length;
-    final folders = [for (final t in await db.trips()) if (desktopFolderOf(t.albumId) != null) t].length;
+    final list = [for (final t in await db.trips()) if (desktopFolderOf(t.albumId) != null) t];
+    if (mounted) {
+      setState(() {
+        _folders = list;
+        if (_folderId != null && !list.any((t) => t.id == _folderId)) _folderId = null;
+      });
+    }
+    final folders = list.length;
     String n(int v) => v.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ',');
     return '${n(photos)} ${photos == 1 ? 'photo' : 'photos'} from $folders ${folders == 1 ? 'folder' : 'folders'}';
   }
 
-  /// Desktop: a large title with the count, then the date filter, the tile
-  /// size slider (wide windows) and "Add folder", like the other pages.
+  /// Desktop, like the other pages: the large title with how many photos
+  /// there are and "Add folder"; under it the filters (folder, dates) on
+  /// the left and the photo size on the right.
   PreferredSizeWidget _deskBar(BuildContext context) {
     final c = widget.controller;
     if (_wasRunning != c.running) {
@@ -157,40 +169,62 @@ class _PhotosTabState extends State<PhotosTab> {
       _meta = _loadMeta();
     }
     final scheme = Theme.of(context).colorScheme;
-    return AppBar(
-      toolbarHeight: 76,
-      titleSpacing: 24,
-      automaticallyImplyLeading: false,
-      backgroundColor: Colors.transparent,
-      surfaceTintColor: Colors.transparent,
-      title: Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-        const Text('Photos', style: TextStyle(fontSize: TextSize.title1, fontWeight: FontWeight.w800, letterSpacing: -0.6)),
-        const SizedBox(width: 10),
-        Flexible(
-          child: FutureBuilder<String>(
-            future: _meta,
-            builder: (context, snap) => Text(snap.data ?? '',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w400, letterSpacing: 0, color: scheme.onSurface.withValues(alpha: 0.5))),
-          ),
-        ),
-      ]),
-      actions: [
-        DateChip(value: _dates, onChanged: (d) => setState(() => _dates = d)),
-        if (DesktopLayout.wide(context)) ...[
-          const SizedBox(width: 12),
-          const _TileSizeSlider(),
-        ],
-        const SizedBox(width: 12),
-        FilledButton.icon(
-          onPressed: () => addDesktopFolder(context, c),
-          icon: const Icon(Icons.create_new_folder_outlined),
-          label: const Text('Add folder'),
-        ),
-        const SizedBox(width: 24),
-      ],
+    final folder = _folders.where((t) => t.id == _folderId).firstOrNull;
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(122),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 18, 24, 10),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                Text('Photos', style: Theme.of(context).textTheme.displaySmall),
+                FutureBuilder<String>(
+                  future: _meta,
+                  builder: (context, snap) => Text(snap.data ?? ' ',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                ),
+              ]),
+            ),
+            _stepAside(FilledButton.icon(
+              onPressed: () => addDesktopFolder(context, c),
+              icon: const Icon(Icons.create_new_folder_outlined, size: 18),
+              label: const Text('Add folder'),
+            )),
+          ]),
+          const SizedBox(height: 12),
+          _stepAside(Row(children: [
+            if (_folders.length > 1) ...[
+              PopupButton(
+                icon: Icons.folder_rounded,
+                label: folder?.name ?? 'All folders',
+                active: folder != null,
+                tooltip: 'Only photos from one folder',
+                onTap: _folderMenu,
+                onClear: () => setState(() => _folderId = null),
+              ),
+              const SizedBox(width: 8),
+            ],
+            DateChip(value: _dates, onChanged: (d) => setState(() => _dates = d)),
+            const Spacer(),
+            if (DesktopLayout.wide(context)) const _TileSizeSlider(),
+          ])),
+        ]),
+      ),
     );
+  }
+
+  Future<void> _folderMenu(BuildContext button) async {
+    final picked = await showMenuBelow<int>(button, [
+      menuChoice(context, -1, 'All folders', selected: _folderId == null),
+      const PopupMenuDivider(),
+      for (final t in _folders)
+        menuChoice(context, t.id, t.name, selected: t.id == _folderId, count: t.photoCount, icon: Icons.folder_rounded),
+    ]);
+    if (!mounted || picked == null) return;
+    setState(() => _folderId = picked < 0 ? null : picked);
   }
 
   @override
@@ -204,12 +238,12 @@ class _PhotosTabState extends State<PhotosTab> {
           // Every scanned photo, from all the scanned folders. Reloads when
           // a scan starts and when it finishes.
           body: GalleryView(
-            key: ValueKey((_dates, widget.controller.running)),
+            key: ValueKey((_dates, _folderId, widget.controller.running)),
             controller: widget.controller,
-            source: GallerySource.ids(() => widget.controller.db.photosIn(dates: _dates)),
-            emptyMessage: _dates == null
+            source: GallerySource.ids(() => widget.controller.db.photosIn(tripId: _folderId, dates: _dates)),
+            emptyMessage: _dates == null && _folderId == null
                 ? 'No photos yet. Add a folder to scan it.'
-                : 'No photos taken in these dates.',
+                : 'No photos match these filters.',
           ),
         ),
       );
@@ -660,7 +694,15 @@ class _TileSizeSlider extends StatelessWidget {
       valueListenable: GalleryView.tileSize,
       builder: (context, v, _) => Tooltip(
         message: 'Photo size (Ctrl + mouse wheel)',
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
+        child: Container(
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: Mac.card(context),
+            borderRadius: BorderRadius.circular(Mac.controlRadius),
+            border: Border.all(color: Mac.hairline(context), width: 0.8),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.photo_size_select_small_rounded, size: 18, color: scheme.onSurfaceVariant),
           SizedBox(
             width: 120,
@@ -680,6 +722,7 @@ class _TileSizeSlider extends StatelessWidget {
           ),
           Icon(Icons.photo_size_select_large_rounded, size: 18, color: scheme.onSurfaceVariant),
         ]),
+        ),
       ),
     );
   }

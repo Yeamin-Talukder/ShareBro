@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'anim.dart';
 
+import '../platform/device.dart';
 import 'glass.dart';
 import 'motion.dart';
 import 'theme.dart';
@@ -28,7 +29,7 @@ class SectionCard extends StatelessWidget {
   SectionCard.rows({super.key, required List<Widget> rows, this.padding = EdgeInsets.zero})
       : child = Column(children: [
           for (final (i, r) in rows.indexed) ...[
-            if (i > 0) const Divider(height: 0.5, thickness: 0.5, indent: 62),
+            if (i > 0) Divider(height: 0.5, thickness: 0.5, indent: Device.desktop ? 50 : 62),
             r,
           ],
         ]);
@@ -39,6 +40,22 @@ class SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
+    if (Device.desktop) {
+      // A Mac grouped box: solid card, hairline rim, a faint lift.
+      return Container(
+        padding: padding,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Mac.card(context),
+          borderRadius: BorderRadius.circular(Mac.cardRadius),
+          border: Border.all(color: Mac.hairline(context), width: 0.5),
+          boxShadow: dark
+              ? null
+              : const [BoxShadow(color: Color(0x0A000000), blurRadius: 3, offset: Offset(0, 1))],
+        ),
+        child: Material(type: MaterialType.transparency, child: child),
+      );
+    }
     return Container(
       padding: padding,
       clipBehavior: Clip.antiAlias,
@@ -62,6 +79,21 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (Device.desktop) {
+      // Smaller and quieter on a computer, as above a Mac settings group.
+      return Padding(
+        padding: EdgeInsets.fromLTRB(4, top * 0.75, 0, 6),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 30),
+          child: Row(children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            if (badge != null) ...[const SizedBox(width: 8), badge!],
+            const Spacer(),
+            ?trailing,
+          ]),
+        ),
+      );
+    }
     return Padding(
       padding: EdgeInsets.fromLTRB(4, top, 0, 8),
       child: ConstrainedBox(
@@ -87,11 +119,11 @@ class SectionFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: Device.desktop ? const EdgeInsets.fromLTRB(12, 6, 12, 0) : const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Text(text,
           textAlign: align,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontSize: TextSize.caption,
+                fontSize: Device.desktop ? TextSize.small : TextSize.caption,
                 height: 1.4,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               )),
@@ -108,11 +140,13 @@ class IconTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Mac System Settings uses smaller tiles than the phone.
+    final size = Device.desktop ? 26.0 : 32.0;
     return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(9)),
-      child: Icon(icon, size: 19, color: iconColor),
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(Device.desktop ? 7 : 9)),
+      child: Icon(icon, size: Device.desktop ? 16 : 19, color: iconColor),
     );
   }
 }
@@ -141,33 +175,45 @@ class SectionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final desk = Device.desktop;
     final row = ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 56),
+      constraints: BoxConstraints(minHeight: desk ? 44 : 56),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+        padding: desk
+            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 7)
+            : const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
         child: Row(children: [
-          if (leading != null) ...[leading!, const SizedBox(width: 14)],
+          if (leading != null) ...[leading!, SizedBox(width: desk ? 12 : 14)],
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
               Text(title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: TextSize.body, color: destructive ? scheme.error : null)),
+                  style: TextStyle(
+                      fontSize: desk ? TextSize.label : TextSize.body,
+                      fontWeight: desk ? FontWeight.w500 : null,
+                      color: destructive ? scheme.error : null)),
               if (subtitle != null)
-                Text(subtitle!, style: TextStyle(fontSize: TextSize.caption, height: 1.3, color: scheme.onSurfaceVariant)),
+                Text(subtitle!,
+                    style: TextStyle(
+                        fontSize: desk ? TextSize.small : TextSize.caption, height: 1.3, color: scheme.onSurfaceVariant)),
             ]),
           ),
           if (trailing != null) ...[const SizedBox(width: 10), trailing!],
           if (chevron) ...[
             const SizedBox(width: 6),
-            Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant.withAlpha(140)),
+            Icon(Icons.chevron_right_rounded, size: desk ? 18 : null, color: scheme.onSurfaceVariant.withAlpha(140)),
           ],
         ]),
       ),
     );
     return Opacity(
       opacity: enabled ? 1 : 0.4,
-      child: InkWell(onTap: enabled ? onTap : null, child: row),
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        mouseCursor: enabled && onTap != null ? SystemMouseCursors.click : null,
+        child: row,
+      ),
     );
   }
 }
@@ -180,6 +226,10 @@ class ToolbarCapsule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (Device.desktop) {
+      // A Mac toolbar group: borderless buttons that tint under the mouse.
+      return Center(child: Row(mainAxisSize: MainAxisSize.min, children: children));
+    }
     return Center(
       child: Glass(
         radius: 24,
@@ -221,6 +271,7 @@ class CapsuleChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final fg = selected ? scheme.onPrimary : outlined ? scheme.onSurfaceVariant : scheme.onSurface;
+    final desk = Device.desktop;
     return Semantics(
       button: true,
       selected: selected,
@@ -230,16 +281,22 @@ class CapsuleChip extends StatelessWidget {
         scale: 0.94,
         child: AnimatedContainer(
           duration: 220.ms,
-          height: textHeight(context, 36),
-          padding: EdgeInsets.only(left: icon == null ? 14 : 11, right: onDeleted != null ? 6 : menu ? 9 : 14),
+          height: textHeight(context, desk ? 30 : 36),
+          padding: EdgeInsets.only(
+              left: icon == null ? (desk ? 12 : 14) : (desk ? 9 : 11),
+              right: onDeleted != null ? 6 : menu ? 8 : (desk ? 12 : 14)),
           decoration: BoxDecoration(
             color: selected ? scheme.primary : outlined ? Colors.transparent : capsuleFill(context),
             borderRadius: BorderRadius.circular(18),
             border: outlined ? Border.all(color: capsuleFill(context), width: 1.5) : null,
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            if (icon != null) ...[Icon(icon, size: 17, color: fg), const SizedBox(width: 6)],
-            Text(label, style: TextStyle(fontSize: TextSize.label, fontWeight: FontWeight.w600, color: fg)),
+            if (icon != null) ...[Icon(icon, size: desk ? 15 : 17, color: fg), SizedBox(width: desk ? 5 : 6)],
+            Text(label,
+                style: TextStyle(
+                    fontSize: desk ? TextSize.caption : TextSize.label,
+                    fontWeight: desk ? FontWeight.w500 : FontWeight.w600,
+                    color: fg)),
             if (count != null)
               Text('  $count', style: TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w500, color: fg.withAlpha(170))),
             if (menu)
@@ -281,23 +338,34 @@ class CapsuleSwitch<T> extends StatelessWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final n = options.length;
     final index = options.indexWhere((o) => o.$1 == value).clamp(0, n - 1);
+    // On a computer: a Mac segmented control, shorter and less rounded,
+    // with a thumb that glides rather than bounces.
+    final desk = Device.desktop;
+    final height = desk ? this.height.clamp(26.0, 30.0) : this.height;
+    final outer = desk ? 8.0 : height / 2;
     return Container(
       height: height,
       padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(color: capsuleFill(context), borderRadius: BorderRadius.circular(height / 2)),
+      decoration: BoxDecoration(color: capsuleFill(context), borderRadius: BorderRadius.circular(outer)),
       child: Stack(children: [
         AnimatedAlign(
           alignment: Alignment(n == 1 ? 0 : -1 + 2 * index / (n - 1), 0),
-          duration: 420.ms,
-          curve: Curves.easeOutBack,
+          duration: desk ? 220.ms : 420.ms,
+          curve: desk ? Curves.easeOutCubic : Curves.easeOutBack,
           child: FractionallySizedBox(
             widthFactor: 1 / n,
             heightFactor: 1,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: dark ? const Color(0xFF636366) : Colors.white,
-                borderRadius: BorderRadius.circular(height / 2 - 2),
-                boxShadow: [BoxShadow(color: Colors.black.withAlpha(30), blurRadius: 8, offset: const Offset(0, 3))],
+                borderRadius: BorderRadius.circular(outer - 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(desk ? 26 : 30),
+                    blurRadius: desk ? 3 : 8,
+                    offset: Offset(0, desk ? 1 : 3),
+                  ),
+                ],
               ),
             ),
           ),
@@ -320,7 +388,7 @@ class CapsuleSwitch<T> extends StatelessWidget {
                     child: AnimatedDefaultTextStyle(
                       duration: 200.ms,
                       style: TextStyle(
-                        fontSize: TextSize.callout,
+                        fontSize: desk ? TextSize.caption : TextSize.callout,
                         fontWeight: v == value ? FontWeight.w600 : FontWeight.w500,
                         color: scheme.onSurface,
                       ),
@@ -341,4 +409,126 @@ class CapsuleSwitch<T> extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// A Mac-style pop-up button for filters on a computer: an icon, what it's
+/// set to and a small arrow, in a bordered rounded box. Tinted with the
+/// accent when it's filtering ([active]), with an × to clear it.
+class PopupButton extends StatefulWidget {
+  const PopupButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.active = false,
+    this.onClear,
+    this.tooltip,
+  });
+
+  final IconData icon;
+  final String label;
+
+  /// Opens its choices; the context is the button's, for [showMenuBelow].
+  final ValueChanged<BuildContext> onTap;
+  final bool active;
+  final VoidCallback? onClear;
+  final String? tooltip;
+
+  @override
+  State<PopupButton> createState() => _PopupButtonState();
+}
+
+class _PopupButtonState extends State<PopupButton> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final w = widget;
+    final on = w.active;
+    final fg = on ? scheme.primary : scheme.onSurface;
+    final button = MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        onTap: () => w.onTap(context),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          height: 30,
+          padding: EdgeInsets.only(left: 10, right: on && w.onClear != null ? 4 : 8),
+          decoration: BoxDecoration(
+            color: on
+                ? scheme.primary.withValues(alpha: _hover ? 0.18 : 0.12)
+                : _hover
+                    ? Mac.hover(context)
+                    : Mac.card(context),
+            borderRadius: BorderRadius.circular(Mac.controlRadius),
+            border: Border.all(
+              color: on ? scheme.primary.withValues(alpha: 0.45) : Mac.hairline(context),
+              width: on ? 1 : 0.8,
+            ),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(w.icon, size: 15, color: on ? scheme.primary : scheme.onSurfaceVariant),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(w.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w500, color: fg)),
+            ),
+            const SizedBox(width: 2),
+            Icon(Icons.keyboard_arrow_down_rounded, size: 17, color: fg.withValues(alpha: 0.7)),
+            if (on && w.onClear != null)
+              InkResponse(
+                onTap: w.onClear,
+                radius: 12,
+                child: Padding(
+                  padding: const EdgeInsets.all(3),
+                  child: Icon(Icons.close_rounded, size: 14, color: scheme.primary),
+                ),
+              ),
+          ]),
+        ),
+      ),
+    );
+    return w.tooltip == null ? button : Tooltip(message: w.tooltip!, child: button);
+  }
+}
+
+/// Opens a menu just below [button] (a [PopupButton]'s context).
+Future<T?> showMenuBelow<T>(BuildContext button, List<PopupMenuEntry<T>> items) {
+  final box = button.findRenderObject() as RenderBox;
+  final overlay = Overlay.of(button).context.findRenderObject() as RenderBox;
+  final topLeft = box.localToGlobal(Offset(0, box.size.height + 4), ancestor: overlay);
+  return showMenu<T>(
+    context: button,
+    position: RelativeRect.fromRect(topLeft & const Size(1, 1), Offset.zero & overlay.size),
+    items: items,
+  );
+}
+
+/// One choice in a [showMenuBelow] menu: a tick when chosen, the label,
+/// and an optional count on the right.
+PopupMenuItem<T> menuChoice<T>(BuildContext context, T value, String label,
+    {bool selected = false, int? count, IconData? icon}) {
+  final scheme = Theme.of(context).colorScheme;
+  return PopupMenuItem<T>(
+    value: value,
+    height: 34,
+    child: Row(children: [
+      SizedBox(
+        width: 22,
+        child: selected ? Icon(Icons.check_rounded, size: 16, color: scheme.primary) : null,
+      ),
+      if (icon != null) ...[Icon(icon, size: 16, color: scheme.onSurfaceVariant), const SizedBox(width: 8)],
+      Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis)),
+      if (count != null) ...[
+        const SizedBox(width: 16),
+        Text('$count', style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
+      ],
+    ]),
+  );
 }

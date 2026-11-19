@@ -1,9 +1,11 @@
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../data/db.dart';
+import 'desktop_layout.dart';
 import 'motion.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -66,7 +68,6 @@ class PeopleSpace extends StatefulWidget {
 }
 
 const _size = 84.0;
-const _half = _size / 2;
 
 class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStateMixin {
   late final Ticker _ticker = createTicker(_tick);
@@ -90,6 +91,21 @@ class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStat
   Offset _lens = Offset.zero;
   double _lensOn = 0;
   bool _dragging = false;
+
+  /// Computer: where the mouse is over the view, and the face under it.
+  Offset? _mouse;
+  int? _hovered;
+
+  /// How big the views are drawn. They were designed on a phone 412 wide;
+  /// in a computer window the shorter side sets it, so faces stay together
+  /// instead of scattering across a wide screen.
+  double get _k => DesktopLayout.on
+      ? (math.min(_area.width, _area.height * 1.2) / 412).clamp(0.9, 1.8)
+      : _area.width / 412;
+
+  /// A face's full size: bigger on a computer, in step with [_k], so the
+  /// views keep the phone's proportions.
+  double get _fs => DesktopLayout.on ? _size * _k : _size;
 
   @override
   void initState() {
@@ -190,7 +206,14 @@ class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStat
         final goal = (_drum / step).round() * step;
         _drum += (goal - _drum) * (1 - decay(0.88));
       }
-      _lensOn *= decay(0.94);
+      // On a computer the lens simply follows the mouse.
+      final mouse = _mouse;
+      if (DesktopLayout.on && widget.layout == PeopleLayout.magnifier && mouse != null) {
+        _lens = mouse;
+        _lensOn = 1;
+      } else {
+        _lensOn *= decay(0.94);
+      }
     }
     if (widget.layout == PeopleLayout.carousel) {
       final column = (-_drum / (2 * math.pi / _drumColumns)).round();
@@ -213,6 +236,7 @@ class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStat
       n.scale += (g.scale - n.scale) * k;
       n.opacity += (g.opacity - n.opacity) * k;
     }
+    _hovered = _mouse == null || _dragging ? null : _faceAt(_mouse!)?.id;
     _frame.value++;
   }
 
@@ -221,7 +245,7 @@ class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStat
   List<_Target> _targets(int count) {
     final w = _area.width, h = _area.height;
     final c = Offset(w / 2, h / 2);
-    final k = w / 412; // the demo was drawn at 412 wide
+    final k = _k; // the demo was drawn at 412 wide
     final out = <_Target>[];
     switch (widget.layout) {
       case PeopleLayout.honeycomb:
@@ -283,7 +307,7 @@ class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStat
         }
         final rows = (count / cols).ceil();
         final origin = c - Offset((cols - 1) * cell / 2, (rows - 1) * cell / 2);
-        final base = cell / _size * 0.86;
+        final base = cell / _fs * 0.86;
         for (var i = 0; i < count; i++) {
           var p = origin + Offset((i % cols) * cell, (i ~/ cols) * cell);
           final away = p - _lens, d = away.distance;
@@ -339,7 +363,7 @@ class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStat
   }
 
   void _panUpdate(DragUpdateDetails d) {
-    final delta = d.delta, k = _area.width / 412;
+    final delta = d.delta, k = _k;
     switch (widget.layout) {
       case PeopleLayout.honeycomb:
         _pan += delta;
@@ -377,24 +401,62 @@ class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStat
     if (_still) _panV = Offset.zero;
   }
 
-  /// The front-most face under the finger.
-  void _tap(TapUpDetails d) {
+  /// The front-most face at [at].
+  PersonSummary? _faceAt(Offset at) {
     PersonSummary? hit;
     var best = -1.0;
     for (final p in _people.take(_cap)) {
       final n = _nodes[p.id], g = n?.target;
       if (n == null || g == null || n.opacity < 0.3) continue;
-      if ((n.pos - d.localPosition).distance <= _half * n.scale && g.depth > best) {
+      if ((n.pos - at).distance <= _fs / 2 * n.scale && g.depth > best) {
         best = g.depth;
         hit = p;
       }
     }
+    return hit;
+  }
+
+  /// The front-most face under the finger.
+  void _tap(TapUpDetails d) {
+    final hit = _faceAt(d.localPosition);
     if (hit == null) return;
     Haptics.tick();
     widget.onOpen(hit);
   }
 
-  String get _hint => switch (widget.layout) {
+  /// Computer: the mouse wheel (or a two-finger scroll) moves the view as
+  /// a drag would.
+  void _wheel(PointerSignalEvent e) {
+    if (e is! PointerScrollEvent) return;
+    final d = e.scrollDelta;
+    final along = d.dy.abs() >= d.dx.abs() ? d.dy : d.dx;
+    switch (widget.layout) {
+      case PeopleLayout.honeycomb:
+        _panV = -d * 0.12;
+      case PeopleLayout.sunflower:
+        _rotV += along * 0.0006;
+      case PeopleLayout.globe:
+        _yawV += d.dx * 0.0006 + d.dy * 0.0006;
+      case PeopleLayout.orbit:
+        _spinV += along * 0.0007;
+      case PeopleLayout.carousel:
+        _drumV += along * 0.0011;
+      default:
+        break;
+    }
+  }
+
+  String get _hint => DesktopLayout.on
+      ? switch (widget.layout) {
+          PeopleLayout.honeycomb => 'Drag or scroll to look around · click a face to open',
+          PeopleLayout.sunflower => 'Drag around the middle or scroll to spin',
+          PeopleLayout.globe => 'Drag or scroll to roll the globe',
+          PeopleLayout.orbit => 'Drag sideways or scroll to spin the rings',
+          PeopleLayout.magnifier => 'Move the mouse over the faces · click one to open',
+          PeopleLayout.carousel => 'Drag sideways or scroll to spin',
+          _ => '',
+        }
+      : switch (widget.layout) {
         PeopleLayout.honeycomb => 'Drag to look around',
         PeopleLayout.sunflower => 'Drag around the middle to spin',
         PeopleLayout.globe => 'Drag to roll the globe',
@@ -407,22 +469,7 @@ class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    // Built once per rebuild, not per frame: frames only move them.
-    final faces = {
-      for (final p in _people)
-        p.id: RepaintBoundary(
-          child: Container(
-            width: _size,
-            height: _size,
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: p.name == null ? scheme.onSurface.withAlpha(60) : scheme.primary,
-            ),
-            child: FaceAvatar(personId: p.id, thumb: p.coverThumb, radius: _half - 3),
-          ),
-        ),
-    };
+    final desk = DesktopLayout.on;
     final labels = {
       for (final p in _people)
         p.id: Text.rich(
@@ -444,7 +491,28 @@ class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStat
     return LayoutBuilder(builder: (context, box) {
       // The usable area stops above the floating dock.
       _area = Size(box.maxWidth, math.max(0, box.maxHeight - bottom));
-      return GestureDetector(
+      final fs = _fs, ring = desk ? 2.5 * _k : 3.0;
+      // Built once per layout, not per frame: frames only move them.
+      final faces = {
+        for (final p in _people)
+          p.id: RepaintBoundary(
+            child: Container(
+              width: fs,
+              height: fs,
+              padding: EdgeInsets.all(ring),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: p.name == null ? scheme.onSurface.withAlpha(60) : scheme.primary,
+              ),
+              child: FaceAvatar(personId: p.id, thumb: p.coverThumb, radius: fs / 2 - ring),
+            ),
+          ),
+      };
+      return Listener(
+        onPointerSignal: _wheel,
+        // Two-finger swipes move the view here, not the page.
+        onPointerPanZoomStart: (_) => NavSwipe.claim(),
+        child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onPanStart: _panStart,
         onPanUpdate: _panUpdate,
@@ -459,17 +527,18 @@ class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStat
               final morphing = _now - _switchedAt < 0.5;
               final orbit = widget.layout == PeopleLayout.orbit;
               final c = _area.center(Offset.zero);
-              final k = _area.width / 412;
-              return Stack(clipBehavior: Clip.none, children: [
+              final k = _k;
+              final hub = desk ? 96.0 * k : 96.0;
+              final stack = Stack(clipBehavior: Clip.none, children: [
                 if (orbit)
                   Positioned.fill(child: CustomPaint(painter: _RingsPainter(c, k, scheme.onSurface.withAlpha(22)))),
                 if (orbit)
                   Positioned(
-                    left: c.dx - 48,
-                    top: c.dy - 48,
+                    left: c.dx - hub / 2,
+                    top: c.dy - hub / 2,
                     child: Container(
-                      width: 96,
-                      height: 96,
+                      width: hub,
+                      height: hub,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: scheme.primary,
@@ -503,34 +572,59 @@ class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStat
                     ),
                   ),
                 for (final p in shown)
-                  _face(p, _nodes[p.id]!, faces[p.id]!, labels[p.id]!, !morphing),
+                  _face(p, _nodes[p.id]!, faces[p.id]!, labels[p.id]!, !morphing, fs),
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: 12,
+                  bottom: desk ? 18 : 12,
                   child: IgnorePointer(
-                    child: Text(_hint,
-                        textAlign: TextAlign.center, style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
+                    child: desk
+                        // A quiet capsule, like a Mac's hint.
+                        ? Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Mac.card(context).withValues(alpha: 0.92),
+                                borderRadius: BorderRadius.circular(99),
+                                border: Border.all(color: Mac.hairline(context), width: 0.5),
+                              ),
+                              child: Text(_hint, style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
+                            ),
+                          )
+                        : Text(_hint,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
                   ),
                 ),
               ]);
+              if (!desk) return stack;
+              // A pointer over a face; the view follows the mouse.
+              return MouseRegion(
+                cursor: _hovered != null ? SystemMouseCursors.click : SystemMouseCursors.grab,
+                onHover: (e) => _mouse = e.localPosition,
+                onExit: (_) => _mouse = null,
+                child: stack,
+              );
             },
           ),
         ),
+      ),
       );
     });
   }
 
-  Widget _face(PersonSummary p, _Node n, Widget face, Widget label, bool labels) {
+  Widget _face(PersonSummary p, _Node n, Widget face, Widget label, bool labels, double fs) {
+    final hovered = _hovered == p.id;
     return Positioned(
       key: ValueKey(p.id),
-      left: n.pos.dx - _half,
-      top: n.pos.dy - _half,
-      width: _size,
-      height: _size,
+      left: n.pos.dx - fs / 2,
+      top: n.pos.dy - fs / 2,
+      width: fs,
+      height: fs,
       child: IgnorePointer(
         child: Transform.scale(
-          scale: n.scale,
+          // The face under the mouse grows a little and shows its name.
+          scale: n.scale * (hovered ? 1.08 : 1),
           child: Opacity(
             opacity: n.opacity.clamp(0.0, 1.0),
             child: Stack(clipBehavior: Clip.none, children: [
@@ -538,9 +632,9 @@ class _PeopleSpaceState extends State<PeopleSpace> with SingleTickerProviderStat
               Positioned(
                 left: -40,
                 right: -40,
-                top: _size + 5,
+                top: fs + 5,
                 child: AnimatedOpacity(
-                  opacity: labels && (n.target?.label ?? false) ? 1 : 0,
+                  opacity: labels && ((n.target?.label ?? false) || hovered) ? 1 : 0,
                   duration: const Duration(milliseconds: 200),
                   child: label,
                 ),

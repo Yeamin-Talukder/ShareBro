@@ -5,6 +5,7 @@ import '../data/db.dart';
 import '../scan/scan_controller.dart';
 import 'gallery_view.dart';
 import 'motion.dart';
+import 'face_image.dart';
 
 /// Pick two or more people and see only the photos they're all in.
 class TogetherScreen extends StatefulWidget {
@@ -54,7 +55,7 @@ class _TogetherScreenState extends State<TogetherScreen> {
                   child: FilterChip(
                     avatar: CircleAvatar(
                       backgroundImage:
-                          p.coverThumb == null ? null : MemoryImage(p.coverThumb!),
+                          p.coverThumb == null ? null : FaceImage(p.coverThumb!),
                     ),
                     label: Text(p.displayName),
                     selected: _picked.contains(p.id),

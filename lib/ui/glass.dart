@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'desktop_layout.dart';
 import 'motion.dart';
+import 'theme.dart';
 
 /// Regular glass for bars, sheets and anything with text; clear glass only
 /// for controls floating over photos.
@@ -160,6 +161,12 @@ class GlassIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = kind == GlassKind.clear ? Colors.white : Theme.of(context).colorScheme.onSurface;
+    if (DesktopLayout.on && kind == GlassKind.regular) {
+      return Tooltip(
+        message: tooltip,
+        child: _ToolButton(onPressed: onPressed, color: color, child: icon),
+      );
+    }
     return Tooltip(
       message: tooltip,
       child: Pressable(
@@ -180,6 +187,60 @@ class GlassIconButton extends StatelessWidget {
   }
 }
 
+/// A borderless square toolbar button, as on a Mac: no fill until the
+/// mouse is over it, a darker tint while pressed.
+class _ToolButton extends StatefulWidget {
+  const _ToolButton({required this.onPressed, required this.color, required this.child});
+
+  final VoidCallback? onPressed;
+  final Color color;
+  final Widget child;
+
+  @override
+  State<_ToolButton> createState() => _ToolButtonState();
+}
+
+class _ToolButtonState extends State<_ToolButton> {
+  bool _hover = false, _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onPressed != null;
+    final scheme = Theme.of(context).colorScheme;
+    final fill = !enabled
+        ? Colors.transparent
+        : _down
+            ? scheme.onSurface.withValues(alpha: 0.12)
+            : _hover
+                ? Mac.hover(context)
+                : Colors.transparent;
+    return MouseRegion(
+      cursor: enabled ? SystemMouseCursors.click : MouseCursor.defer,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: enabled ? (_) => setState(() => _down = true) : null,
+        onTapCancel: () => setState(() => _down = false),
+        onTapUp: (_) => setState(() => _down = false),
+        onTap: widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(Mac.controlRadius)),
+          child: Center(
+            child: IconTheme(
+              data: IconThemeData(color: widget.color.withValues(alpha: enabled ? 0.85 : 0.3), size: 19),
+              child: widget.child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Glass bar pinned to the top of a scrolling page. It stays invisible at
 /// the top of the page and fades in as content scrolls under it (the
 /// "scroll edge effect").
@@ -190,8 +251,30 @@ class GlassTopBar extends StatelessWidget {
   final double visible;
 
   @override
-  Widget build(BuildContext context) =>
-      Glass(radius: 0, shadow: false, blur: false, fade: visible.clamp(0, 1), child: const SizedBox.expand());
+  Widget build(BuildContext context) => DesktopLayout.on
+      ? _MacBar(visible: visible.clamp(0, 1))
+      : Glass(radius: 0, shadow: false, blur: false, fade: visible.clamp(0, 1), child: const SizedBox.expand());
+}
+
+/// The computer version of the pinned bar: the window colour with a
+/// hairline along its bottom edge once content scrolls under it.
+class _MacBar extends StatelessWidget {
+  const _MacBar({required this.visible});
+
+  final double visible;
+
+  @override
+  Widget build(BuildContext context) {
+    final surface = Theme.of(context).colorScheme.surface;
+    final line = Mac.hairline(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: surface.withValues(alpha: 0.96 * visible),
+        border: Border(bottom: BorderSide(color: line.withValues(alpha: line.a * visible), width: 0.5)),
+      ),
+      child: const SizedBox.expand(),
+    );
+  }
 }
 
 /// A top-level page: a large title that scrolls away, and a pinned bar that
@@ -271,13 +354,15 @@ class _GlassScrollViewState extends State<GlassScrollView> {
     final text = Theme.of(context).textTheme;
     final max = widget.maxContentWidth;
     final inset = max == null ? 0.0 : DesktopLayout.inset(context, max: max);
+    final desk = DesktopLayout.on;
     return NotificationListener<ScrollNotification>(
       onNotification: _onScroll,
       child: CustomScrollView(controller: _scroll, physics: widget.physics, slivers: [
         SliverAppBar(
           pinned: true,
           backgroundColor: Colors.transparent,
-          toolbarHeight: 60,
+          toolbarHeight: desk ? 52 : 60,
+          titleSpacing: desk ? 24 + inset : null,
           title: AnimatedOpacity(
             opacity: _scrolled ? 1 : 0,
             duration: const Duration(milliseconds: 200),
@@ -287,21 +372,26 @@ class _GlassScrollViewState extends State<GlassScrollView> {
           flexibleSpace: TweenAnimationBuilder<double>(
             tween: Tween(end: _scrolled ? 1 : 0),
             duration: const Duration(milliseconds: 220),
-            builder: (context, fade, _) =>
-                Glass(radius: 0, shadow: false, blur: false, fade: fade, child: const SizedBox.expand()),
+            builder: (context, fade, _) => desk
+                ? _MacBar(visible: fade)
+                : Glass(radius: 0, shadow: false, blur: false, fade: fade, child: const SizedBox.expand()),
           ),
         ),
         SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(20 + inset, 0, 20 + inset, 8),
+            padding: desk
+                ? EdgeInsets.fromLTRB(24 + inset, 0, 24 + inset, 12)
+                : EdgeInsets.fromLTRB(20 + inset, 0, 20 + inset, 8),
             child: AnimatedOpacity(
               opacity: _scrolled ? 0 : 1,
               duration: const Duration(milliseconds: 160),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(widget.title, style: text.displaySmall),
-                if (widget.subtitle != null)
+                if (widget.subtitle != null) ...[
+                  if (desk) const SizedBox(height: 2),
                   Text(widget.subtitle!,
                       style: text.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                ],
               ]),
             ),
           ),

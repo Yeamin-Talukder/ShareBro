@@ -333,7 +333,7 @@ class AppDb {
     }
     final db = await openDatabase(
       path,
-      version: 10,
+      version: 11,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onCreate: (db, _) async {
         await db.execute('''
@@ -375,6 +375,7 @@ class AppDb {
         await _upgradeTo8(db);
         await _upgradeTo9(db);
         await _upgradeTo10(db);
+        await _upgradeTo11(db);
       },
       onUpgrade: (db, from, _) async {
         if (from < 2) {
@@ -399,6 +400,7 @@ class AppDb {
         if (from < 8) await _upgradeTo8(db);
         if (from < 9) await _upgradeTo9(db);
         if (from < 10) await _upgradeTo10(db);
+        if (from < 11) await _upgradeTo11(db);
       },
     );
     return AppDb._(db);
@@ -532,6 +534,20 @@ class AppDb {
     await db.execute('CREATE INDEX known_faces_person ON known_faces(person_id)');
   }
 
+  /// Each person's face shape for the 3D face model: 468 points averaged
+  /// from their clearest photos (see lib/face/face_shape.dart). Worked out
+  /// on this device, never sent anywhere.
+  static Future<void> _upgradeTo11(Database db) async {
+    await db.execute('''
+      CREATE TABLE person_shapes (
+        person_id INTEGER PRIMARY KEY REFERENCES persons(id) ON DELETE CASCADE,
+        points BLOB NOT NULL,
+        faces_used INTEGER NOT NULL,
+        face_count INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )''');
+  }
+
   static Future<void> _upgradeTo9(Database db) async {
     await db.execute('''
       CREATE TABLE file_keys (
@@ -541,6 +557,103 @@ class AppDb {
         content TEXT NOT NULL
       )''');
     await db.execute('CREATE INDEX file_keys_content ON file_keys(content)');
+  }
+
+  // ---- Face shape (the 3D face model) ----
+
+  /// The saved shape: 468 points (x, y, z), the faces it came from, and how
+  /// many faces the person had when it was made.
+  Future<({Float32List points, int facesUsed, int faceCount})?> personShape(int personId) async {
+    final rows = await _db.query('person_shapes', where: 'person_id = ?', whereArgs: [personId], limit: 1);
+    if (rows.isEmpty) return null;
+    final r = rows.first;
+    final blob = r['points'] as Uint8List;
+    return (
+      points: Float32List.fromList(blob.buffer.asFloat32List(blob.offsetInBytes, blob.lengthInBytes ~/ 4)),
+      facesUsed: r['faces_used'] as int,
+      faceCount: r['face_count'] as int,
+    );
+  }
+
+  Future<void> savePersonShape(int personId, Float32List points, {required int facesUsed, required int faceCount}) =>
+      _db.insert(
+        'person_shapes',
+        {
+          'person_id': personId,
+          'points': points.buffer.asUint8List(points.offsetInBytes, points.lengthInBytes),
+          'faces_used': facesUsed,
+          'face_count': faceCount,
+          'updated_at': DateTime.now().millisecondsSinceEpoch,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+  /// The person's clearest, most front-on faces (photo and box), best
+  /// first, to work the shape out from.
+  Future<List<({String assetId, double left, double top, double width, double height, double? yaw})>> shapeFaces(
+      int personId, {int limit = 20}) async {
+    final rows = await _db.rawQuery('''
+      SELECT f.asset_id, f.left, f.top, f.width, f.height, f.yaw FROM faces f
+      JOIN photos ph ON ph.asset_id = f.asset_id AND ph.hidden = 0
+      WHERE f.person_id = ?
+      ORDER BY (CASE WHEN f.yaw IS NULL THEN 20 ELSE ABS(f.yaw) END) * 2
+               - COALESCE(f.sharpness, 50) * 0.05 - f.width * 60
+      LIMIT ?''', [personId, limit]);
+    return [
+      for (final r in rows)
+        (
+          assetId: r['asset_id'] as String,
+          left: (r['left'] as num).toDouble(),
+          top: (r['top'] as num).toDouble(),
+          width: (r['width'] as num).toDouble(),
+          height: (r['height'] as num).toDouble(),
+          yaw: (r['yaw'] as num?)?.toDouble(),
+        ),
+    ];
+  }
+
+  /// What the app knows about a person's face, for the face model: faces
+  /// seen turned each way, with eyes open, smiling, how sharp, and how many
+  /// came from other devices.
+  Future<FaceModelStats> faceModelStats(int personId) async {
+    final rows = await _db.rawQuery('''
+      SELECT f.yaw, f.eyes_open, f.smile, f.sharpness FROM faces f
+      JOIN photos ph ON ph.asset_id = f.asset_id AND ph.hidden = 0
+      WHERE f.person_id = ?''', [personId]);
+    var left = 0, front = 0, right = 0, eyes = 0, smiles = 0, sharpN = 0;
+    var sharp = 0.0;
+    for (final r in rows) {
+      final yaw = (r['yaw'] as num?)?.toDouble() ?? 0;
+      // Nose to the right of the eyes (yaw > 0): more of the face's left
+      // side, as you look at it, is in the photo.
+      if (yaw > 18) {
+        left++;
+      } else if (yaw < -18) {
+        right++;
+      } else {
+        front++;
+      }
+      if (((r['eyes_open'] as num?)?.toDouble() ?? 0) >= 0.5) eyes++;
+      if (((r['smile'] as num?)?.toDouble() ?? 0) >= 0.6) smiles++;
+      final sh = (r['sharpness'] as num?)?.toDouble();
+      if (sh != null) {
+        sharp += (sh / 120).clamp(0.0, 1.0);
+        sharpN++;
+      }
+    }
+    final synced = Sqflite.firstIntValue(
+            await _db.rawQuery('SELECT COUNT(*) FROM known_faces WHERE person_id = ?', [personId])) ??
+        0;
+    return FaceModelStats(
+      faces: rows.length,
+      left: left,
+      front: front,
+      right: right,
+      eyesOpen: eyes,
+      smiling: smiles,
+      sharpness: sharpN == 0 ? 0.5 : sharp / sharpN,
+      synced: synced,
+    );
   }
 
   // ---- Transfer history ----
@@ -2048,4 +2161,31 @@ class FileKey {
 
   Map<String, Object> row(String assetId) =>
       {'asset_id': assetId, 'size': size, 'modified': modified, 'content': content};
+}
+
+/// What the app has seen of one person's face (see [AppDb.faceModelStats]).
+class FaceModelStats {
+  const FaceModelStats({
+    required this.faces,
+    required this.left,
+    required this.front,
+    required this.right,
+    required this.eyesOpen,
+    required this.smiling,
+    required this.sharpness,
+    required this.synced,
+  });
+
+  final int faces;
+
+  /// Faces turned so that the left side (as you look at it), the front, or
+  /// the right side shows most.
+  final int left, front, right;
+  final int eyesOpen, smiling;
+
+  /// 0..1, on average.
+  final double sharpness;
+
+  /// Faces learned from the person's other devices.
+  final int synced;
 }

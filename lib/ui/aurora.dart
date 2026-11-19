@@ -4,6 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../platform/device.dart';
+
 /// One full loop of the drift. Every movement repeats a whole number of
 /// times per loop, so it never jumps when the loop starts over.
 const _cycle = Duration(seconds: 90);
@@ -109,6 +111,8 @@ class _AuroraState extends State<Aurora> with SingleTickerProviderStateMixin {
   /// Runs the drift only while this screen is visible and motion is allowed.
   void _sync() {
     final run = mounted &&
+        // The computer version keeps a plain, still window.
+        !Device.desktop &&
         (_visible?.value.enabled ?? true) &&
         !MediaQuery.disableAnimationsOf(context) &&
         !_moving(_in) &&
@@ -139,6 +143,14 @@ class _AuroraState extends State<Aurora> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dark = scheme.brightness == Brightness.dark;
+    // On a computer the page is a plain neutral window, as on a Mac: the
+    // map's moving lines would compete with the content.
+    if (Device.desktop) {
+      return ColoredBox(
+        color: scheme.surface,
+        child: NotificationListener<ScrollNotification>(onNotification: _onScroll, child: widget.child),
+      );
+    }
     return Stack(children: [
       Positioned.fill(
         child: RepaintBoundary(

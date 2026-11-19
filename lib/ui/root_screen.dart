@@ -17,7 +17,7 @@ import 'gallery_screen.dart';
 import 'launch_clink.dart';
 import 'glass_dock.dart';
 import 'home_screen.dart';
-import 'island.dart' show Island, islandNavigator;
+import 'island.dart' show Island, desktopPages, islandNavigator, pageNavigator;
 import 'receive_screen.dart';
 import 'review_screen.dart';
 import 'scan_screen.dart';
@@ -30,6 +30,7 @@ import 'desktop_gallery.dart';
 import 'desktop_layout.dart';
 import 'desktop_shell.dart';
 import 'people_sync_screen.dart';
+import 'scan_helper_ui.dart';
 
 /// Bottom navigation between People, Photos, Albums, Explore and Share. Tabs keep
 /// their scroll position and filters when you switch.
@@ -97,6 +98,8 @@ class _RootScreenState extends State<RootScreen> {
     if (!mounted || nav == null) return;
     final c = widget.controller;
     nav.popUntil((r) => r.isFirst);
+    // Desktop: back to the main pages beside the sidebar too.
+    desktopPages.currentState?.popUntil((r) => r.isFirst);
     Widget? screen;
     switch (target) {
       case 'people':
@@ -107,16 +110,20 @@ class _RootScreenState extends State<RootScreen> {
       case 'scan':
         screen = ScanScreen(controller: c);
       case 'review':
-        setState(() => _tab = 0);
+        setState(() {
+          _tab = 0;
+          _page = DesktopPage.people;
+        });
         screen = ReviewScreen(controller: c);
       case 'receive':
         screen = ReceiveScreen(controller: c);
       case 'transfers':
         screen = SendCenterScreen(controller: c);
       case 'update':
-        showUpdateSheet(nav.context);
+        // Desktop: Settings › Software update, beside the sidebar.
+        if (!DesktopNav.openSettings('updates')) showUpdateSheet(nav.context);
     }
-    if (screen != null) nav.push(MaterialPageRoute(builder: (_) => screen!));
+    if (screen != null) (pageNavigator ?? nav).push(MaterialPageRoute(builder: (_) => screen!));
   }
 
   @override
@@ -183,7 +190,7 @@ class _RootScreenState extends State<RootScreen> {
     return Stack(children: [
       AppLockGate(
           controller: c,
-          child: IncomingWatcher(controller: c, child: PeopleSyncWatcher(controller: c, child: app))),
+          child: IncomingWatcher(controller: c, child: PeopleSyncWatcher(controller: c, child: ScanHelperWatcher(controller: c, child: app)))),
       if (_launching)
         LaunchClink(onDone: () => setState(() => _launching = false)),
     ]);
@@ -272,7 +279,7 @@ class _RootScreenState extends State<RootScreen> {
     return Stack(children: [
       AppLockGate(
           controller: c,
-          child: IncomingWatcher(controller: c, child: PeopleSyncWatcher(controller: c, child: app))),
+          child: IncomingWatcher(controller: c, child: PeopleSyncWatcher(controller: c, child: ScanHelperWatcher(controller: c, child: app)))),
       if (_launching)
         LaunchClink(onDone: () => setState(() => _launching = false)),
     ]);

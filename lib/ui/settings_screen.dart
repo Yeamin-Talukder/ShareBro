@@ -23,17 +23,24 @@ import 'desktop_layout.dart';
 import 'island.dart';
 import 'profile_screen.dart';
 import 'sections.dart';
+import 'scan_helper_ui.dart';
+import 'software_update.dart';
 import 'storage_screen.dart';
 import 'theme.dart';
 import 'update_sheet.dart';
 import 'aurora.dart';
 import 'glass.dart';
 import 'widgets.dart';
+import 'face_image.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.controller});
+  const SettingsScreen({super.key, required this.controller, this.section});
 
   final ScanController controller;
+
+  /// On a computer, the section to show first: 'profile', 'grouping',
+  /// 'appearance', 'sharing', 'general', 'data', 'updates' or 'about'.
+  final String? section;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -55,15 +62,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) setState(() => _current = _preview = n);
     });
     _loadChips();
-    _scroll.addListener(_onScroll);
   }
 
   /// What scanning has learned about this phone's chips so far.
   AccelState? _chips;
 
+  /// What's known about the graphics chip finding faces next to ML Kit.
+  AccelState? _finder;
+
   Future<void> _loadChips() async {
     final chips = await c.faceChips();
-    if (mounted) setState(() => _chips = chips);
+    final finder = await c.gpuFinder();
+    if (mounted) {
+      setState(() {
+        _chips = chips;
+        _finder = finder;
+      });
+    }
+  }
+
+  /// "Graphics chip also finds faces · 18 ms a photo", or why not.
+  String? get _finderNote {
+    final f = _finder;
+    if (f == null || c.faceChip == AccelChoice.cpu) return null;
+    if (f.bad.contains(Accel.gpu)) return "Graphics chip can't find faces on this phone";
+    final ms = f.ms[Accel.gpu];
+    if (ms == null) return 'Graphics chip also finds faces · tried on the next scan';
+    return 'Graphics chip also finds faces · ${ms.round()} ms a photo';
   }
 
   /// "12 ms a face", "didn't work on this phone", or nothing yet.
@@ -133,7 +158,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
-    _scroll.dispose();
     super.dispose();
   }
 
@@ -347,7 +371,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           leading: CircleAvatar(
             radius: 20,
             backgroundColor: scheme.surfaceContainerHighest,
-            backgroundImage: c.profile.thumb == null ? null : MemoryImage(c.profile.thumb!),
+            backgroundImage: c.profile.thumb == null ? null : FaceImage(c.profile.thumb!),
             child: c.profile.thumb == null ? Icon(Icons.face_rounded, color: scheme.onSurfaceVariant) : null,
           ),
           title: 'Profile',
@@ -468,7 +492,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
     );
 
-    final appearance = [
+    final appearance = desk
+        ? [
+            SectionCard(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+              child: ValueListenableBuilder<ThemeMode>(
+                valueListenable: Appearance.mode,
+                builder: (context, mode, _) => Row(children: [
+                  for (final (m, label) in const [
+                    (ThemeMode.system, 'Automatic'),
+                    (ThemeMode.light, 'Light'),
+                    (ThemeMode.dark, 'Dark'),
+                  ]) ...[
+                    if (m != ThemeMode.system) const SizedBox(width: 18),
+                    _LookChoice(
+                      mode: m,
+                      label: label,
+                      selected: mode == m,
+                      onTap: () => Appearance.set(c.db, m),
+                    ),
+                  ],
+                ]),
+              ),
+            ),
+            const SectionFooter('Automatic follows Windows\' light or dark mode.'),
+          ]
+        : [
       SectionCard(
         padding: const EdgeInsets.all(8),
         child: ValueListenableBuilder<ThemeMode>(
@@ -488,7 +537,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       SectionFooter(desk
           ? 'System follows your computer\'s light or dark mode.'
           : 'System follows your phone\'s dark mode setting.'),
-    ];
+          ];
 
     final sharing = [
       SectionCard.rows(rows: [
@@ -524,12 +573,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
           trailing: Switch(value: c.autoScanEnabled, onChanged: setAutoScan),
           onTap: () => setAutoScan(!c.autoScanEnabled),
         ),
+        if (!desk)
+          SectionRow(
+            leading: const IconTile(icon: Icons.memory_rounded, color: Color(0xFF5E5CE6)),
+            title: 'Scan with my computer',
+            subtitle: c.helperPc == null
+                ? 'Use your computer to scan much faster'
+                : c.helperOn
+                    ? 'Using ${c.helperPcName ?? 'your computer'} when it\'s nearby'
+                    : 'Off · ${c.helperPcName ?? 'your computer'}',
+            chevron: true,
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ScanHelperScreen(controller: c)))
+                .then((_) => setState(() {})),
+          ),
+        if (desk && c.scanHelper != null) ...[
+          SectionRow(
+            leading: const IconTile(icon: Icons.memory_rounded, color: Color(0xFF5E5CE6)),
+            title: 'Help my phone scan',
+            subtitle: 'Your phone sends small copies; this computer finds the faces and sends back only the results',
+            trailing: Switch(
+              value: c.scanHelper!.allowed,
+              onChanged: (v) async {
+                await c.scanHelper!.setAllowed(v);
+                setState(() {});
+              },
+            ),
+            onTap: () async {
+              await c.scanHelper!.setAllowed(!c.scanHelper!.allowed);
+              setState(() {});
+            },
+          ),
+          if (c.scanHelper!.allowed)
+            SectionRow(
+              leading: const IconTile(icon: Icons.insights_rounded, color: Color(0xFF34C759)),
+              title: 'Scanning for phones',
+              subtitle: c.scanHelper!.active.isEmpty
+                  ? 'Speed, photos left and other details while a phone scans with this computer'
+                  : 'Now: ${c.scanHelper!.active.map((s) => s.alias).join(', ')}',
+              chevron: true,
+              onTap: () => Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => ScanHelperDashboard(controller: c))),
+            ),
+          if (c.scanHelper!.pairedCount > 0)
+            SectionRow(
+              leading: const IconTile(icon: Icons.phonelink_erase_rounded, color: Color(0xFF8E8E93)),
+              title: 'Forget allowed phones',
+              subtitle: '${c.scanHelper!.pairedCount} ${c.scanHelper!.pairedCount == 1 ? 'phone' : 'phones'} can use '
+                  'this computer without asking',
+              onTap: () async {
+                await c.scanHelper!.forgetAll();
+                setState(() {});
+              },
+            ),
+        ],
         // Phones only: desktop scanning doesn't use the phone's chips.
         if (!desk)
           SectionRow(
             leading: const IconTile(icon: Icons.memory_rounded, color: Color(0xFFFF375F)),
             title: 'Face scanning chip',
-            subtitle: _chipSummary,
+            subtitle: [_chipSummary, ?_finderNote].join('\n'),
             chevron: true,
             onTap: _pickChip,
           ),
@@ -606,6 +708,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ];
 
     final updates = [
+      if (desk) ...[
+        const SoftwareUpdatePanel(),
+        const SizedBox(height: 20),
+      ],
       ListenableBuilder(
         listenable: Updater.instance,
         builder: (context, _) {
@@ -614,10 +720,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SectionRow(
               leading: const IconTile(icon: Icons.update_rounded, color: Color(0xFF34C759)),
               title: 'Check for updates automatically',
-              subtitle: "Once a day, and tells you when there's a new version",
+              subtitle: desk
+                  ? "Once a day. A dot on your profile in the sidebar shows when there's a new version"
+                  : "Once a day, and tells you when there's a new version",
               trailing: Switch(value: u.autoCheck, onChanged: u.setAutoCheck),
               onTap: () => u.setAutoCheck(!u.autoCheck),
             ),
+            if (!desk)
             SectionRow(
               leading: const IconTile(icon: Icons.wifi_rounded, color: Color(0xFF0A84FF)),
               title: 'Download on Wi-Fi only',
@@ -635,14 +744,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ];
 
     final sections = [
-      _Section('Profile', Icons.account_circle_outlined, [profile], header: false),
-      _Section('Face grouping', Icons.tune_rounded, [grouping], header: false),
-      _Section('Appearance', Icons.palette_outlined, appearance),
-      _Section('Sharing', Icons.swap_horiz_rounded, sharing),
-      _Section('General', Icons.settings_outlined, general),
-      _Section('Your data', Icons.storage_rounded, data),
-      if (Device.selfUpdate) _Section('Updates', Icons.system_update_alt_rounded, updates),
-      const _Section('About', Icons.info_outline_rounded, [_AboutCard()]),
+      _Section('profile', 'Profile', Icons.account_circle_rounded, [desk ? _deskProfile(context) : profile],
+          header: false,
+          color: const Color(0xFF8E8E93),
+          note: 'Your face, for trip groups, and the name others see',
+          keywords: const ['face', 'name', 'selfie', 'me', 'you']),
+      _Section('grouping', 'Face grouping', Icons.face_retouching_natural_rounded, [grouping],
+          header: false,
+          color: const Color(0xFF5E5CE6),
+          note: 'How strictly faces are put together into people',
+          keywords: const ['strict', 'loose', 'merge', 'regroup', 'people', 'faces']),
+      _Section('appearance', 'Appearance', Icons.contrast_rounded, appearance,
+          color: const Color(0xFF3A3A3C),
+          note: 'Light, dark, or the same as ${desk ? 'Windows' : 'your phone'}',
+          keywords: const ['dark', 'light', 'theme', 'mode', 'colour', 'color']),
+      _Section('sharing', 'Sharing', Icons.swap_horiz_rounded, sharing,
+          color: const Color(0xFF0A84FF),
+          note: 'How you show up on other devices, and what you send',
+          keywords: const ['send', 'device', 'name', 'quality', 'location', 'gps', 'original']),
+      _Section('general', 'General', Icons.settings_rounded, general,
+          color: const Color(0xFF8E8E93),
+          note: 'Scanning, app lock and the island',
+          keywords: const ['scan', 'auto', 'lock', 'windows hello', 'password', 'island', 'notification']),
+      _Section('data', 'Your data', Icons.storage_rounded, data,
+          color: const Color(0xFF34C759),
+          note: 'Storage, backups, and clearing what ShareBro knows',
+          keywords: const ['storage', 'backup', 'restore', 'clear', 'delete', 'hidden', 'not in our group', 'space']),
+      if (Device.selfUpdate)
+        _Section('updates', desk ? 'Software update' : 'Updates', Icons.system_update_alt_rounded, updates,
+            color: Brand.accentLight,
+            note: 'Get new versions of ShareBro',
+            keywords: const ['update', 'version', 'download', 'new', 'upgrade']),
+      const _Section('about', 'About', Icons.info_rounded, [_AboutCard()],
+          color: Color(0xFF30B0C7),
+          note: 'Who made ShareBro',
+          keywords: ['about', 'developer', 'source', 'code', 'github', 'licence', 'license']),
     ];
 
     if (desk) return _desktop(context, sections);
@@ -672,177 +808,541 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // ---- Desktop: a list of sections on the left, the page beside it ----
+  // ---- Desktop: the list of sections on the left, one section beside it,
+  // like a Mac's System Settings ----
 
-  final _scroll = ScrollController();
-  final _pageKey = GlobalKey();
-  final List<GlobalKey> _sectionKeys = [];
-  int _section = 0;
+  late String _pane = widget.section ?? 'profile';
 
-  /// How far below the top of the page a section has to reach to count as
-  /// the one being read (clears the title bar).
-  static const _readLine = 110.0;
-
-  double? _topOf(GlobalKey key) {
-    final box = key.currentContext?.findRenderObject() as RenderBox?;
-    final page = _pageKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null || page == null || !box.attached) return null;
-    return box.localToGlobal(Offset.zero).dy - page.localToGlobal(Offset.zero).dy;
+  void _show(String id) {
+    if (id != _pane) setState(() => _pane = id);
   }
 
-  /// Highlights the section being read as the page scrolls.
-  void _onScroll() {
-    if (!_scroll.hasClients) return;
-    var current = 0;
-    final p = _scroll.position;
-    if (p.pixels >= p.maxScrollExtent - 4) {
-      current = _sectionKeys.length - 1;
-    } else {
-      for (final (i, k) in _sectionKeys.indexed) {
-        final top = _topOf(k);
-        if (top != null && top <= _readLine) current = i;
-      }
-    }
-    if (current != _section) setState(() => _section = current);
-  }
-
-  void _jumpTo(int i) {
-    final top = _topOf(_sectionKeys[i]);
-    if (top == null || !_scroll.hasClients) return;
-    final p = _scroll.position;
-    final target = (p.pixels + top - _readLine + 24).clamp(0.0, p.maxScrollExtent);
-    setState(() => _section = i);
-    if (reduceMotion) {
-      _scroll.jumpTo(target);
-    } else {
-      _scroll.animateTo(target, duration: 320.ms, curve: Curves.easeOutCubic);
-    }
+  /// Desktop Profile: a large picture, the name others see, whether the
+  /// face is set, and buttons to change either.
+  Widget _deskProfile(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return ListenableBuilder(
+      listenable: c,
+      builder: (context, _) {
+        final thumb = c.profile.thumb;
+        void edit() => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(controller: c)));
+        return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          SectionCard(
+            padding: const EdgeInsets.all(20),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: c.profile.isSet ? scheme.primary : Mac.hairline(context),
+                ),
+                child: CircleAvatar(
+                  radius: 34,
+                  backgroundColor: scheme.surfaceContainerHighest,
+                  backgroundImage: thumb == null ? null : FaceImage(thumb),
+                  child: thumb == null ? Icon(Icons.face_rounded, size: 32, color: scheme.onSurfaceVariant) : null,
+                ),
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(c.sharing.identity.alias, style: text.titleLarge),
+                  const SizedBox(height: 3),
+                  Row(children: [
+                    Icon(c.profile.isSet ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                        size: 15, color: c.profile.isSet ? Mac.green : scheme.onSurfaceVariant),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        c.profile.isSet ? 'Your face is set up' : 'Your face isn\'t set up yet',
+                        style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ),
+                  ]),
+                ]),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton(onPressed: _renameDevice, child: const Text('Change name')),
+              const SizedBox(width: 8),
+              FilledButton(onPressed: edit, child: Text(c.profile.isSet ? 'Edit profile' : 'Set up face')),
+            ]),
+          ),
+          const SectionFooter(
+            'Your face lets trip groups find the photos you\'re in; your name is what other devices see when you '
+            'send or receive. Both stay on this computer.',
+          ),
+        ]);
+      },
+    );
   }
 
   Widget _desktop(BuildContext context, List<_Section> sections) {
-    while (_sectionKeys.length < sections.length) {
-      _sectionKeys.add(GlobalKey());
-    }
-    final section = _section.clamp(0, sections.length - 1);
-    return Aurora(
-      intensity: 0.5,
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: LayoutBuilder(builder: (context, box) {
-          final nav = box.maxWidth >= DesktopLayout.twoColumnsFrom;
-          final page = KeyedSubtree(
-            key: _pageKey,
-            child: GlassScrollView(
-              title: 'Settings',
-              controller: _scroll,
-              slivers: [
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(nav ? 8 : 24, 8, 24, 48),
-                  sliver: SliverToBoxAdapter(
-                    child: Align(
-                      alignment: Alignment.topLeft,
-                      // Rows stay a readable length on a wide window.
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 760),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                          for (final (i, s) in sections.indexed)
-                            KeyedSubtree(
-                              key: _sectionKeys[i],
-                              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                                SectionHeader(title: s.title, top: i == 0 ? 4 : 30),
-                                ...s.children,
-                              ]),
-                            ),
-                        ]),
+    final index = sections.indexWhere((s) => s.id == _pane);
+    final section = sections[index < 0 ? 0 : index];
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return Scaffold(
+      backgroundColor: scheme.surface,
+      body: LayoutBuilder(builder: (context, box) {
+        final list = box.maxWidth >= 640;
+        // The pane: a header with the section's icon, name and what's in
+        // it, then its settings.
+        final pane = Scrollbar(
+          key: ValueKey(section.id),
+          child: ListView(padding: const EdgeInsets.fromLTRB(28, 26, 28, 48), children: [
+            Align(
+              alignment: Alignment.topLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 680),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Row(children: [
+                    if (Navigator.of(context).canPop()) ...[
+                      GlassIconButton(
+                        tooltip: 'Back (Esc)',
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        onPressed: () => Navigator.maybePop(context),
                       ),
+                      const SizedBox(width: 8),
+                    ],
+                    if (!list) ...[
+                      PopupMenuButton<String>(
+                        tooltip: 'All settings',
+                        icon: const Icon(Icons.menu_rounded),
+                        onSelected: _show,
+                        itemBuilder: (_) => [
+                          for (final s in sections)
+                            menuChoice(context, s.id, s.title, selected: s.id == section.id, icon: s.icon),
+                        ],
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(color: section.color, borderRadius: BorderRadius.circular(11)),
+                      child: Icon(section.icon, size: 26, color: Colors.white),
                     ),
-                  ),
-                ),
-              ],
-            ),
-          );
-          if (!nav) return page;
-          return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            SizedBox(
-              width: 220,
-              child: _SettingsNav(
-                sections: sections,
-                selected: section,
-                onSelect: _jumpTo,
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(section.title, style: text.headlineSmall),
+                        if (section.note != null)
+                          Text(section.note!, style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
+                      ]),
+                    ),
+                  ]),
+                  const SizedBox(height: 22),
+                  ...section.children,
+                ]),
               ),
             ),
-            Expanded(child: page),
-          ]);
-        }),
-      ),
+          ]),
+        );
+        final animated = AnimatedSwitcher(
+          duration: const Duration(milliseconds: 160),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          layoutBuilder: (current, previous) => Stack(alignment: Alignment.topLeft, children: [...previous, ?current]),
+          child: pane,
+        );
+        if (!list) return animated;
+        return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Container(
+            width: 236,
+            decoration: BoxDecoration(
+              color: Mac.sidebar(context).withValues(alpha: 0.5),
+              border: Border(right: BorderSide(color: Mac.hairline(context), width: 0.5)),
+            ),
+            child: _SettingsNav(
+              controller: c,
+              sections: sections,
+              selected: section.id,
+              onSelect: _show,
+            ),
+          ),
+          Expanded(child: animated),
+        ]);
+      }),
     );
   }
 }
 
-/// One part of Settings: its title (and icon, for the desktop list).
+/// One part of Settings: its title, icon and colour (for the desktop list),
+/// a line about what's in it, and words that find it in the search.
 class _Section {
-  const _Section(this.title, this.icon, this.children, {this.header = true});
+  const _Section(this.id, this.title, this.icon, this.children,
+      {this.header = true, this.color = const Color(0xFF8E8E93), this.note, this.keywords = const []});
 
+  final String id;
   final String title;
   final IconData icon;
+  final Color color;
+  final String? note;
+  final List<String> keywords;
   final List<Widget> children;
 
   /// Phones show a header above it; Profile and grouping go without one.
   final bool header;
+
+  bool matches(String q) =>
+      title.toLowerCase().contains(q) ||
+      (note?.toLowerCase().contains(q) ?? false) ||
+      keywords.any((k) => k.contains(q));
 }
 
-/// Desktop: the list of sections beside the page, like a settings app's
-/// sidebar. Clicking one scrolls the page to it.
-class _SettingsNav extends StatelessWidget {
-  const _SettingsNav({required this.sections, required this.selected, required this.onSelect});
+/// A small coloured tile with a white symbol, as in a Mac's settings list.
+class _NavTile extends StatelessWidget {
+  const _NavTile({required this.icon, required this.color});
 
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 22,
+        height: 22,
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),
+        child: Icon(icon, size: 14, color: Colors.white),
+      );
+}
+
+/// Desktop: the list beside the pane, like a Mac's System Settings: a
+/// search box, you, then the sections in small groups, the version at the
+/// foot. Typing filters the list; Enter opens the first match.
+class _SettingsNav extends StatefulWidget {
+  const _SettingsNav({
+    required this.controller,
+    required this.sections,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final ScanController controller;
   final List<_Section> sections;
-  final int selected;
-  final ValueChanged<int> onSelect;
+  final String selected;
+  final ValueChanged<String> onSelect;
+
+  @override
+  State<_SettingsNav> createState() => _SettingsNavState();
+}
+
+class _SettingsNavState extends State<_SettingsNav> {
+  final _search = TextEditingController();
+  String _q = '';
+
+  /// Which sections go together (a gap between groups).
+  static const _groups = [
+    ['grouping', 'appearance'],
+    ['sharing', 'general'],
+    ['data', 'updates'],
+    ['about'],
+  ];
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return SafeArea(
-      right: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 96, 8, 16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          for (final (i, s) in sections.indexed)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: Material(
-                color: i == selected ? scheme.primary.withAlpha(26) : Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () => onSelect(i),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    child: Row(children: [
-                      Icon(s.icon, size: 20, color: i == selected ? scheme.primary : scheme.onSurfaceVariant),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          s.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: TextSize.label,
-                            fontWeight: i == selected ? FontWeight.w700 : FontWeight.w500,
-                            color: i == selected ? scheme.primary : scheme.onSurface,
-                          ),
-                        ),
-                      ),
-                    ]),
-                  ),
-                ),
+    final c = widget.controller;
+    final faint = Mac.secondary(context);
+    final q = _q.trim().toLowerCase();
+    final found = q.isEmpty ? null : [for (final s in widget.sections) if (s.matches(q)) s];
+
+    Widget row({required String id, required Widget leading, required Widget label, Widget? trailing, double height = 32}) {
+      final on = id == widget.selected;
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 2),
+        child: Material(
+          color: on ? Mac.selection(context) : Colors.transparent,
+          borderRadius: BorderRadius.circular(Mac.rowRadius),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(Mac.rowRadius),
+            mouseCursor: SystemMouseCursors.click,
+            onTap: () => widget.onSelect(id),
+            child: SizedBox(
+              height: height,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(children: [leading, const SizedBox(width: 10), Expanded(child: label), ?trailing]),
               ),
             ),
+          ),
+        ),
+      );
+    }
+
+    Widget sectionRow(_Section s) => row(
+          id: s.id,
+          leading: _NavTile(icon: s.icon, color: s.color),
+          label: Text(
+            s.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: TextSize.caption,
+              fontWeight: s.id == widget.selected ? FontWeight.w600 : FontWeight.w400,
+              color: scheme.onSurface,
+            ),
+          ),
+          trailing: s.id == 'updates'
+              ? ListenableBuilder(
+                  listenable: Updater.instance,
+                  builder: (context, _) => Updater.instance.hasUpdate
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(color: scheme.primary, borderRadius: BorderRadius.circular(99)),
+                          child: Text('1',
+                              style: TextStyle(fontSize: TextSize.tiny, fontWeight: FontWeight.w700, color: scheme.onPrimary)),
+                        )
+                      : const SizedBox.shrink(),
+                )
+              : null,
+        );
+
+    final byId = {for (final s in widget.sections) s.id: s};
+    final profile = byId['profile'];
+    final children = <Widget>[
+      SizedBox(
+        height: 30,
+        child: TextField(
+          controller: _search,
+          onChanged: (v) => setState(() => _q = v),
+          onSubmitted: (_) {
+            final first = found?.firstOrNull;
+            if (first != null) widget.onSelect(first.id);
+          },
+          style: const TextStyle(fontSize: TextSize.caption),
+          decoration: InputDecoration(
+            hintText: 'Search settings',
+            hintStyle: TextStyle(fontSize: TextSize.caption, color: faint),
+            prefixIcon: Icon(Icons.search_rounded, size: 16, color: faint),
+            prefixIconConstraints: const BoxConstraints(minWidth: 30),
+            suffixIcon: _q.isEmpty
+                ? null
+                : IconButton(
+                    iconSize: 14,
+                    style: IconButton.styleFrom(minimumSize: const Size(24, 24), padding: EdgeInsets.zero),
+                    onPressed: () => setState(() {
+                      _search.clear();
+                      _q = '';
+                    }),
+                    icon: const Icon(Icons.cancel_rounded),
+                  ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 6),
+            filled: true,
+            fillColor: scheme.onSurface.withValues(alpha: 0.06),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(Mac.controlRadius), borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(Mac.controlRadius), borderSide: BorderSide.none),
+          ),
+        ),
+      ),
+      const SizedBox(height: 12),
+    ];
+    if (found != null) {
+      children.addAll(found.isEmpty
+          ? [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                child: Text('No settings match "${_q.trim()}"', style: TextStyle(fontSize: TextSize.small, color: faint)),
+              ),
+            ]
+          : [for (final s in found) sectionRow(s)]);
+    } else {
+      if (profile != null) {
+        children.add(ListenableBuilder(
+          listenable: c,
+          builder: (context, _) => row(
+            id: profile.id,
+            height: 52,
+            leading: CircleAvatar(
+              radius: 17,
+              backgroundColor: scheme.surfaceContainerHighest,
+              backgroundImage: c.profile.thumb == null ? null : FaceImage(c.profile.thumb!),
+              child: c.profile.thumb == null ? Icon(Icons.face_rounded, size: 18, color: faint) : null,
+            ),
+            label: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(c.sharing.identity.alias,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w600)),
+              Text(c.profile.isSet ? 'Profile · face set' : 'Set up your profile',
+                  maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: TextSize.tiny, color: faint)),
+            ]),
+          ),
+        ));
+      }
+      final placed = <String>{'profile'};
+      for (final group in _groups) {
+        final rows = [for (final id in group) ?byId[id]];
+        if (rows.isEmpty) continue;
+        children.add(const SizedBox(height: 12));
+        for (final s in rows) {
+          children.add(sectionRow(s));
+          placed.add(s.id);
+        }
+      }
+      // Anything not in a group still shows.
+      for (final s in widget.sections) {
+        if (!placed.contains(s.id)) children.add(sectionRow(s));
+      }
+    }
+    children.addAll([
+      const SizedBox(height: 18),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Text('ShareBro ${Updater.instance.currentText}', style: TextStyle(fontSize: TextSize.tiny, color: faint)),
+      ),
+    ]);
+    return ListView(padding: const EdgeInsets.fromLTRB(10, 16, 10, 16), children: children);
+  }
+}
+
+/// Settings › Appearance on a computer: a small picture of the window in
+/// each look, like a Mac's appearance choice.
+class _LookChoice extends StatefulWidget {
+  const _LookChoice({required this.mode, required this.label, required this.selected, required this.onTap});
+
+  final ThemeMode mode;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  State<_LookChoice> createState() => _LookChoiceState();
+}
+
+class _LookChoiceState extends State<_LookChoice> {
+  bool _hover = false;
+
+  /// A tiny window: a sidebar, a title line and three cards.
+  static Widget _window(bool dark) {
+    final bg = dark ? Mac.windowDark : Mac.windowLight;
+    final side = dark ? Mac.sidebarDark : Mac.sidebarLight;
+    final card = dark ? Mac.cardDark : Mac.cardLight;
+    final line = dark ? const Color(0xFF48484A) : const Color(0xFFD1D1D6);
+    return ColoredBox(
+      color: bg,
+      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Container(
+          width: 30,
+          color: side,
+          padding: const EdgeInsets.fromLTRB(5, 8, 5, 0),
+          child: Column(children: [
+            for (var i = 0; i < 4; i++)
+              Container(
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 5),
+                decoration: BoxDecoration(
+                  color: i == 0 ? Brand.accentLight.withValues(alpha: 0.8) : line,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+          ]),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(7, 8, 7, 0),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(width: 34, height: 5, decoration: BoxDecoration(color: line, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 7),
+              Row(children: [
+                for (var i = 0; i < 3; i++) ...[
+                  if (i > 0) const SizedBox(width: 4),
+                  Expanded(
+                    child: Container(
+                      height: 22,
+                      decoration: BoxDecoration(color: card, borderRadius: BorderRadius.circular(3)),
+                    ),
+                  ),
+                ],
+              ]),
+            ]),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final picture = switch (widget.mode) {
+      ThemeMode.light => _window(false),
+      ThemeMode.dark => _window(true),
+      // Automatic: light on the left, dark on the right.
+      ThemeMode.system => Stack(fit: StackFit.expand, children: [
+          _window(false),
+          ClipPath(clipper: _RightHalf(), child: _window(true)),
         ]),
+    };
+    return Semantics(
+      button: true,
+      selected: widget.selected,
+      label: '${widget.label} appearance',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hover = true),
+        onExit: (_) => setState(() => _hover = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 112,
+              height: 72,
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: widget.selected
+                      ? scheme.primary
+                      : _hover
+                          ? scheme.onSurface.withValues(alpha: 0.25)
+                          : Colors.transparent,
+                  width: 2.5,
+                ),
+              ),
+              child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Mac.hairline(context), width: 0.5),
+                ),
+                child: picture,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              widget.label,
+              style: TextStyle(
+                fontSize: TextSize.caption,
+                fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w400,
+                color: widget.selected ? scheme.onSurface : Mac.secondary(context),
+              ),
+            ),
+          ]),
+        ),
       ),
     );
   }
+}
+
+class _RightHalf extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) => Path()
+    ..moveTo(size.width * 0.55, 0)
+    ..lineTo(size.width, 0)
+    ..lineTo(size.width, size.height)
+    ..lineTo(size.width * 0.45, size.height)
+    ..close();
+
+  @override
+  bool shouldReclip(_RightHalf old) => false;
 }
 
 /// Who made ShareBro, with links to the developer's GitHub and the code.
@@ -874,7 +1374,8 @@ class _AboutCard extends StatelessWidget {
           ]),
         ),
         const Divider(height: 0.5, thickness: 0.5, indent: 16),
-        if (Device.selfUpdate) ...[
+        // A computer has a Software update section of its own.
+        if (Device.selfUpdate && !DesktopLayout.on) ...[
           const _UpdateRow(),
           const Divider(height: 0.5, thickness: 0.5, indent: 62),
         ],
@@ -1009,7 +1510,7 @@ class _IgnoredScreenState extends State<_IgnoredScreen> {
                     leading: CircleAvatar(
                       backgroundImage: p.coverThumb == null
                           ? null
-                          : MemoryImage(p.coverThumb!),
+                          : FaceImage(p.coverThumb!),
                     ),
                     title: Text(p.displayName),
                     subtitle: Text('${p.photoCount} photos'),

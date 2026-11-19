@@ -32,8 +32,14 @@ class IncomingPeopleRequest {
   final Completer<bool> _answer = Completer();
   bool get answered => _answer.isCompleted;
 
-  void answer(bool yes) {
-    if (!_answer.isCompleted) _answer.complete(yes);
+  /// When accepting: only these of [people] (by sync id) are taken in;
+  /// null takes everyone.
+  Set<String>? only;
+
+  void answer(bool yes, {Set<String>? only}) {
+    if (_answer.isCompleted) return;
+    this.only = only;
+    _answer.complete(yes);
   }
 }
 
@@ -145,7 +151,14 @@ class PeopleSyncHub extends ChangeNotifier {
     }
     if (!yes) return _reply(res, HttpStatus.forbidden);
     try {
-      lastIncoming = await take(theirs);
+      final only = request.only;
+      lastIncoming = await take(only == null
+          ? theirs
+          : PeoplePackage(
+              from: theirs.from,
+              model: theirs.model,
+              people: [for (final p in theirs.people) if (only.contains(p.syncId)) p],
+            ));
       notifyListeners();
       final mine = await build();
       return await _reply(res, HttpStatus.ok, {'package': mine.toJson()});

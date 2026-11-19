@@ -1,28 +1,91 @@
 import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import '../scan/desktop_folders.dart';
 import '../scan/scan_controller.dart';
 import 'desktop_gallery.dart';
 import 'desktop_layout.dart';
+import 'active_shares.dart';
 import 'group_screen.dart';
+import 'island.dart' show desktopPages;
 import 'scan_screen.dart';
 import 'search_screen.dart';
 import 'settings_screen.dart';
 import 'theme.dart';
 import 'widgets.dart';
 import 'people_sync_screen.dart';
+import '../update/updater.dart';
+import 'face_image.dart';
 
 /// The pages the sidebar switches between. Folders get a page each.
 enum DesktopPage { people, photos, explore, share, folder }
+
+/// Opens things in the desktop window from outside it (a notification, the
+/// update banner).
+abstract final class DesktopNav {
+  static _DesktopShellState? _shell;
+
+  /// Shows Settings beside the sidebar, at [section] (see
+  /// [SettingsScreen.section]). False when there's no desktop window.
+  static bool openSettings([String? section]) {
+    final shell = _shell;
+    if (shell == null || !shell.mounted) return false;
+    shell._openSettings(section);
+    return true;
+  }
+
+  /// Back, as in a browser: closes the page on top, or (with [pages]) goes
+  /// to the main page shown before. False when there's nowhere to go.
+  static bool back({bool pages = true}) {
+    final shell = _shell;
+    return shell != null && shell.mounted && shell._back(pages: pages);
+  }
+
+  /// Forward: opens again what Back just left.
+  static bool forward() {
+    final shell = _shell;
+    return shell != null && shell.mounted && shell._forwardGo();
+  }
+}
+
+/// A step Forward can take again: reopen a page, or show a main page.
+class _Fwd {
+  _Fwd.route(Route<dynamic> Function() this.make)
+      : page = null,
+        folder = null;
+  _Fwd.page(DesktopPage this.page, this.folder) : make = null;
+
+  final Route<dynamic> Function()? make;
+  final DesktopPage? page;
+  final _Folder? folder;
+}
+
+/// Names of the pages the sidebar opens on top of the main pages; the
+/// sidebar highlights the one showing.
+abstract final class _Opened {
+  static const settings = 'settings';
+  static const tripGroup = 'trip-group';
+  static const syncPeople = 'sync-people';
+  static const search = 'search';
+  static const scan = 'scan';
+
+  /// The ones with a row of their own in the sidebar.
+  static const inSidebar = {settings, tripGroup, syncPeople};
+}
 
 /// ShareBro's desktop window: a sidebar on the left (People, Photos,
 /// Explore, sharing, the scanned folders, the running scan and settings)
 /// and the page on the right. Below [DesktopLayout.wideFrom] the sidebar
 /// folds into an icon rail. Replaces the phone's floating dock.
+///
+/// Every page opens beside the sidebar: the content area has its own
+/// navigator ([desktopPages]), so a person, a photo or Settings never
+/// covers the sidebar. Dialogs still cover the whole window.
 class DesktopShell extends StatefulWidget {
   const DesktopShell({
     super.key,
@@ -59,21 +122,160 @@ class _DesktopShellState extends State<DesktopShell> {
   Timer? _reload;
   bool _wasRunning = false;
 
+  /// Hero animations (a face growing into a person's page) inside the
+  /// content area's navigator.
+  final _hero = HeroController(createRectTween: (b, e) => MaterialRectArcTween(begin: b, end: e));
+  late final _observer = _StackObserver(_stackChanged, onPush: _pushed);
+
+  /// The name of the sidebar page opened over the main pages, if any.
+  String? _opened;
+
+  // ---- Back and forward, as in a browser ----
+
+  /// Main pages shown before this one, and what Forward can reopen.
+  final List<(DesktopPage, _Folder?)> _pageBack = [];
+  final List<_Fwd> _forward = [];
+
+  /// Forward is reopening a page (which mustn't clear Forward).
+  bool _replaying = false;
+
+  bool get _canBack => (_pages?.canPop() ?? false) || _pageBack.isNotEmpty;
+  bool get _canForward => _forward.isNotEmpty;
+
+  /// A way to open [r] again, for Forward.
+  static Route<dynamic> Function()? _remake(Route<dynamic> r) {
+    if (r is MaterialPageRoute) {
+      final build = r.builder, settings = r.settings;
+      return () => MaterialPageRoute<dynamic>(builder: build, settings: settings);
+    }
+    if (r is PageRouteBuilder) {
+      final b = r;
+      return () => PageRouteBuilder<dynamic>(
+            settings: b.settings,
+            opaque: b.opaque,
+            pageBuilder: b.pageBuilder,
+            transitionsBuilder: b.transitionsBuilder,
+            transitionDuration: b.transitionDuration,
+            reverseTransitionDuration: b.reverseTransitionDuration,
+          );
+    }
+    return null;
+  }
+
+  bool _back({bool pages = true}) {
+    final nav = _pages;
+    if (nav != null && nav.canPop()) {
+      Route<dynamic>? top;
+      nav.popUntil((r) {
+        top = r;
+        return true;
+      });
+      // A sheet or menu on top handles its own closing.
+      if (top is! PageRoute) return false;
+      final again = _remake(top!);
+      nav.maybePop().then((popped) {
+        if (popped && again != null && mounted) _forward.add(_Fwd.route(again));
+      });
+      return true;
+    }
+    if (!pages || _pageBack.isEmpty) return false;
+    final (page, folder) = _pageBack.removeLast();
+    _forward.add(_Fwd.page(widget.page, _folder));
+    _show(page, folder);
+    return true;
+  }
+
+  bool _forwardGo() {
+    if (_forward.isEmpty) return false;
+    final f = _forward.removeLast();
+    final make = f.make;
+    if (make != null) {
+      _replaying = true;
+      _pages?.push(make());
+      _replaying = false;
+    } else {
+      _pageBack.add((widget.page, _folder));
+      _show(f.page!, f.folder);
+    }
+    return true;
+  }
+
+  /// A page opened by anything but Forward starts a new path: nothing to
+  /// go forward to any more.
+  void _pushed() {
+    if (!_replaying) _forward.clear();
+  }
+
+  // The two-finger swipe: how far it has gone sideways (+ back, − forward).
+  static const _swipeTrigger = 110.0;
+  final _swipe = ValueNotifier<double>(0);
+  bool _swipeOn = false, _swipeDecided = false;
+
+  void _swipeStart(PointerPanZoomStartEvent e) {
+    _swipeOn = !NavSwipe.take();
+    _swipeDecided = false;
+    _swipe.value = 0;
+  }
+
+  void _swipeUpdate(PointerPanZoomUpdateEvent e) {
+    if (!_swipeOn) return;
+    // A pinch is a zoom, not a swipe.
+    if ((e.scale - 1).abs() > 0.03) return _swipeCancel();
+    final d = e.pan;
+    if (!_swipeDecided) {
+      if (d.distance < 12) return;
+      _swipeDecided = true;
+      // Mostly up or down: that's scrolling.
+      if (d.dy.abs() > d.dx.abs() * 0.8) {
+        _swipeOn = false;
+        return;
+      }
+    }
+    final dx = d.dx;
+    final can = dx > 0 ? _canBack : _canForward;
+    _swipe.value = can ? dx : 0;
+  }
+
+  void _swipeEnd(PointerPanZoomEndEvent e) {
+    final s = _swipe.value;
+    _swipeOn = false;
+    _swipe.value = 0;
+    if (s.abs() < _swipeTrigger) return;
+    s > 0 ? _back() : _forwardGo();
+  }
+
+  void _swipeCancel() {
+    _swipeOn = false;
+    _swipe.value = 0;
+  }
+
+  /// Something scrolled sideways under the fingers: the swipe was for it.
+  bool _sidewaysScroll(ScrollNotification n) {
+    if (_swipeOn && n.metrics.axis == Axis.horizontal && n is ScrollUpdateNotification) _swipeCancel();
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
+    DesktopNav._shell = this;
     c.addListener(_changed);
     c.sharing.addListener(_sharingChanged);
     c.sharing.receiver.addListener(_sharingChanged);
+    c.sharing.server.addListener(_sharingChanged);
     _load();
   }
 
   @override
   void dispose() {
+    if (DesktopNav._shell == this) DesktopNav._shell = null;
+    _hero.dispose();
+    _swipe.dispose();
     _reload?.cancel();
     c.removeListener(_changed);
     c.sharing.removeListener(_sharingChanged);
     c.sharing.receiver.removeListener(_sharingChanged);
+    c.sharing.server.removeListener(_sharingChanged);
     super.dispose();
   }
 
@@ -116,10 +318,40 @@ class _DesktopShellState extends State<DesktopShell> {
     });
   }
 
+  /// The content area's pages changed: which sidebar page is open? Read
+  /// after the frame, as pushes can happen while the navigator builds.
+  void _stackChanged(List<Route<dynamic>> stack) {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final opened = stack.length > 1 ? stack[1].settings.name : null;
+      if (opened != _opened) setState(() => _opened = opened);
+    });
+  }
+
+  NavigatorState? get _pages => desktopPages.currentState;
+
+  /// Back to the main pages, closing whatever was opened over them.
+  void _closeOpened() => _pages?.popUntil((r) => r.isFirst);
+
   void _go(DesktopPage page, [_Folder? folder]) {
+    final same = page == widget.page && folder?.tripId == _folder?.tripId;
+    if (!same) {
+      _pageBack.add((widget.page, _folder));
+      if (_pageBack.length > 50) _pageBack.removeAt(0);
+      _forward.clear();
+    }
+    _show(page, folder);
+  }
+
+  /// Shows a main page (closing anything opened over it).
+  void _show(DesktopPage page, _Folder? folder) {
+    _closeOpened();
     setState(() => _folder = folder);
     widget.onPage(page);
   }
+
+  void _openSettings([String? section]) =>
+      _push(SettingsScreen(controller: c, section: section), name: _Opened.settings, fresh: true);
 
   Future<void> _addFolder() async {
     final folder = await FilePicker.getDirectoryPath(dialogTitle: 'Choose a folder of photos to scan');
@@ -133,12 +365,21 @@ class _DesktopShellState extends State<DesktopShell> {
               : 'No photos in that folder (JPEG, PNG, WebP, GIF or BMP).')));
       return;
     }
-    _push(ScanScreen(controller: c));
+    _push(ScanScreen(controller: c), name: _Opened.scan);
   }
 
-  void _push(Widget screen) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+  /// Opens [screen] beside the sidebar. A named one replaces whatever was
+  /// opened from the sidebar before; if it's already showing it stays as it
+  /// is, unless [fresh].
+  void _push(Widget screen, {required String name, bool fresh = false}) {
+    final nav = _pages;
+    if (nav == null) return;
+    if (_opened == name && !fresh) return;
+    nav.popUntil((r) => r.isFirst);
+    nav.push(MaterialPageRoute(settings: RouteSettings(name: name), builder: (_) => screen));
+  }
 
-  void _search() => _push(SearchScreen(controller: c));
+  void _search() => _push(SearchScreen(controller: c), name: _Opened.search);
 
   @override
   Widget build(BuildContext context) {
@@ -161,6 +402,48 @@ class _DesktopShellState extends State<DesktopShell> {
         ),
     ]);
     content = widget.background?.call(content) ?? content;
+    // The content area: its own navigator, sized to the area (not the
+    // window) so pages centre and pick their layout by the room they have.
+    final area = LayoutBuilder(
+      builder: (context, box) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(size: Size(box.maxWidth, box.maxHeight)),
+        child: _Content(
+          content: content,
+          child: HeroControllerScope(
+            controller: _hero,
+            child: Navigator(
+              key: desktopPages,
+              observers: [_observer],
+              onGenerateInitialRoutes: (_, _) => [
+                PageRouteBuilder<void>(
+                  settings: const RouteSettings(name: '/'),
+                  pageBuilder: (_, _, _) => const _MainPages(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    // Two fingers sideways on a touchpad: back or forward, with an arrow
+    // that slides in from the edge (as in Chrome).
+    final swipeable = Listener(
+      onPointerPanZoomStart: _swipeStart,
+      onPointerPanZoomUpdate: _swipeUpdate,
+      onPointerPanZoomEnd: _swipeEnd,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: _sidewaysScroll,
+        // Fills the room beside the sidebar: the arrow layer on top is
+        // empty most of the time and mustn't decide the size.
+        child: Stack(fit: StackFit.expand, children: [
+          area,
+          ValueListenableBuilder<double>(
+            valueListenable: _swipe,
+            builder: (context, s, _) => s == 0 ? const SizedBox.shrink() : _SwipeArrow(swipe: s, trigger: _swipeTrigger),
+          ),
+        ]),
+      ),
+    );
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyK, control: true): _search,
@@ -169,7 +452,8 @@ class _DesktopShellState extends State<DesktopShell> {
         const SingleActivator(LogicalKeyboardKey.digit2, control: true): () => _go(DesktopPage.photos),
         const SingleActivator(LogicalKeyboardKey.digit3, control: true): () => _go(DesktopPage.explore),
         const SingleActivator(LogicalKeyboardKey.digit4, control: true): () => _go(DesktopPage.share),
-        const SingleActivator(LogicalKeyboardKey.comma, control: true): () => _push(SettingsScreen(controller: c)),
+        const SingleActivator(LogicalKeyboardKey.comma, control: true): () =>
+            _push(SettingsScreen(controller: c), name: _Opened.settings),
         const SingleActivator(LogicalKeyboardKey.keyO, control: true): _addFolder,
       },
       child: Focus(
@@ -180,14 +464,14 @@ class _DesktopShellState extends State<DesktopShell> {
             curve: Curves.easeOutCubic,
             width: wide ? DesktopLayout.sidebarWidth : DesktopLayout.railWidth,
             decoration: BoxDecoration(
-              color: dark ? const Color(0xFF141219) : const Color(0xFFEDEBF1),
+              color: Mac.sidebar(context),
               border: Border(
-                right: BorderSide(color: dark ? const Color(0x12FFFFFF) : const Color(0x141A1820)),
+                right: BorderSide(color: dark ? const Color(0x33000000) : Mac.hairlineLight, width: dark ? 1 : 0.5),
               ),
             ),
             child: _sidebar(context, wide),
           ),
-          Expanded(child: content),
+          Expanded(child: swipeable),
         ]),
       ),
     );
@@ -195,9 +479,13 @@ class _DesktopShellState extends State<DesktopShell> {
 
   Widget _sidebar(BuildContext context, bool wide) {
     final scheme = Theme.of(context).colorScheme;
-    final sharing = c.sharing;
-    final busy = sharing.activeCount + (sharing.receiver.session?.finished == false ? 1 : 0);
-    final page = widget.page;
+    // Links, sends and receives going on now (the live badge).
+    final busy = activeShareCount(c);
+    // A page opened from the sidebar (Settings, Trip group…) is the
+    // selected row; otherwise the main page is, even with a person or a
+    // photo opened over it.
+    final opened = _Opened.inSidebar.contains(_opened) ? _opened : null;
+    final page = opened == null ? widget.page : null;
     Widget nav(IconData icon, IconData selectedIcon, String label, DesktopPage p,
             {String? count, int live = 0, String? keys}) =>
         _NavItem(
@@ -213,13 +501,13 @@ class _DesktopShellState extends State<DesktopShell> {
         );
     return ClipRect(
       child: Padding(
-        padding: EdgeInsets.fromLTRB(wide ? 10 : 8, 10, wide ? 10 : 8, 10),
+        padding: EdgeInsets.fromLTRB(wide ? 10 : 10, 8, wide ? 10 : 10, 8),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           _Brand(wide: wide),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           if (wide) _SearchField(onTap: _search) else _NavIcon(icon: Icons.search_rounded, tooltip: 'Search  (Ctrl+K)', onTap: _search),
           Expanded(
-            child: ListView(padding: EdgeInsets.zero, children: [
+            child: ListView(padding: const EdgeInsets.only(bottom: 8), children: [
               _Group('Library', wide: wide),
               nav(Icons.people_outline_rounded, Icons.people_rounded, 'People', DesktopPage.people,
                   count: _people?.toString(), keys: 'Ctrl+1'),
@@ -234,18 +522,18 @@ class _DesktopShellState extends State<DesktopShell> {
                 selectedIcon: Icons.diversity_3_rounded,
                 label: 'Trip group',
                 wide: wide,
-                selected: false,
+                selected: opened == _Opened.tripGroup,
                 tooltip: 'Trip group',
-                onTap: () => _push(TripGroupScreen(controller: c)),
+                onTap: () => _push(TripGroupScreen(controller: c), name: _Opened.tripGroup),
               ),
               _NavItem(
                 icon: Icons.sync_alt_rounded,
                 selectedIcon: Icons.sync_alt_rounded,
                 label: 'Sync people',
                 wide: wide,
-                selected: false,
+                selected: opened == _Opened.syncPeople,
                 tooltip: "Swap who's who with your other devices",
-                onTap: () => _push(PeopleSyncScreen(controller: c)),
+                onTap: () => _push(PeopleSyncScreen(controller: c), name: _Opened.syncPeople),
               ),
               _Group('Folders', wide: wide),
               for (final f in _folders)
@@ -272,20 +560,130 @@ class _DesktopShellState extends State<DesktopShell> {
               ),
             ]),
           ),
+          // What's being shared right now, each with a Stop.
+          SharingNowCard(controller: c, wide: wide),
           if (c.running)
             wide
-                ? _ScanCard(controller: c, onOpen: () => _push(ScanScreen(controller: c)))
-                : _ScanRing(controller: c, onOpen: () => _push(ScanScreen(controller: c))),
-          const SizedBox(height: 4),
-          _Profile(
-            wide: wide,
-            thumb: c.profile.thumb,
-            accent: scheme.primary,
-            onTap: () => _push(SettingsScreen(controller: c)),
+                ? _ScanCard(controller: c, onOpen: () => _push(ScanScreen(controller: c), name: _Opened.scan))
+                : _ScanRing(controller: c, onOpen: () => _push(ScanScreen(controller: c), name: _Opened.scan)),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Divider(height: 0.5, thickness: 0.5, color: Mac.hairline(context)),
+          ),
+          ListenableBuilder(
+            listenable: Updater.instance,
+            builder: (context, _) => _Profile(
+              wide: wide,
+              thumb: c.profile.thumb,
+              accent: scheme.primary,
+              selected: opened == _Opened.settings,
+              update: Updater.instance.hasUpdate,
+              onTap: () => _push(SettingsScreen(controller: c), name: _Opened.settings),
+            ),
           ),
         ]),
       ),
     );
+  }
+}
+
+/// Hands the main pages (built by the shell) to the content navigator's
+/// first route, which is built once and so can't take them directly.
+class _Content extends InheritedWidget {
+  const _Content({required this.content, required super.child});
+
+  final Widget content;
+
+  @override
+  bool updateShouldNotify(_Content old) => content != old.content;
+}
+
+class _MainPages extends StatelessWidget {
+  const _MainPages();
+
+  @override
+  Widget build(BuildContext context) => context.dependOnInheritedWidgetOfExactType<_Content>()!.content;
+}
+
+/// The round arrow of a two-finger swipe: slides in from the left edge
+/// (back) or the right (forward) and fills with the accent once letting go
+/// will go there.
+class _SwipeArrow extends StatelessWidget {
+  const _SwipeArrow({required this.swipe, required this.trigger});
+
+  final double swipe, trigger;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final back = swipe > 0;
+    final t = (swipe.abs() / trigger).clamp(0.0, 1.0);
+    final ready = t >= 1;
+    final x = -48 + 72 * Curves.easeOutCubic.transform(t);
+    final arrow = AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: ready ? scheme.primary : Mac.card(context),
+        border: Border.all(color: Mac.hairline(context), width: 0.5),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 12, offset: const Offset(0, 3))],
+      ),
+      child: Icon(
+        back ? Icons.arrow_back_rounded : Icons.arrow_forward_rounded,
+        size: 22,
+        color: ready ? scheme.onPrimary : scheme.onSurface.withValues(alpha: 0.35 + 0.65 * t),
+      ),
+    );
+    return Positioned(
+      left: back ? x : null,
+      right: back ? null : x,
+      top: 0,
+      bottom: 0,
+      child: IgnorePointer(child: Center(child: arrow)),
+    );
+  }
+}
+
+/// Reports the content navigator's pages, bottom first.
+class _StackObserver extends NavigatorObserver {
+  _StackObserver(this.onChange, {this.onPush});
+
+  final void Function(List<Route<dynamic>> stack) onChange;
+  final VoidCallback? onPush;
+  final _stack = <Route<dynamic>>[];
+
+  void _report() => onChange(List.of(_stack));
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _stack.add(route);
+    onPush?.call();
+    _report();
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _stack.remove(route);
+    _report();
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _stack.remove(route);
+    _report();
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    final i = oldRoute == null ? -1 : _stack.indexOf(oldRoute);
+    if (i >= 0 && newRoute != null) {
+      _stack[i] = newRoute;
+    } else if (newRoute != null) {
+      _stack.add(newRoute);
+    }
+    _report();
   }
 }
 
@@ -309,6 +707,7 @@ class _Folder {
   final int count;
 }
 
+/// The app's icon and name at the top of the sidebar.
 class _Brand extends StatelessWidget {
   const _Brand({required this.wide});
 
@@ -317,23 +716,32 @@ class _Brand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final logo = ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: Image.asset('assets/icon/app_icon_store_512.png', width: 28, height: 28, filterQuality: FilterQuality.medium),
+      borderRadius: BorderRadius.circular(6),
+      child: Image.asset('assets/icon/app_icon_store_512.png', width: 24, height: 24, filterQuality: FilterQuality.medium),
     );
     return SizedBox(
-      height: 44,
+      height: 40,
       child: wide
           ? Row(children: [
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               logo,
-              const SizedBox(width: 10),
-              const Text('ShareBro', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
+              const SizedBox(width: 9),
+              const Text('ShareBro',
+                  style: TextStyle(
+                    fontFamily: Mac.fontDisplay,
+                    fontFamilyFallback: Mac.fontFallback,
+                    fontSize: TextSize.callout,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  )),
             ])
           : Center(child: logo),
     );
   }
 }
 
+/// A Mac search field: a rounded grey well with a magnifier, the
+/// placeholder and the shortcut. Opens Search.
 class _SearchField extends StatefulWidget {
   const _SearchField({required this.onTap});
 
@@ -349,32 +757,42 @@ class _SearchFieldState extends State<_SearchField> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final faint = scheme.onSurface.withValues(alpha: 0.45);
+    final dark = scheme.brightness == Brightness.dark;
+    final faint = Mac.secondary(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 0, 2, 4),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerHighest.withValues(alpha: _hover ? 0.9 : 0.6),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: scheme.onSurface.withValues(alpha: 0.07)),
-            ),
-            child: Row(children: [
-              Icon(Icons.search_rounded, size: 18, color: faint),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text('Search people, places',
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: TextSize.caption, color: faint)),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 6),
+      child: Semantics(
+        button: true,
+        label: 'Search',
+        child: MouseRegion(
+          cursor: SystemMouseCursors.text,
+          onEnter: (_) => setState(() => _hover = true),
+          onExit: (_) => setState(() => _hover = false),
+          child: GestureDetector(
+            onTap: widget.onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              height: 30,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: dark
+                    ? Colors.white.withValues(alpha: _hover ? 0.12 : 0.08)
+                    : Colors.black.withValues(alpha: _hover ? 0.08 : 0.055),
+                borderRadius: BorderRadius.circular(Mac.controlRadius),
               ),
-              _Key('Ctrl+K'),
-            ]),
+              child: Row(children: [
+                Icon(Icons.search_rounded, size: 16, color: faint),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text('Search',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: TextSize.caption, color: faint)),
+                ),
+                Text('Ctrl K',
+                    style: TextStyle(fontSize: TextSize.tiny, color: faint.withValues(alpha: 0.8), letterSpacing: 0.2)),
+              ]),
+            ),
           ),
         ),
       ),
@@ -382,25 +800,8 @@ class _SearchFieldState extends State<_SearchField> {
   }
 }
 
-class _Key extends StatelessWidget {
-  const _Key(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: scheme.onSurface.withValues(alpha: 0.12)),
-      ),
-      child: Text(text, style: TextStyle(fontSize: TextSize.tiny, color: scheme.onSurface.withValues(alpha: 0.55))),
-    );
-  }
-}
-
+/// "Library", "Sharing": the small grey label over a group of rows, as in
+/// Finder's sidebar. A short hairline in the rail.
 class _Group extends StatelessWidget {
   const _Group(this.title, {required this.wide});
 
@@ -411,27 +812,30 @@ class _Group extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!wide) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
-        child: Divider(height: 1, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08)),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        child: Divider(height: 0.5, thickness: 0.5, color: Mac.hairline(context)),
       );
     }
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 14, 12, 6),
-      child: Text(
-        title.toUpperCase(),
-        style: TextStyle(
-          fontSize: TextSize.tiny,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.9,
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.42),
+      padding: const EdgeInsets.fromLTRB(10, 16, 10, 4),
+      child: Semantics(
+        header: true,
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: TextSize.tiny,
+            fontWeight: FontWeight.w600,
+            color: Mac.secondary(context).withValues(alpha: 0.85),
+          ),
         ),
       ),
     );
   }
 }
 
-/// One sidebar row: icon (or a folder's cover photo), label and a count or
-/// a live dot. Just the icon in the rail.
+/// One sidebar row: an accent-tinted icon (or a folder's cover photo), the
+/// label and a count or a live dot, on a rounded grey selection. Just the
+/// icon in the rail.
 class _NavItem extends StatefulWidget {
   const _NavItem({
     required this.icon,
@@ -465,68 +869,70 @@ class _NavItem extends StatefulWidget {
 }
 
 class _NavItemState extends State<_NavItem> {
-  bool _hover = false;
+  bool _hover = false, _down = false;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final w = widget;
     final accent = scheme.primary;
-    final fg = w.selected
-        ? accent
-        : _hover
-            ? scheme.onSurface
-            : scheme.onSurface.withValues(alpha: w.faint ? 0.45 : 0.68);
+    final secondary = Mac.secondary(context);
+    final fg = w.faint ? secondary : scheme.onSurface;
+    final iconColor = w.faint ? secondary : accent;
     final icon = w.cover != null
         ? ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: SizedBox(width: 22, height: 22, child: AssetThumb(id: w.cover!, size: 64)),
+            borderRadius: BorderRadius.circular(4),
+            child: SizedBox(width: 18, height: 18, child: AssetThumb(id: w.cover!, size: 64)),
           )
-        : Icon(w.selected ? w.selectedIcon : w.icon, size: 20, color: fg);
+        : Icon(w.selected ? w.selectedIcon : w.icon, size: w.wide ? 18 : 20, color: iconColor);
     final trailing = w.live > 0
         ? Row(mainAxisSize: MainAxisSize.min, children: [
             const _LiveDot(),
             const SizedBox(width: 5),
             Text('${w.live}',
-                style: const TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w600, color: Color(0xFF30D158))),
+                style: const TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w600, color: Mac.green)),
           ])
         : w.count == null
             ? null
             : Text(w.count!,
                 style: TextStyle(
                   fontSize: TextSize.small,
-                  color: w.selected ? accent : scheme.onSurface.withValues(alpha: 0.42),
+                  color: secondary,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ));
-    Widget row = AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      margin: const EdgeInsets.symmetric(vertical: 1),
-      padding: w.wide ? const EdgeInsets.symmetric(horizontal: 11, vertical: 8) : const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        color: w.selected
-            ? accent.withValues(alpha: 0.14)
+    final fill = w.selected
+        ? Mac.selection(context)
+        : _down
+            ? Mac.selection(context)
             : _hover
-                ? scheme.onSurface.withValues(alpha: 0.05)
-                : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
+                ? Mac.hover(context)
+                : Colors.transparent;
+    final row = AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
+      height: w.wide ? 30 : 40,
+      margin: const EdgeInsets.symmetric(vertical: 1),
+      padding: w.wide ? const EdgeInsets.symmetric(horizontal: 8) : EdgeInsets.zero,
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(w.wide ? Mac.rowRadius : Mac.controlRadius),
       ),
       child: w.wide
           ? Row(children: [
-              icon,
-              const SizedBox(width: 11),
+              SizedBox(width: 20, child: Center(child: icon)),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   w.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: TextSize.label,
-                    fontWeight: w.selected ? FontWeight.w600 : FontWeight.w500,
+                    fontSize: TextSize.caption,
+                    fontWeight: w.selected ? FontWeight.w600 : FontWeight.w400,
                     color: fg,
                   ),
                 ),
               ),
-              ?trailing,
+              if (trailing != null) ...[const SizedBox(width: 6), trailing],
             ])
           : Center(
               child: Stack(clipBehavior: Clip.none, children: [
@@ -535,18 +941,6 @@ class _NavItemState extends State<_NavItem> {
               ]),
             ),
     );
-    if (w.wide && w.selected) {
-      // The accent bar on the left edge of the selected row.
-      row = Stack(children: [
-        row,
-        Positioned(
-          left: 0,
-          top: 10,
-          bottom: 10,
-          child: Container(width: 3, decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(3))),
-        ),
-      ]);
-    }
     return Tooltip(
       message: w.tooltip,
       waitDuration: Duration(milliseconds: w.wide ? 900 : 300),
@@ -559,7 +953,14 @@ class _NavItemState extends State<_NavItem> {
           cursor: SystemMouseCursors.click,
           onEnter: (_) => setState(() => _hover = true),
           onExit: (_) => setState(() => _hover = false),
-          child: GestureDetector(behavior: HitTestBehavior.opaque, onTap: w.onTap, child: row),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (_) => setState(() => _down = true),
+            onTapUp: (_) => setState(() => _down = false),
+            onTapCancel: () => setState(() => _down = false),
+            onTap: w.onTap,
+            child: row,
+          ),
         ),
       ),
     );
@@ -604,19 +1005,18 @@ class _LiveDotState extends State<_LiveDot> with SingleTickerProviderStateMixin 
 
   @override
   Widget build(BuildContext context) {
-    const green = Color(0xFF30D158);
     return AnimatedBuilder(
       animation: _pulse,
       builder: (context, _) => Container(
         width: 7,
         height: 7,
         decoration: BoxDecoration(
-          color: green,
+          color: Mac.green,
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: green.withValues(alpha: 0.6 * (1 - _pulse.value)),
-              spreadRadius: 7 * _pulse.value,
+              color: Mac.green.withValues(alpha: 0.55 * (1 - _pulse.value)),
+              spreadRadius: 6 * _pulse.value,
             ),
           ],
         ),
@@ -637,73 +1037,77 @@ class _ScanCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = controller;
     final scheme = Theme.of(context).colorScheme;
-    final faint = scheme.onSurface.withValues(alpha: 0.45);
+    final faint = Mac.secondary(context);
     final eta = c.eta;
     final faces = c.recentFaces.reversed.take(5).toList().reversed.toList();
     final progress = c.total == 0 ? null : (c.done / c.total).clamp(0.0, 1.0);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 4, 2, 6),
+      padding: const EdgeInsets.only(top: 6),
       child: Material(
-        color: scheme.surfaceContainerHighest.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(14),
+        color: Mac.card(context),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: Mac.hairline(context), width: 0.5),
+        ),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(
-          borderRadius: BorderRadius.circular(14),
           onTap: onOpen,
+          mouseCursor: SystemMouseCursors.click,
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(11, 9, 6, 11),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Icon(Icons.face_retouching_natural_rounded, size: 18, color: scheme.primary),
-                const SizedBox(width: 8),
+                Icon(Icons.face_retouching_natural_rounded, size: 16, color: scheme.primary),
+                const SizedBox(width: 7),
                 Expanded(
                   child: Text(
                     c.upgrading ? 'Updating face matching' : 'Scanning ${c.albumName ?? 'photos'}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w700),
+                    style: const TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w600),
                   ),
                 ),
                 TextButton(
                   style: TextButton.styleFrom(
-                    minimumSize: Size.zero,
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    minimumSize: const Size(0, 24),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     foregroundColor: faint,
-                    textStyle: const TextStyle(fontSize: TextSize.small),
+                    textStyle: const TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w500),
                   ),
                   onPressed: c.cancel,
                   child: const Text('Stop'),
                 ),
               ]),
               if (faces.isNotEmpty) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Row(children: [
                   SizedBox(
-                    height: 28,
-                    width: 28 + 21.0 * (faces.length - 1),
+                    height: 24,
+                    width: 24 + 17.0 * (faces.length - 1),
                     child: Stack(children: [
                       for (final (i, f) in faces.indexed)
-                        Positioned(left: 21.0 * i, child: _FaceDot(bytes: f, ring: scheme.surfaceContainerHighest)),
+                        Positioned(left: 17.0 * i, child: _FaceDot(bytes: f, ring: Mac.card(context))),
                     ]),
                   ),
                   const SizedBox(width: 8),
-                  Text('${c.facesFound} ${c.facesFound == 1 ? 'face' : 'faces'}', style: TextStyle(fontSize: TextSize.small, color: faint)),
+                  Text('${c.facesFound} ${c.facesFound == 1 ? 'face' : 'faces'}',
+                      style: TextStyle(fontSize: TextSize.small, color: faint)),
                 ]),
               ],
               const SizedBox(height: 8),
-              Text(
-                '${c.done} of ${c.total} photos'
-                '${eta == null ? '' : ' · ${_eta(eta)}'}',
-                style: TextStyle(fontSize: TextSize.small, color: faint),
-              ),
-              const SizedBox(height: 7),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(3),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 5,
-                  backgroundColor: scheme.onSurface.withValues(alpha: 0.08),
+              Padding(
+                padding: const EdgeInsets.only(right: 5),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: LinearProgressIndicator(value: progress, minHeight: 4),
                 ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${_thousands(c.done)} of ${_thousands(c.total)}'
+                '${eta == null ? '' : ' · ${_eta(eta)}'}',
+                style: TextStyle(fontSize: TextSize.tiny, color: faint, fontFeatures: const [FontFeature.tabularFigures()]),
               ),
             ]),
           ),
@@ -724,9 +1128,9 @@ class _FaceDot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 28,
-        height: 28,
-        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: ring, width: 2)),
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: ring, width: 1.5)),
         child: ClipOval(child: Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true)),
       );
 }
@@ -745,23 +1149,25 @@ class _ScanRing extends StatelessWidget {
     final progress = c.total == 0 ? null : (c.done / c.total).clamp(0.0, 1.0);
     return Tooltip(
       message: 'Scanning ${c.albumName ?? 'photos'} · ${c.done} of ${c.total}',
-      child: InkResponse(
-        onTap: onOpen,
-        radius: 24,
-        child: SizedBox(
-          height: 48,
-          child: Center(
-            child: SizedBox(
-              width: 36,
-              height: 36,
-              child: Stack(alignment: Alignment.center, children: [
-                CircularProgressIndicator(
-                  value: progress,
-                  strokeWidth: 3,
-                  backgroundColor: scheme.onSurface.withValues(alpha: 0.08),
-                ),
-                Icon(Icons.face_retouching_natural_rounded, size: 17, color: scheme.primary),
-              ]),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onOpen,
+          child: SizedBox(
+            height: 46,
+            child: Center(
+              child: SizedBox(
+                width: 32,
+                height: 32,
+                child: Stack(alignment: Alignment.center, children: [
+                  CircularProgressIndicator(
+                    value: progress,
+                    strokeWidth: 2.5,
+                    backgroundColor: scheme.onSurface.withValues(alpha: 0.1),
+                  ),
+                  Icon(Icons.face_retouching_natural_rounded, size: 15, color: scheme.primary),
+                ]),
+              ),
             ),
           ),
         ),
@@ -770,13 +1176,27 @@ class _ScanRing extends StatelessWidget {
   }
 }
 
+/// You, at the foot of the sidebar: opens Profile & settings.
 class _Profile extends StatefulWidget {
-  const _Profile({required this.wide, required this.thumb, required this.accent, required this.onTap});
+  const _Profile({
+    required this.wide,
+    required this.thumb,
+    required this.accent,
+    required this.onTap,
+    this.selected = false,
+    this.update = false,
+  });
 
   final bool wide;
   final Uint8List? thumb;
   final Color accent;
   final VoidCallback onTap;
+
+  /// Settings is open.
+  final bool selected;
+
+  /// A new version is waiting: a small badge, and the subtitle says so.
+  final bool update;
 
   @override
   State<_Profile> createState() => _ProfileState();
@@ -787,47 +1207,81 @@ class _ProfileState extends State<_Profile> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final avatar = CircleAvatar(
-      radius: 14,
-      backgroundColor: widget.accent.withValues(alpha: 0.18),
-      backgroundImage: widget.thumb == null ? null : MemoryImage(widget.thumb!),
-      child: widget.thumb == null ? Icon(Icons.person_rounded, size: 16, color: widget.accent) : null,
+    final faint = Mac.secondary(context);
+    final face = CircleAvatar(
+      radius: 13,
+      backgroundColor: widget.accent.withValues(alpha: 0.16),
+      backgroundImage: widget.thumb == null ? null : FaceImage(widget.thumb!),
+      child: widget.thumb == null ? Icon(Icons.person_rounded, size: 15, color: widget.accent) : null,
     );
-    return Tooltip(
-      message: 'Profile & settings',
-      waitDuration: Duration(milliseconds: widget.wide ? 900 : 300),
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hover = true),
-        onExit: (_) => setState(() => _hover = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding: EdgeInsets.symmetric(horizontal: widget.wide ? 10 : 0, vertical: 8),
-            decoration: BoxDecoration(
-              color: _hover ? scheme.onSurface.withValues(alpha: 0.05) : Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
+    final avatar = !widget.update
+        ? face
+        : Stack(clipBehavior: Clip.none, children: [
+            face,
+            Positioned(
+              right: -2,
+              top: -2,
+              child: Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: widget.accent,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Mac.sidebar(context), width: 2),
+                ),
+              ),
             ),
-            child: widget.wide
-                ? Row(children: [
-                    avatar,
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        const Text('You', style: TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w600)),
-                        Text('Profile & settings',
-                            style: TextStyle(fontSize: TextSize.small, color: scheme.onSurface.withValues(alpha: 0.45))),
-                      ]),
-                    ),
-                    Icon(Icons.settings_outlined, size: 20, color: scheme.onSurface.withValues(alpha: 0.45)),
-                  ])
-                : Center(child: avatar),
+          ]);
+    return Tooltip(
+      message: 'Profile & settings  (Ctrl+,)',
+      waitDuration: Duration(milliseconds: widget.wide ? 900 : 300),
+      child: Semantics(
+        button: true,
+        label: 'Profile and settings',
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _hover = true),
+          onExit: (_) => setState(() => _hover = false),
+          child: GestureDetector(
+            onTap: widget.onTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              height: 42,
+              padding: EdgeInsets.symmetric(horizontal: widget.wide ? 6 : 0),
+              decoration: BoxDecoration(
+                color: widget.selected
+                    ? Mac.selection(context)
+                    : _hover
+                        ? Mac.hover(context)
+                        : Colors.transparent,
+                borderRadius: BorderRadius.circular(Mac.controlRadius),
+              ),
+              child: widget.wide
+                  ? Row(children: [
+                      avatar,
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('You', style: TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w600)),
+                              Text(widget.update ? 'Update available' : 'Profile & settings',
+                                  style: TextStyle(
+                                    fontSize: TextSize.tiny,
+                                    color: widget.update ? widget.accent : faint,
+                                    fontWeight: widget.update ? FontWeight.w600 : null,
+                                  )),
+                            ]),
+                      ),
+                      Icon(Icons.settings_outlined, size: 17, color: faint),
+                      const SizedBox(width: 4),
+                    ])
+                  : Center(child: avatar),
+            ),
           ),
         ),
       ),
     );
   }
 }
-

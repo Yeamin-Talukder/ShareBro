@@ -10,6 +10,7 @@ import 'anim.dart';
 import 'person_screen.dart';
 import 'photo_info.dart';
 import 'theme.dart';
+import 'face_image.dart';
 
 /// The viewer is always dark, whatever the app theme, so the panel uses
 /// fixed colours rather than the theme's.
@@ -231,11 +232,11 @@ class _PersonRow extends StatelessWidget {
         ),
       );
     } else {
-      final img = CircleAvatar(radius: 19, backgroundImage: MemoryImage(person.thumb));
+      final img = CircleAvatar(radius: 19, backgroundImage: FaceImage(person.thumb));
       avatar = unnamed
           ? CustomPaint(
               foregroundPainter: _DashedRing(color: _accent),
-              child: Padding(padding: const EdgeInsets.all(3), child: CircleAvatar(radius: 16, backgroundImage: MemoryImage(person.thumb))),
+              child: Padding(padding: const EdgeInsets.all(3), child: CircleAvatar(radius: 16, backgroundImage: FaceImage(person.thumb))),
             )
           : img;
     }

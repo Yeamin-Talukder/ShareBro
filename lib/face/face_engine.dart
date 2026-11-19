@@ -4,14 +4,17 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 import 'package:image/image.dart' as img;
 import 'package:onnxruntime/onnxruntime.dart';
+import 'package:path/path.dart' as p;
 import 'package:tflite_flutter/tflite_flutter.dart';
 
 import '../data/db.dart';
+import '../platform/app_dirs.dart';
 import '../platform/device.dart';
 import 'accel.dart';
 import 'scrfd.dart';
@@ -20,6 +23,7 @@ import 'ort_lite.dart';
 import 'tags.dart' show differenceHash;
 
 part 'face_engine_desktop.dart';
+part 'face_finder_gpu.dart';
 
 /// InsightFace's MobileFaceNet trained on WebFace600K (`w600k_mbf` from the
 /// buffalo_s pack, converted to TensorFlow Lite): a 512-number fingerprint
@@ -86,12 +90,22 @@ abstract class FaceEngine {
   /// preview and the duplicate fingerprint made in the same pass (no JPEG
   /// written or read). Faces narrower than [minFace] pixels are skipped;
   /// with [skipFaces] only the preview and hash are made. Null on phones,
-  /// which scan through [analyze].
+  /// which scan through [analyze]. Without [preview] the live-view JPEG
+  /// is skipped (it's the costliest extra).
   Future<RgbaScan?> analyzeRgba(TransferableTypedData pixels, int w, int h,
-      {required double minFace, bool skipFaces = false});
+      {required double minFace, bool skipFaces = false, bool preview = true});
 
   /// How many photos the engine works on at once (desktop runs several).
   int get parallel => 1;
+
+  /// Phones: how many photos can be with the graphics-chip face finder at
+  /// once, next to ML Kit's; 0 when it isn't running.
+  int get gpuLanes => 0;
+
+  /// Phones: faces found by the graphics-chip face finder instead of ML Kit
+  /// (no smile or open-eye scores). Throws when it can't; ML Kit
+  /// ([analyze]) then takes the photo.
+  Future<List<NewFace>> analyzeOnGpu(String imagePath);
 
   /// Desktop: one of the face workers runs on the graphics chip.
   bool get onGpu => false;
@@ -101,7 +115,7 @@ abstract class FaceEngine {
 
 /// What [FaceEngine.analyzeRgba] found in one photo.
 class RgbaScan {
-  RgbaScan(this.faces, this.preview, this.hash);
+  RgbaScan(this.faces, this.preview, this.hash, {this.micros});
 
   final List<NewFace> faces;
 
@@ -110,6 +124,10 @@ class RgbaScan {
 
   /// Duplicate fingerprint (see [differenceHash]).
   final int? hash;
+
+  /// Time per stage in the face worker, in microseconds; only when built
+  /// with `SB_SCAN_TIMING` (see `tool/scan_bench.dart`).
+  final Map<String, int>? micros;
 }
 
 /// Faces narrower than this are skipped, measured on a [scanLongSide]
@@ -120,7 +138,7 @@ const minFacePx = _minFacePx;
 /// phone's NPU or GPU when one is there and quicker than the CPU (see
 /// [AccelState]).
 class _PhoneFaceEngine implements FaceEngine {
-  _PhoneFaceEngine._(this._detector, this._labeler, this._worker);
+  _PhoneFaceEngine._(this._detector, this._labeler, this._worker, this._gpuFinder);
 
   final FaceDetector _detector;
 
@@ -131,14 +149,21 @@ class _PhoneFaceEngine implements FaceEngine {
   /// GPU and NPU are only ever touched from one place.
   final _EmbedWorker _worker;
 
+  /// Finds faces on the graphics chip at the same time as ML Kit on the
+  /// CPU; null where the chip doesn't work, or Settings asks for the CPU.
+  final _GpuFinder? _gpuFinder;
+
   static Future<FaceEngine> load({AccelChoice chip = AccelChoice.auto}) async {
     final model = await rootBundle.load(_modelAsset);
+    // Both start together: the graphics chip takes a moment to set up.
+    final finder = chip == AccelChoice.cpu || _gpuLanesWanted <= 0 ? null : _GpuFinder.start();
     final worker = await _EmbedWorker.start(_workerMain, _WorkerSetup(
       model: TransferableTypedData.fromList([model.buffer.asUint8List(model.offsetInBytes, model.lengthInBytes)]),
       statePath: await accelStatePath(),
       stateKey: accelStateKey(faceModelId),
       chip: chip,
     ));
+    final gpuFinder = await finder;
     final detector = FaceDetector(
       options: FaceDetectorOptions(
         enableLandmarks: true,
@@ -150,7 +175,22 @@ class _PhoneFaceEngine implements FaceEngine {
     );
     final labeler = ImageLabeler(
         options: ImageLabelerOptions(confidenceThreshold: _minLabelConfidence));
-    return _PhoneFaceEngine._(detector, labeler, worker);
+    return _PhoneFaceEngine._(detector, labeler, worker, gpuFinder);
+  }
+
+  @override
+  int get gpuLanes => _gpuFinder?.working ?? false ? _gpuLanesWanted : 0;
+
+  @override
+  Future<List<NewFace>> analyzeOnGpu(String imagePath) async {
+    final finder = _gpuFinder;
+    if (finder == null || !finder.working) throw StateError('No graphics-chip face finder');
+    final decoded = await _decodeRgba(imagePath);
+    if (decoded == null) return const [];
+    final (pixels, w, h) = decoded;
+    final found = await finder.find(pixels, w, h);
+    if (found.boxes.isEmpty) return const [];
+    return _worker.ask<List<NewFace>>(_EmbedJob(found.pixels, w, h, found.boxes));
   }
 
   @override
@@ -194,17 +234,19 @@ class _PhoneFaceEngine implements FaceEngine {
 
   @override
   Future<RgbaScan?> analyzeRgba(TransferableTypedData pixels, int w, int h,
-          {required double minFace, bool skipFaces = false}) async =>
+          {required double minFace, bool skipFaces = false, bool preview = true}) async =>
       null;
 
+  /// The graphics chip finds faces too.
   @override
-  bool get onGpu => false;
+  bool get onGpu => _gpuFinder?.working ?? false;
 
   @override
   int get parallel => 1;
 
   @override
   void dispose() {
+    _gpuFinder?.stop();
     _worker.stop();
     _detector.close();
     _labeler.close();

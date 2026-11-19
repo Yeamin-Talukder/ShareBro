@@ -177,11 +177,367 @@ class _TripGroupScreenState extends State<TripGroupScreen> {
           listenable: Listenable.merge([hub, c.sharing, c]),
           builder: (context, _) {
             final g = hub.group;
+            if (DesktopLayout.on) return g == null ? _deskLobby(context) : _deskInGroup(context, g);
             return g == null ? _lobby(context) : _inGroup(context, g);
           },
         ),
       ),
     );
+  }
+
+  // ---- Desktop: two columns, like Send & receive ----
+
+  Widget _deskHeader(BuildContext context, String title, String subtitle) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 24, 14),
+      child: Row(children: [
+        if (Navigator.of(context).canPop()) ...[
+          GlassIconButton(
+            tooltip: 'Back (Esc)',
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => Navigator.maybePop(context),
+          ),
+          const SizedBox(width: 10),
+        ],
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(color: const Color(0xFF30D158), borderRadius: BorderRadius.circular(11)),
+          child: const Icon(Icons.diversity_3_rounded, color: Colors.white, size: 26),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: text.headlineSmall),
+            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant)),
+          ]),
+        ),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(controller: c))),
+          icon: const Icon(Icons.account_circle_rounded, size: 17),
+          label: const Text('Profile'),
+        ),
+      ]),
+    );
+  }
+
+  /// A numbered step title, as on Send & receive.
+  Widget _deskStep(BuildContext context, int n, String title, String subtitle, {bool done = false}) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: done ? Mac.green : scheme.primary),
+          child: Center(
+            child: done
+                ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+                : Text('$n', style: TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w700, color: scheme.onPrimary)),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: const TextStyle(fontSize: TextSize.callout, fontWeight: FontWeight.w700)),
+            Text(subtitle, style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _deskLobby(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final start = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _deskStep(context, 1, 'Start a group', 'Name the trip; friends join with a code', done: false),
+      if (!c.profile.isSet) ...[
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFF9F0A).withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(Mac.cardRadius),
+          ),
+          child: Row(children: [
+            const IconTile(icon: Icons.face_retouching_natural_rounded, color: Color(0xFFFF9F0A)),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text('Set up your face first, once. Groups use it to find the photos you\'re in.',
+                  style: TextStyle(fontSize: TextSize.caption)),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(controller: c))),
+              child: const Text('Set up'),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 12),
+      ],
+      SectionCard(
+        padding: const EdgeInsets.all(18),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('Trip name', style: TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant)),
+          const SizedBox(height: 6),
+          Row(children: [
+            Expanded(
+              child: TextField(
+                controller: _name,
+                textCapitalization: TextCapitalization.words,
+                onSubmitted: (_) => _start(),
+                decoration: const InputDecoration(hintText: 'e.g. Goa trip'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+              onPressed: _start,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Start group'),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          Text('You get a 4-digit code to give your friends.',
+              style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
+        ]),
+      ),
+    ]);
+    final join = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(child: _deskStep(context, 2, 'Or join one nearby', 'Groups started on this Wi‑Fi or hotspot')),
+        hub.searching
+            ? const Padding(
+                padding: EdgeInsets.only(top: 4, right: 6),
+                child: SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+              )
+            : TextButton.icon(
+                onPressed: hub.search,
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Look again'),
+              ),
+      ]),
+      if (hub.nearby.isEmpty)
+        SectionCard(
+          padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+          child: Column(children: [
+            Icon(Icons.wifi_find_rounded, size: 36, color: scheme.onSurfaceVariant)
+                .animate(onPlay: (a) => a.repeat(reverse: true))
+                .fade(begin: 1, end: 0.45, duration: 1100.ms),
+            const SizedBox(height: 10),
+            Text(hub.searching ? 'Looking for groups…' : 'No groups nearby yet',
+                style: const TextStyle(fontSize: TextSize.label, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Text('Be on the same Wi‑Fi or hotspot as the device that started it.',
+                textAlign: TextAlign.center, style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
+          ]),
+        )
+      else
+        SectionCard.rows(rows: [
+          for (final g in hub.nearby)
+            SectionRow(
+              leading: const IconTile(icon: Icons.luggage_rounded, color: Color(0xFF5E9BFF)),
+              title: g.name,
+              subtitle: 'Started by ${g.hostAlias} · ${g.count} ${g.count == 1 ? 'device' : 'devices'}',
+              trailing: FilledButton(onPressed: () => _join(g), child: const Text('Join')),
+              onTap: () => _join(g),
+            ),
+        ]).animate().fadeIn(),
+    ]);
+    Widget how(IconData icon, Color color, String title, String text) => Expanded(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            IconTile(icon: icon, color: color),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title, style: const TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w600)),
+                Text(text, style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
+              ]),
+            ),
+          ]),
+        );
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _deskHeader(context, 'Trip group', 'Everyone shares their photos; each photo goes only to the people in it'),
+      Expanded(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1080),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                LayoutBuilder(
+                  builder: (context, box) => box.maxWidth >= 760
+                      ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Expanded(child: start),
+                          const SizedBox(width: 20),
+                          Expanded(child: join),
+                        ])
+                      : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [start, const SizedBox(height: 22), join]),
+                ),
+                const SizedBox(height: 26),
+                SectionCard(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    how(Icons.group_add_rounded, const Color(0xFF30D158), 'Start or join', 'One device starts; others type its code'),
+                    const SizedBox(width: 16),
+                    how(Icons.face_rounded, const Color(0xFFFF9F0A), 'Everyone\'s face', 'Set once in Profile, to find who\'s in each photo'),
+                    const SizedBox(width: 16),
+                    how(Icons.lock_person_rounded, const Color(0xFF0A84FF), 'Only to who\'s in it', 'Each photo goes just to the people in it'),
+                  ]),
+                ),
+                const SectionFooter(
+                  'Everyone needs ShareBro. Devices talk over the same Wi‑Fi or a hotspot; nothing goes through the internet.',
+                ),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _deskInGroup(BuildContext context, TripGroup g) {
+    final scheme = Theme.of(context).colorScheme;
+    final members = g.members.values.toList();
+    final me = c.sharing.identity.fingerprint;
+    final jobs = [for (final j in c.sharing.jobs) if (j.groupId == g.id) j];
+    final ready = members.where((m) => m.faces.isNotEmpty).length;
+    final left = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      SectionCard(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (g.hosting) ...[
+            Text('Join code', style: TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant)),
+            const SizedBox(height: 10),
+            Row(children: [
+              for (final (i, d) in g.code.split('').indexed)
+                Container(
+                  width: 54,
+                  height: 64,
+                  margin: const EdgeInsets.only(right: 8),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(d,
+                      style: TextStyle(fontSize: TextSize.title1, fontWeight: FontWeight.w800, color: scheme.primary)),
+                ).animate().fadeIn(delay: (70 * i).ms).moveY(begin: 6, curve: Curves.easeOutCubic),
+            ]),
+            const SizedBox(height: 10),
+            Text('Friends open ShareBro › Trip group, pick "${g.name}" and type this code.',
+                style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
+            const SizedBox(height: 18),
+          ] else ...[
+            Row(children: [
+              Icon(Icons.check_circle_rounded, color: Mac.green, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('You\'re in ${g.name}',
+                    style: const TextStyle(fontSize: TextSize.label, fontWeight: FontWeight.w600)),
+              ),
+            ]),
+            const SizedBox(height: 4),
+            Text('Started by ${g.host?.alias ?? 'a friend'}. Photos from the group arrive without asking.',
+                style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
+            const SizedBox(height: 18),
+          ],
+          FilledButton.icon(
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+            onPressed: members.length < 2 ? null : () => _share(g),
+            icon: const Icon(Icons.photo_library_rounded, size: 18),
+            label: Text(members.length < 2 ? 'Waiting for friends to join' : 'Pick photos to share'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(foregroundColor: scheme.error, minimumSize: const Size.fromHeight(38)),
+            onPressed: () => _leave(g),
+            icon: const Icon(Icons.logout_rounded, size: 17),
+            label: Text(g.hosting ? 'End the group' : 'Leave the group'),
+          ),
+        ]),
+      ),
+      const SectionFooter(
+        'While the group is open, members\' devices accept photos from each other without asking. It lasts until '
+        'it\'s ended or ShareBro is closed on the device that started it.',
+      ),
+    ]);
+    final right = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        const Text('Members', style: TextStyle(fontSize: TextSize.callout, fontWeight: FontWeight.w700)),
+        const SizedBox(width: 8),
+        Text('$ready of ${members.length} ready', style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
+      ]),
+      const SizedBox(height: 10),
+      SectionCard(
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 14),
+        child: Wrap(runSpacing: 14, children: [
+          for (final m in members)
+            SizedBox(
+              width: 86,
+              child: Column(children: [
+                Stack(clipBehavior: Clip.none, children: [
+                  MemberAvatar(member: m, size: 56),
+                  Positioned(
+                    right: -3,
+                    bottom: -3,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: m.faces.isNotEmpty ? Mac.green : scheme.surfaceContainerHighest,
+                        border: Border.all(color: Mac.card(context), width: 2.5),
+                      ),
+                      child: Icon(m.faces.isNotEmpty ? Icons.check_rounded : Icons.more_horiz_rounded,
+                          size: 12, color: m.faces.isNotEmpty ? Colors.white : scheme.onSurfaceVariant),
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 6),
+                Text(m.fingerprint == me ? 'You' : _short(m.alias),
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w600)),
+                Text(m.faces.isEmpty ? 'No face yet' : 'Ready',
+                    style: TextStyle(fontSize: TextSize.tiny, color: m.faces.isEmpty ? scheme.onSurfaceVariant : Mac.green)),
+              ]),
+            ).animate(key: ValueKey(m.fingerprint)).fadeIn(duration: 250.ms).scaleXY(begin: 0.9, curve: Curves.easeOutCubic),
+        ]),
+      ),
+      if (jobs.isNotEmpty) ...[
+        const SizedBox(height: 18),
+        const Text('Sending', style: TextStyle(fontSize: TextSize.callout, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 10),
+        SectionCard.rows(rows: [for (final j in jobs) _jobRow(context, g, j)]),
+      ],
+    ]);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _deskHeader(
+        context,
+        g.name,
+        g.hosting ? 'Trip group · you started it' : 'Trip group · started by ${g.host?.alias ?? 'a friend'}',
+      ),
+      Expanded(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1080),
+              child: LayoutBuilder(
+                builder: (context, box) => box.maxWidth >= 760
+                    ? Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Expanded(flex: 10, child: left),
+                        const SizedBox(width: 20),
+                        Expanded(flex: 11, child: right),
+                      ])
+                    : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [left, const SizedBox(height: 20), right]),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ]);
   }
 
   Widget _lobby(BuildContext context) {

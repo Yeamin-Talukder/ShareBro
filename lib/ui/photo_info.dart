@@ -11,6 +11,7 @@ import 'widgets.dart';
 import '../platform/desktop_library.dart';
 import '../platform/device.dart';
 import '../scan/scan_item.dart';
+import 'face_image.dart';
 
 /// Bottom sheet with a photo's date, size, resolution, location and the
 /// people recognised in it.
@@ -172,7 +173,7 @@ class _PhotoInfoState extends State<PhotoInfoPanel> {
                               for (final (i, p) in info.people.indexed)
                                 ActionChip(
                                   avatar: CircleAvatar(
-                                      backgroundImage: MemoryImage(p.thumb)),
+                                      backgroundImage: FaceImage(p.thumb)),
                                   label: Text(p.displayName),
                                   onPressed: () {
                                     final nav = Navigator.of(context);

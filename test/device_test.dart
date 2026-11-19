@@ -24,7 +24,8 @@ void main() {
     expect(Device.systemNotifications, isFalse);
     expect(Device.nearbyNoNetwork, isFalse);
     expect(Device.installedApps, isFalse);
-    expect(Device.selfUpdate, isFalse);
+    // Windows updates itself from GitHub (its own installer).
+    expect(Device.selfUpdate, isTrue);
   });
 
   testWidgets('desktop placeholder points to the Share tab', (tester) async {

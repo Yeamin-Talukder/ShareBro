@@ -2,7 +2,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'island.dart' show islandNavigator;
+import 'desktop_shell.dart' show DesktopNav;
+import 'island.dart' show desktopPages, islandNavigator;
 import 'theme.dart';
 
 /// Keys and mouse buttons that work on every desktop page: back (Esc,
@@ -48,33 +49,62 @@ class _DesktopKeysState extends State<DesktopKeys> {
       if (context != null && !_sheetOpen) showShortcuts(context);
       return true;
     }
+    // Alt + Right: forward, as in a browser.
+    if (k == LogicalKeyboardKey.arrowRight && keys.isAltPressed) {
+      _forward();
+      return true;
+    }
+    final esc = k == LogicalKeyboardKey.escape;
     final back = (k == LogicalKeyboardKey.arrowLeft && keys.isAltPressed) ||
-        (k == LogicalKeyboardKey.escape && DesktopKeys.escClaims.isEmpty && !keys.isControlPressed);
+        (esc && DesktopKeys.escClaims.isEmpty && !keys.isControlPressed);
     if (!back) return false;
     // Esc in a text box clears or closes that box first (its own job).
-    if (k == LogicalKeyboardKey.escape && _typing()) return false;
-    _back();
+    if (esc && _typing()) return false;
+    // Esc only closes pages; Alt + Left also goes back to the main page
+    // shown before.
+    _back(pages: !esc);
     // Esc also reaches dialogs and menus, which close themselves.
     return k != LogicalKeyboardKey.escape;
   }
 
-  void _back() {
-    final nav = islandNavigator.currentState;
+  void _back({bool pages = true}) {
+    final root = islandNavigator.currentState;
+    if (root == null) return;
     // Dialogs, sheets and menus handle Esc on their own; only pages go back.
-    if (nav == null || !nav.canPop()) return;
+    if (root.canPop()) {
+      if (_topIsPage(root)) root.maybePop();
+      return;
+    }
+    // The desktop window keeps a browser-like history (Forward too).
+    if (DesktopNav.back(pages: pages)) return;
+    // Pages open beside the sidebar, in the content area's own navigator.
+    final content = desktopPages.currentState;
+    if (content == null || !content.canPop()) return;
+    if (_topIsPage(content)) content.maybePop();
+  }
+
+  void _forward() {
+    final root = islandNavigator.currentState;
+    if (root == null || root.canPop()) return;
+    DesktopNav.forward();
+  }
+
+  static bool _topIsPage(NavigatorState nav) {
     var top = true;
     nav.popUntil((route) {
       top = route is PageRoute;
       return true;
     });
-    if (top) nav.maybePop();
+    return top;
   }
 
   @override
   Widget build(BuildContext context) => Listener(
         // The Back button on the side of a mouse.
         onPointerDown: (e) {
-          if (e.kind == PointerDeviceKind.mouse && e.buttons & kBackMouseButton != 0) _back();
+          if (e.kind != PointerDeviceKind.mouse) return;
+          if (e.buttons & kBackMouseButton != 0) _back();
+          if (e.buttons & kForwardMouseButton != 0) _forward();
         },
         child: widget.child,
       );
@@ -98,16 +128,22 @@ const _groups = <(String, List<(String, String)>)>[
     ('Ctrl  1 – 4', 'People, Photos, Explore, Share'),
     ('Ctrl  ,', 'Settings'),
     ('Ctrl  O', 'Add a folder of photos'),
-    ('Esc  ·  Alt  ←  ·  mouse Back', 'Go back'),
+    ('Esc  ·  Alt  ←  ·  mouse Back  ·  two-finger swipe right', 'Go back'),
+    ('Alt  →  ·  mouse Forward  ·  two-finger swipe left', 'Go forward'),
     ('F1  ·  Ctrl  /', 'This list'),
   ]),
   ('Photos', [
-    ('← → ↑ ↓', 'Move between photos'),
-    ('Enter', 'Open'),
-    ('Space', 'Select'),
+    ('Click', 'Select a photo'),
+    ('Double-click  ·  Enter', 'Open'),
+    ('Drag', 'Select with a box (hold Ctrl to add)'),
     ('Shift  click  ·  Shift  arrows', 'Select a range'),
-    ('Ctrl  click', 'Add to the selection'),
+    ('Ctrl  click  ·  Space', 'Add to or take from the selection'),
+    ('Ctrl  Shift  click', 'Add a range'),
     ('Ctrl  A', 'Select all'),
+    ('Click', 'Clear the selection (on empty space)'),
+    ('Esc', 'Clear the selection'),
+    ('← → ↑ ↓', 'Move between photos'),
+    ('F5  ·  Ctrl  R', 'Refresh'),
     ('Delete', 'Move to the Recycle Bin'),
     ('Right-click', 'More actions'),
     ('Pinch  ·  Ctrl  wheel  ·  Ctrl  + / −', 'Bigger or smaller photos'),
@@ -196,7 +232,7 @@ class _Key extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    if (label == '·' || label == 'click' || label == 'wheel' || label == 'arrows' || label.contains('swipe') ||
+    if (label == '·' || label == 'click' || label == 'Click' || label == 'Drag' || label == 'wheel' || label == 'arrows' || label.contains('swipe') ||
         label == 'Pinch' || label == 'Right-click' || label == 'Double-click' || label.startsWith('mouse')) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),

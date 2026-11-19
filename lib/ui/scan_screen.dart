@@ -14,6 +14,7 @@ import 'glass.dart';
 import 'sections.dart';
 import 'theme.dart';
 import 'widgets.dart';
+import 'scan_helper_ui.dart';
 
 /// Full-screen scan progress: a rolling photo count and a live stream of
 /// faces popping in as they're found, then a celebration when done.
@@ -194,6 +195,7 @@ class _ScanScreenState extends State<ScanScreen> {
                   ),
                 ),
               ),
+              ScanHelperBadge(controller: c),
               const SizedBox(height: 16),
               SectionCard(
                 child: IntrinsicHeight(
@@ -205,6 +207,14 @@ class _ScanScreenState extends State<ScanScreen> {
                       color: const Color(0xFF5E5CE6),
                       value: c.peopleSoFar == 0 ? '–' : '≈ ${c.peopleSoFar}',
                       label: 'people so far',
+                    ),
+                    const VerticalDivider(width: 0.5, thickness: 0.5, indent: 14, endIndent: 14),
+                    _Stat(
+                      icon: Icons.speed_rounded,
+                      color: const Color(0xFF34C759),
+                      value: c.photosPerSecond == null ? '–' : formatRate(c.photosPerSecond!),
+                      label: 'photos/s',
+                      bounce: false,
                     ),
                     const VerticalDivider(width: 0.5, thickness: 0.5, indent: 14, endIndent: 14),
                     _Stat(
@@ -567,17 +577,24 @@ class _ScanPainter extends CustomPainter {
 /// One number in the stats card, with a Settings-style icon; it bumps when
 /// it changes.
 class _Stat extends StatelessWidget {
-  const _Stat({required this.icon, required this.color, required this.value, required this.label});
+  const _Stat({required this.icon, required this.color, required this.value, required this.label, this.bounce = true});
 
   final IconData icon;
   final Color color;
   final String value, label;
 
+  /// Bounce when the value changes (not for ones that change constantly).
+  final bool bounce;
+
   @override
   Widget build(BuildContext context) {
+    final number = Text(value,
+        maxLines: 1,
+        style: const TextStyle(
+            fontSize: TextSize.title3, fontWeight: FontWeight.w800, fontFeatures: [FontFeature.tabularFigures()]));
     return Expanded(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+        padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
             width: 28,
@@ -586,13 +603,19 @@ class _Stat extends StatelessWidget {
             child: Icon(icon, size: 17, color: Colors.white),
           ),
           const SizedBox(height: 6),
-          Text(value,
-                  maxLines: 1,
-                  style: const TextStyle(
-                      fontSize: TextSize.title3, fontWeight: FontWeight.w800, fontFeatures: [FontFeature.tabularFigures()]))
-              .animate(key: ValueKey(value))
-              .scaleXY(begin: 1.25, alignment: Alignment.centerLeft, duration: 450.ms, curve: Curves.elasticOut),
-          Text(label, maxLines: 1, style: TextStyle(fontSize: TextSize.small, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: bounce
+                ? number
+                    .animate(key: ValueKey(value))
+                    .scaleXY(begin: 1.25, alignment: Alignment.centerLeft, duration: 450.ms, curve: Curves.elasticOut)
+                : number,
+          ),
+          Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: TextSize.small, color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ]),
       ),
     );

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math' as math;
+import 'dart:ui' as ui show ImageByteFormat, instantiateImageCodec;
 import 'dart:ui' show Rect;
 
 import 'package:flutter/foundation.dart';
@@ -31,6 +32,9 @@ import 'scan_item.dart';
 import '../platform/desktop_library.dart';
 import '../data/people_sync.dart';
 import '../share/people_link.dart';
+import '../share/protocol.dart' show LsDevice, LsDeviceType, LsInfo;
+import '../platform/app_dirs.dart';
+import '../share/scan_helper.dart';
 
 /// Longest side of the image the face finder looks at. Bigger finds smaller
 /// faces in group shots but is slower.
@@ -53,6 +57,11 @@ const _inFlight = 3;
 /// this (by halves, quarters or eighths; see [DesktopScanItem.decodePixels]).
 /// The face finder looks at 640 px and faces are cropped to 112 px.
 const _desktopDecodeAtLeast = 1000;
+
+/// Desktop scans make a live-view picture at most this often. Making one
+/// for every photo took about a third of the face workers' time
+/// (tool/scan_bench.dart), and the screen can't show 15 a second anyway.
+const _desktopPreviewEvery = Duration(milliseconds: 250);
 
 /// Scanned photos are saved together, this many at a time (or every
 /// couple of seconds), instead of each step of each photo on its own.
@@ -121,6 +130,10 @@ class FaceReview extends ReviewItem {
   final double similarity;
 }
 
+/// Where a phone scan lane finds faces: ML Kit here, the graphics chip
+/// here, or your computer.
+enum _Via { here, gpu, computer }
+
 /// Runs scans and grouping, and tells the UI what's happening.
 class ScanController extends ChangeNotifier {
   ScanController(this.db);
@@ -132,6 +145,11 @@ class ScanController extends ChangeNotifier {
   String get engineSummary {
     final e = _engine;
     if (e == null) return 'not loaded';
+    if (!Device.desktop) {
+      return 'ML Kit on $_inFlight lanes'
+          '${e.gpuLanes > 0 ? ', graphics chip on ${e.gpuLanes}' : ''}'
+          '${helper != null ? ', computer on $_helperLanes' : ''}';
+    }
     return '${e.parallel} worker${e.parallel == 1 ? '' : 's'}${e.onGpu ? ', graphics chip' : ''}';
   }
 
@@ -148,6 +166,9 @@ class ScanController extends ChangeNotifier {
   int facesFound = 0;
   String? error;
   DateTime? _startedAt;
+
+  /// When a desktop photo last asked for a live-view picture.
+  DateTime _lastPreviewAsked = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Newest first; drives the live face stream on the scan screen.
   final List<Uint8List> recentFaces = [];
@@ -202,10 +223,222 @@ class ScanController extends ChangeNotifier {
   /// Your face, set up once in Profile.
   FaceProfile profile = FaceProfile(faces: const []);
 
+  // ---- Scanning with your computer's help ----
+
+  /// Desktop: scanning for your phones.
+  ScanHelperHub? scanHelper;
+
+  /// Phone: the computer paired to help (its fingerprint and name, and the
+  /// key it gave us), and whether to use it.
+  String? helperPc, helperPcName;
+  String? _helperKey;
+  bool helperOn = true;
+
+  /// Phone: days the computer may remember face results (0 is off; see
+  /// [scanHelpKeepChoices]). The computer follows this phone's choice.
+  int helperKeepDays = 0;
+
+  /// Phone, while scanning: the computer helping, and photos it scanned.
+  ScanHelperClient? helper;
+  int helperPhotos = 0;
+
+  /// Phone: photos whose faces the graphics chip found this scan.
+  int gpuPhotos = 0;
+
+  static const _helperPcKey = 'scan_helper_pc';
+  static const _helperNameKey = 'scan_helper_name';
+  static const _helperKeyKey = 'scan_helper_key';
+  static const _helperOnKey = 'scan_helper_on';
+  static const _helperKeepKey = 'scan_helper_keep';
+  static const _helperIpKey = 'scan_helper_ip';
+  static const _helperPortKey = 'scan_helper_port';
+
+  /// Desktop: the server and discovery are kept open (findable on this
+  /// Wi‑Fi) while helping phones is allowed.
+  bool _helperListening = false;
+
+  Future<void> _syncHelperListening() async {
+    final want = Device.desktop && (scanHelper?.allowed ?? false);
+    if (want && !_helperListening) {
+      _helperListening = true;
+      await sharing.open();
+    } else if (!want && _helperListening) {
+      _helperListening = false;
+      await sharing.close();
+    }
+  }
+
+  /// Phone: remembers where the computer was, to try it there when it
+  /// isn't heard announcing itself.
+  Future<void> _saveHelperAddress(LsDevice pc) async {
+    await db.setSetting(_helperIpKey, pc.ip);
+    await db.setSetting(_helperPortKey, '${pc.info.port}');
+  }
+
+  /// The paired computer at the address it had last time.
+  Future<LsDevice?> _lastKnownHelper() async {
+    final fp = helperPc;
+    final ip = await db.setting(_helperIpKey);
+    final port = int.tryParse(await db.setting(_helperPortKey) ?? '');
+    if (fp == null || ip == null || ip.isEmpty || port == null) return null;
+    return LsDevice(
+      info: LsInfo(
+        alias: helperPcName ?? 'Computer',
+        fingerprint: fp,
+        deviceModel: 'ShareBro',
+        deviceType: LsDeviceType.desktop,
+        port: port,
+        protocol: 'https',
+      ),
+      ip: ip,
+      lastSeen: DateTime.now(),
+    );
+  }
+
+  /// Photo lanes the computer takes while it helps (the phone keeps its
+  /// own [_inFlight]).
+  static const _helperLanes = 4;
+
+  Future<void> _loadHelper() async {
+    helperPc = await db.setting(_helperPcKey);
+    helperPcName = await db.setting(_helperNameKey);
+    _helperKey = await db.setting(_helperKeyKey);
+    helperOn = await db.setting(_helperOnKey) != '0';
+    final keep = int.tryParse(await db.setting(_helperKeepKey) ?? '') ?? 0;
+    helperKeepDays = scanHelpKeepChoices.contains(keep) ? keep : 0;
+    if (helperPc != null && helperPc!.isEmpty) helperPc = null;
+  }
+
+  /// ShareBro computers on this Wi‑Fi that could help.
+  List<LsDevice> get helperCandidates => [
+        for (final d in sharing.discovery.devices)
+          if (d.info.deviceModel == 'ShareBro' &&
+              d.info.deviceType == LsDeviceType.desktop &&
+              d.fingerprint != sharing.identity.fingerprint)
+            d,
+      ];
+
+  /// The paired computer, if it's on this Wi‑Fi now.
+  LsDevice? get helperNearby => helperCandidates.where((d) => d.fingerprint == helperPc).firstOrNull;
+
+  /// Phone: pairs [pc] (it asks there, showing [code]) and remembers it.
+  Future<void> pairHelper(LsDevice pc, String code) async {
+    String? key;
+    final client = await ScanHelperClient.connect(pc,
+        me: sharing.identity, faceModel: faceModelId, code: code, onKey: (k) => key = k);
+    client.close();
+    helperPc = pc.fingerprint;
+    helperPcName = client.alias;
+    _helperKey = key ?? _helperKey;
+    await _saveHelperAddress(pc);
+    helperOn = true;
+    await db.setSetting(_helperPcKey, pc.fingerprint);
+    await db.setSetting(_helperNameKey, client.alias);
+    if (_helperKey != null) await db.setSetting(_helperKeyKey, _helperKey!);
+    await db.setSetting(_helperOnKey, '1');
+    notifyListeners();
+  }
+
+  Future<void> forgetHelper() async {
+    helperPc = helperPcName = _helperKey = null;
+    await db.setSetting(_helperPcKey, '');
+    await db.setSetting(_helperNameKey, '');
+    await db.setSetting(_helperKeyKey, '');
+    notifyListeners();
+  }
+
+  Future<void> setHelperOn(bool on) async {
+    helperOn = on;
+    notifyListeners();
+    await db.setSetting(_helperOnKey, on ? '1' : '0');
+  }
+
+  /// How long the computer may remember face results. Takes effect on the
+  /// computer with the next photo it scans for this phone (0 deletes what
+  /// it remembers then).
+  Future<void> setHelperKeepDays(int days) async {
+    if (!scanHelpKeepChoices.contains(days)) return;
+    helperKeepDays = days;
+    notifyListeners();
+    await db.setSetting(_helperKeepKey, '$days');
+  }
+
+  /// Phone, at the start of a scan: connect to the paired computer if it's
+  /// here. Quietly null if it isn't (the phone scans alone).
+  Future<ScanHelperClient?> _connectHelper() async {
+    if (Device.desktop || !helperOn || helperPc == null || _helperKey == null) return null;
+    // Listen and announce for a moment: the computer answers when it hears
+    // us. If it doesn't, try where it was last time.
+    await sharing.open();
+    try {
+      var pc = helperNearby;
+      for (var i = 0; i < 15 && pc == null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        pc = helperNearby;
+      }
+      final heard = pc != null;
+      pc ??= await _lastKnownHelper();
+      if (pc == null) return null;
+      final client = await ScanHelperClient.connect(pc,
+          me: sharing.identity, faceModel: faceModelId, key: _helperKey, keepDays: helperKeepDays);
+      if (heard) await _saveHelperAddress(pc);
+      // The computer shows how the whole scan is going, and follows this
+      // phone's setting for remembering results.
+      client.progress = () => ScanHelpProgress(
+            done: done,
+            total: total,
+            rate: photosPerSecond ?? 0,
+            keepDays: helperKeepDays,
+            album: albumName,
+          );
+      return client;
+    } catch (e) {
+      debugPrint('Scan helper not used: $e');
+      return null;
+    } finally {
+      await sharing.close();
+    }
+  }
+
+  /// Desktop: the faces in a phone's scan copy (an upright JPEG, the same
+  /// 1600 px copy the phone would scan), found as the phone would.
+  Future<List<NewFace>> facesForPhone(Uint8List jpeg) async {
+    await _readyEngine();
+    final codec = await ui.instantiateImageCodec(jpeg);
+    final frame = await codec.getNextFrame();
+    codec.dispose();
+    final image = frame.image;
+    final w = image.width, h = image.height;
+    final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    image.dispose();
+    if (data == null) return const [];
+    final scan = await _engine!.analyzeRgba(
+        TransferableTypedData.fromList([data.buffer.asUint8List()]), w, h,
+        minFace: minFacePx);
+    return scan?.faces ?? const [];
+  }
+
   Future<void> load() async {
     sharing = await SendCenter.create(db);
     peopleSync = PeopleSyncHub(sharing.identity, build: peoplePackage, take: takePeople);
     sharing.server.people = peopleSync;
+    await _loadHelper();
+    if (Device.desktop) {
+      final hub = ScanHelperHub(
+        readSetting: db.setting,
+        writeSetting: db.setSetting,
+        faceModel: faceModelId,
+        analyze: facesForPhone,
+        alias: () => sharing.identity.alias,
+        resultsRoot: appDataDir,
+      );
+      await hub.load();
+      scanHelper = hub;
+      sharing.server.scanHelper = hub;
+      // Findable on this Wi‑Fi while helping is on; not when it's off.
+      hub.addListener(() => unawaited(_syncHelperListening()));
+      await _syncHelperListening();
+    }
     // Photos friends send us get scanned like any other album.
     sharing.receiver.onSaved = (_) => scanReceived();
     sharing.server.onSelfie = _answerSelfie;
@@ -234,6 +467,9 @@ class ScanController extends ChangeNotifier {
   /// What's known about this phone's chips: which work, and how fast.
   Future<AccelState> faceChips() async => AccelState.read(await accelStatePath(), accelStateKey(faceModelId));
 
+  /// Whether the graphics chip can find faces next to ML Kit, and how fast.
+  Future<AccelState> gpuFinder() async => AccelState.read(await gpuFinderStatePath(), gpuFinderStateKey());
+
   /// Takes effect the next time faces are scanned. Asking for one chip by
   /// name gives it a fresh try, even if it failed before.
   Future<void> setFaceChip(AccelChoice choice) async {
@@ -256,6 +492,11 @@ class ScanController extends ChangeNotifier {
       ..forget(Accel.gpu)
       ..forget(Accel.npu)
       ..write(path);
+    // And the graphics-chip face finder.
+    final finder = await gpuFinderStatePath();
+    AccelState.read(finder, gpuFinderStateKey())
+      ..forget(Accel.gpu)
+      ..write(finder);
     _engineChip = null;
     notifyListeners();
   }
@@ -684,6 +925,26 @@ class ScanController extends ChangeNotifier {
     return (share: share, name: name);
   }
 
+  /// Photos scanned a second over the last few seconds (photos skipped as
+  /// already done don't count); null until there's enough to tell.
+  double? get photosPerSecond {
+    final start = _startedAt;
+    if (start == null || _rateTimes.length < 3) return null;
+    final now = DateTime.now();
+    _rateTimes.removeWhere((t) => now.difference(t) > _rateWindow);
+    final span = now.difference(start) < _rateWindow ? now.difference(start) : _rateWindow;
+    return _rateTimes.length / math.max(1.0, span.inMilliseconds / 1000);
+  }
+
+  static const _rateWindow = Duration(seconds: 10);
+  final List<DateTime> _rateTimes = [];
+
+  void _rateTick() {
+    final now = DateTime.now();
+    _rateTimes.add(now);
+    if (_rateTimes.length > 400) _rateTimes.removeWhere((t) => now.difference(t) > _rateWindow);
+  }
+
   Duration? get eta {
     final start = _startedAt;
     final work = done - skipped;
@@ -786,8 +1047,25 @@ class ScanController extends ChangeNotifier {
     // One scan copy per photo in flight (phones; desktop scans from pixels).
     // Desktop keeps every face worker busy, with one photo decoding ahead.
     await _readyEngine();
-    final lanes = Device.desktop ? _engine!.parallel + 1 : _inFlight;
-    final tmps = [for (var i = 0; i < lanes; i++) File(p.join(dir, 'scan_$i.jpg'))];
+    // Phone: your computer takes some lanes when it's here to help.
+    helper = await _connectHelper();
+    helperPhotos = 0;
+    gpuPhotos = 0;
+    _speedPhotos = 0;
+    _speedMark = null;
+    _rateTimes.clear();
+    // Phone lanes: ML Kit on the CPU, then the graphics-chip face finder,
+    // then the computer. Each takes the next photo when it's free.
+    final gpuLanes = Device.desktop ? 0 : _engine!.gpuLanes;
+    final vias = Device.desktop
+        ? List.filled(_engine!.parallel + 1, _Via.here)
+        : [
+            for (var i = 0; i < _inFlight; i++) _Via.here,
+            for (var i = 0; i < gpuLanes; i++) _Via.gpu,
+            if (helper != null)
+              for (var i = 0; i < _helperLanes; i++) _Via.computer,
+          ];
+    final tmps = [for (var i = 0; i < vias.length; i++) File(p.join(dir, 'scan_$i.jpg'))];
     try {
       final scanned = await db.scannedAssetIds();
       final tagged = await db.taggedAssetIds(tagVersion);
@@ -800,27 +1078,33 @@ class ScanController extends ChangeNotifier {
         // A few photos at once: while one waits on the photo library,
         // another is in face detection and a third in the labeller.
         var next = 0;
-        Future<void> lane(File tmp) async {
+        Future<void> lane(File tmp, _Via via) async {
           while (!_cancel && next < assets.length) {
             final asset = assets[next++];
             if (tagged.contains(asset.id)) {
               skipped++;
             } else {
               // Already-scanned photos only need categorising, not faces.
-              await _scanOne(asset, tmp, facesDone: scanned.contains(asset.id));
+              await _scanOne(asset, tmp, facesDone: scanned.contains(asset.id), via: via);
             }
             final facesBefore = facesFound;
             done++;
+            if (!tagged.contains(asset.id)) {
+              _speedTick();
+              _rateTick();
+            }
             _celebrate(facesBefore);
             // Every photo when scanning (live preview), less often when skipping.
             if (!tagged.contains(asset.id) || done % 20 == 0) notifyListeners();
             if (done % 5 == 0) {
-              ScanNotification.update('$done of $total photos · $facesFound faces');
+              final rate = photosPerSecond;
+              ScanNotification.update('$done of $total photos · $facesFound faces'
+                  '${rate == null ? '' : ' · ${formatRate(rate)} photos/s'}');
             }
           }
         }
 
-        await Future.wait([for (final t in tmps) lane(t)]);
+        await Future.wait([for (final (i, t) in tmps.indexed) lane(t, vias[i])]);
         await _save();
       }
       await _save();
@@ -829,7 +1113,9 @@ class ScanController extends ChangeNotifier {
       // Kept in release builds: the one line that tells how fast scanning is.
       debugPrint('Scan done ($engineSummary): $work photos scanned ($skipped skipped), $facesFound faces '
           'in ${took.inSeconds}s'
-          '${work > 0 ? ' = ${(took.inMilliseconds / work).round()} ms/photo' : ''}');
+          '${work > 0 ? ' = ${(took.inMilliseconds / work).round()} ms/photo' : ''}'
+          '${gpuPhotos > 0 ? ', $gpuPhotos by the graphics chip' : ''}'
+          '${helperPhotos > 0 ? ', $helperPhotos by the computer' : ''}');
       ScanNotification.update('Grouping faces…');
       await regroup();
       peopleFound = (await db.people(tripId: tripId)).length;
@@ -846,6 +1132,8 @@ class ScanController extends ChangeNotifier {
       for (final tmp in tmps) {
         if (await tmp.exists()) await tmp.delete();
       }
+      helper?.close();
+      helper = null;
       await ScanNotification.stop();
       running = false;
       if (_receivedPending) {
@@ -859,12 +1147,29 @@ class ScanController extends ChangeNotifier {
     }
   }
 
+  /// Every so many photos, how fast scanning goes and who found the faces:
+  /// one line in the log (kept in release builds), for measuring.
+  void _speedTick() {
+    final now = DateTime.now();
+    final mark = _speedMark ??= (now, 0, 0, 0);
+    _speedPhotos++;
+    if (_speedPhotos - mark.$2 < _speedEvery) return;
+    final ms = now.difference(mark.$1).inMilliseconds / (_speedPhotos - mark.$2);
+    debugPrint('Scan speed: ${ms.round()} ms/photo over the last ${_speedPhotos - mark.$2} '
+        '(graphics chip ${gpuPhotos - mark.$3}, computer ${helperPhotos - mark.$4}; $engineSummary)');
+    _speedMark = (now, _speedPhotos, gpuPhotos, helperPhotos);
+  }
+
+  static const _speedEvery = 200;
+  int _speedPhotos = 0;
+  (DateTime, int, int, int)? _speedMark;
+
   Future<void> _scanOne(ScanItem asset, File tmp,
-      {required bool facesDone}) async {
+      {required bool facesDone, _Via via = _Via.here}) async {
     try {
       final found = asset is DesktopScanItem && Device.desktop
           ? await _readDesktop(asset, facesDone: facesDone)
-          : await _readPhone(asset, tmp, facesDone: facesDone);
+          : await _readPhone(asset, tmp, facesDone: facesDone, via: via);
       if (found == null) return;
       final (faces, labels, where, hash, bytes) = found;
       // The live preview changes in one go, so with several photos in
@@ -903,7 +1208,7 @@ class ScanController extends ChangeNotifier {
   /// Phone: a downscaled, already-rotated JPEG from the photo library goes
   /// to ML Kit (which reads files). The original photo is never touched.
   Future<(List<NewFace>, List<String>, LatLng?, int?, Uint8List?)?> _readPhone(ScanItem asset, File tmp,
-      {required bool facesDone}) async {
+      {required bool facesDone, _Via via = _Via.here}) async {
     final bytes = await asset.scanJpeg(_scanSize);
     if (bytes == null) return null;
     // Read back by this app only, straight away: no need to force it to disk.
@@ -914,8 +1219,42 @@ class ScanController extends ChangeNotifier {
     final labels = _engine!.labels(tmp.path).catchError((Object _) => <String>[]);
     final where = asset.location();
     final hash = asset.hash().catchError((Object _) => null);
-    final faces = facesDone ? const <NewFace>[] : await _engine!.analyze(tmp.path);
+    final faces = facesDone ? const <NewFace>[] : await _phoneFaces(bytes, tmp.path, via: via);
     return (faces, await labels, await where, await hash, bytes);
+  }
+
+  /// The faces in a scan copy: from your computer on its lanes while it's
+  /// helping, from the graphics chip on its lanes, else (or if either
+  /// fails) from ML Kit.
+  Future<List<NewFace>> _phoneFaces(Uint8List jpeg, String path, {required _Via via}) async {
+    if (via == _Via.gpu) {
+      try {
+        final faces = await _engine!.analyzeOnGpu(path);
+        gpuPhotos++;
+        return faces;
+      } catch (e) {
+        // This photo goes to ML Kit; after a few failures in a row the
+        // graphics chip stops for the rest of the scan.
+        debugPrint('Graphics-chip face finder skipped a photo: $e');
+      }
+    }
+    final h = helper;
+    if (via == _Via.computer && h != null) {
+      try {
+        final faces = await h.scan(jpeg);
+        helperPhotos++;
+        return faces;
+      } catch (e) {
+        // Gone or failing: the phone takes over from here.
+        debugPrint('Scan helper stopped helping: $e');
+        if (identical(helper, h)) {
+          helper = null;
+          h.close();
+          notifyListeners();
+        }
+      }
+    }
+    return _engine!.analyze(path);
   }
 
   /// Desktop: the file is decoded once, straight to pixels at the size the
@@ -931,8 +1270,13 @@ class ScanController extends ChangeNotifier {
     // same faces measure smaller here.
     final full = math.max(asset.size.width, asset.size.height);
     final minFace = minFacePx * math.max(w, h) / math.max(1.0, math.min(_scanSize.toDouble(), full));
+    // Only a few live-view pictures a second; photos in between keep the
+    // last one on screen.
+    final now = DateTime.now();
+    final wantPreview = now.difference(_lastPreviewAsked) >= _desktopPreviewEvery;
+    if (wantPreview) _lastPreviewAsked = now;
     final scan = await _engine!.analyzeRgba(TransferableTypedData.fromList([pixels]), w, h,
-        minFace: minFace, skipFaces: facesDone);
+        minFace: minFace, skipFaces: facesDone, preview: wantPreview);
     await meta;
     return (scan?.faces ?? const <NewFace>[], const <String>[], await asset.location(), scan?.hash, scan?.preview);
   }
@@ -1103,11 +1447,28 @@ class ScanController extends ChangeNotifier {
 
   /// Works out the photo's categories (selfie, beach, screenshot, …).
   /// This device's named people, to send to another of your devices.
-  Future<PeoplePackage> peoplePackage() async => PeoplePackage(
-        from: sharing.identity.alias,
-        model: faceModelId,
-        people: [for (final r in await db.peopleForSync()) SyncPerson.fromRow(r)],
-      );
+  Future<PeoplePackage> peoplePackage() async {
+    final skipped = await peopleSyncSkipped();
+    return PeoplePackage(
+      from: sharing.identity.alias,
+      model: faceModelId,
+      people: [
+        for (final r in await db.peopleForSync())
+          if (!skipped.contains(r.syncId)) SyncPerson.fromRow(r),
+      ],
+    );
+  }
+
+  static const _syncSkipKey = 'sync_people_skip';
+
+  /// Named people chosen not to be shared with other devices (by sync id).
+  /// Everyone else is shared, so people named later are shared too.
+  Future<Set<String>> peopleSyncSkipped() async {
+    final saved = await db.setting(_syncSkipKey);
+    return saved == null || saved.isEmpty ? <String>{} : saved.split(',').toSet();
+  }
+
+  Future<void> setPeopleSyncSkipped(Set<String> ids) => db.setSetting(_syncSkipKey, ids.join(','));
 
   /// Takes in people from another of your devices: someone already here
   /// (synced before, or with faces alike enough) gets their faces from the
@@ -1313,3 +1674,6 @@ String folderToRelative(String folder) {
   f = f.replaceAll(RegExp(r'^/+'), '');
   return f.endsWith('/') || f.isEmpty ? f : '$f/';
 }
+
+/// "12.3", "4.0", "0.6": photos a second, one decimal (none from 100 up).
+String formatRate(double rate) => rate >= 100 ? rate.round().toString() : rate.toStringAsFixed(1);

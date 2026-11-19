@@ -22,6 +22,7 @@ import 'receive.dart';
 import 'web_page.dart';
 import 'zip_stream.dart';
 import 'people_link.dart';
+import 'scan_helper.dart';
 
 /// Port for the browser gallery (plain HTTP: browsers reject self-made
 /// certificates, so LocalSend serves its browser mode over HTTP too).
@@ -103,6 +104,9 @@ class ShareServer extends ChangeNotifier {
 
   /// Swapping who's who with your other devices (same port).
   PeopleSyncHub? people;
+
+  /// Desktop: scanning for your phone (see [ScanHelperHub]).
+  ScanHelperHub? scanHelper;
 
   int get webServerPort => _web?.port ?? webPort;
   bool get running => _secure != null;
@@ -219,6 +223,7 @@ class ShareServer extends ChangeNotifier {
         default:
           if (await groups?.handle(req, ip) ?? false) return;
           if (await people?.handle(req, ip) ?? false) return;
+          if (await scanHelper?.handle(req, ip) ?? false) return;
           return await _status(res, HttpStatus.notFound);
       }
     } catch (e) {
@@ -309,14 +314,7 @@ class ShareServer extends ChangeNotifier {
           if (share == null) return;
           final f = _file(share, q['fileId']);
           if (f == null) return await _status(res, HttpStatus.notFound);
-          share.downloads++;
-          notifyListeners();
-          res.headers
-            ..contentType = ContentType.parse(f.mime)
-            ..contentLength = f.size
-            ..set('Content-Disposition', _attachment(f.fileName));
-          await res.addStream(f.open());
-          return await res.close();
+          return await _sendFile(req, res, share, f, inline: q['inline'] == '1');
         case ('GET', '/thumb'):
           final share = _authorised(req, res);
           if (share == null) return;
@@ -460,6 +458,42 @@ class ShareServer extends ChangeNotifier {
       return null;
     }
     return share;
+  }
+
+  /// Sends [f], honouring a single `Range` so browsers can stream and seek
+  /// videos. [inline] views (the gallery's full-quality zoom and video
+  /// playback) open in the page and don't count as downloads.
+  Future<void> _sendFile(HttpRequest req, HttpResponse res, WebShare share, PreparedFile f,
+      {required bool inline}) async {
+    final size = f.size;
+    var start = 0, end = size - 1;
+    final range = RegExp(r'^bytes=(\d*)-(\d*)$').firstMatch(req.headers.value(HttpHeaders.rangeHeader)?.trim() ?? '');
+    if (range != null && size > 0 && (range.group(1)!.isNotEmpty || range.group(2)!.isNotEmpty)) {
+      final a = range.group(1)!, b = range.group(2)!;
+      if (a.isEmpty) {
+        start = math.max(0, size - int.parse(b));
+      } else {
+        start = int.parse(a);
+        if (b.isNotEmpty) end = math.min(int.parse(b), size - 1);
+      }
+      if (start >= size || start > end) {
+        res.headers.set(HttpHeaders.contentRangeHeader, 'bytes */$size');
+        return _status(res, HttpStatus.requestedRangeNotSatisfiable);
+      }
+      res.statusCode = HttpStatus.partialContent;
+      res.headers.set(HttpHeaders.contentRangeHeader, 'bytes $start-$end/$size');
+    }
+    if (!inline && start == 0) {
+      share.downloads++;
+      notifyListeners();
+    }
+    res.headers
+      ..contentType = ContentType.parse(f.mime)
+      ..contentLength = end - start + 1
+      ..set(HttpHeaders.acceptRangesHeader, 'bytes')
+      ..set('Content-Disposition', inline ? 'inline' : _attachment(f.fileName));
+    await res.addStream(start == 0 && end == size - 1 ? f.open() : f.file.openRead(start, end + 1));
+    await res.close();
   }
 
   PreparedFile? _file(WebShare share, String? id) {

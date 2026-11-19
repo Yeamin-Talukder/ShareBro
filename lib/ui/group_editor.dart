@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/db.dart';
 import '../scan/scan_controller.dart';
+import 'face_image.dart';
 
 /// Create or edit a saved group of people ("Family", "Office friends").
 /// Returns true if something was saved or deleted.
@@ -82,7 +83,7 @@ class _GroupEditorState extends State<_GroupEditor> {
                           setState(() => v! ? _members.add(p.id) : _members.remove(p.id)),
                       secondary: CircleAvatar(
                         backgroundImage:
-                            p.coverThumb == null ? null : MemoryImage(p.coverThumb!),
+                            p.coverThumb == null ? null : FaceImage(p.coverThumb!),
                       ),
                       title: Text(p.displayName),
                       subtitle: p.nickname == null ? null : Text(p.nickname!),

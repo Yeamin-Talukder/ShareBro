@@ -77,7 +77,8 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.f1);
     await tester.pumpAndSettle();
     expect(find.text('Keyboard and touchpad'), findsOneWidget);
-    expect(find.text('Select a range'), findsOneWidget);
+    // The Photos list starts with clicking to select.
+    expect(find.text('Select a photo'), findsOneWidget);
     // A second F1 doesn't stack another copy.
     await tester.sendKeyEvent(LogicalKeyboardKey.f1);
     await tester.pumpAndSettle();

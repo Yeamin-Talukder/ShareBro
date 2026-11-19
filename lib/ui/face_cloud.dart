@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'anim.dart';
 
 import '../data/db.dart';
+import 'desktop_layout.dart';
 import 'widgets.dart';
 
 /// Everyone as floating bubbles, bigger for people in more photos.
@@ -27,9 +28,12 @@ class FaceCloud extends StatelessWidget {
         child: Stack(children: [
           for (final (i, p) in placed.indexed)
             Positioned(
+              key: ValueKey(p.person.id),
               left: p.centre.dx - p.radius,
               top: p.centre.dy - p.radius,
-              child: GestureDetector(
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
                 onTap: () => onOpen(p.person),
                 child: Tooltip(
                   message: '${p.person.displayName} · ${p.person.photoCount} photos',
@@ -39,6 +43,7 @@ class FaceCloud extends StatelessWidget {
                     radius: p.radius - 3,
                   ),
                 ),
+              ),
               )
                   .animate()
                   .scaleXY(
@@ -66,9 +71,11 @@ class FaceCloud extends StatelessWidget {
     final maxCount = people.map((p) => p.photoCount).reduce(math.max).toDouble();
     final sorted = [...people]..sort((a, b) => b.photoCount.compareTo(a.photoCount));
     final placed = <_Bubble>[];
-    final centre = Offset(width / 2, 90);
+    // Bigger bubbles on a computer, where there's room for them.
+    final grow = DesktopLayout.on ? 1.4 : 1.0;
+    final centre = Offset(width / 2, 90 * grow);
     for (final person in sorted) {
-      final r = 26 + 40 * math.sqrt(person.photoCount / math.max(maxCount, 1));
+      final r = (26 + 40 * math.sqrt(person.photoCount / math.max(maxCount, 1))) * grow;
       var angle = 0.0;
       var dist = 0.0;
       // Bounded so a very narrow screen can never hang the layout.

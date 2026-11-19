@@ -4,13 +4,30 @@ import 'package:flutter/widgets.dart';
 
 import '../platform/device.dart';
 
+/// Two-finger swipes on a touchpad go back (right) and forward (left), as
+/// in Chrome. A view that uses sideways two-finger swipes itself (the photo
+/// viewer, the spatial People views) claims the gesture when it starts.
+abstract final class NavSwipe {
+  static bool _claimed = false;
+
+  /// Call from a Listener's onPointerPanZoomStart below the window's.
+  static void claim() => _claimed = true;
+
+  /// Whether this gesture was claimed (and forget it for the next one).
+  static bool take() {
+    final c = _claimed;
+    _claimed = false;
+    return c;
+  }
+}
+
 /// When ShareBro uses its desktop layout (a sidebar instead of the bottom
 /// dock, toolbars instead of floating buttons, side panels instead of
 /// pull-up sheets). Phones never do. See design/desktop_layout_demo.html.
 abstract final class DesktopLayout {
   /// The sidebar with labels; below [wideFrom] it folds into an icon rail.
-  static const sidebarWidth = 252.0;
-  static const railWidth = 68.0;
+  static const sidebarWidth = 236.0;
+  static const railWidth = 60.0;
 
   /// Window width from which the sidebar shows labels, and side panels
   /// (the viewer's info) fit beside the content.

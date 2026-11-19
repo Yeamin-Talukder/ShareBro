@@ -18,6 +18,14 @@ import 'widgets.dart';
 /// The app's navigator, so the island can open screens from above it.
 final islandNavigator = GlobalKey<NavigatorState>();
 
+/// On a computer: the navigator in the window's content area, beside the
+/// sidebar, so every page keeps the sidebar. Not used on phones.
+final desktopPages = GlobalKey<NavigatorState>();
+
+/// Where to open a page: beside the sidebar on a computer, else the app's
+/// own navigator. Dialogs still go over the whole window.
+NavigatorState? get pageNavigator => desktopPages.currentState ?? islandNavigator.currentState;
+
 /// The app's messenger: quick messages fall back to bottom bars when the
 /// island is turned off.
 final islandMessenger = GlobalKey<ScaffoldMessengerState>();
@@ -222,14 +230,14 @@ class _IslandState extends State<Island> {
         final job = _job;
         setState(() => _expanded = false);
         if (job != null) {
-          islandNavigator.currentState?.push(
+          pageNavigator?.push(
             MaterialPageRoute(
               builder: (_) => TransferScreen(controller: c, job: job),
             ),
           );
         }
       case _Kind.receive:
-        islandNavigator.currentState?.push(MaterialPageRoute(builder: (_) => ReceiveLiveScreen(controller: c)));
+        pageNavigator?.push(MaterialPageRoute(builder: (_) => ReceiveLiveScreen(controller: c)));
       case _Kind.toast:
         final t = _toast;
         if (t?.onAction != null) {

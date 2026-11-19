@@ -379,7 +379,7 @@ class MediaActionBar extends StatelessWidget {
     final fg = clear ? Colors.white : null;
     return Glass(
       kind: kind,
-      radius: 28,
+      radius: Device.desktop ? 14 : 28,
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       child: Row(children: [
         ActionButton(icon: Icons.send_rounded, label: 'Send', onTap: onSend, color: Theme.of(context).colorScheme.primary),

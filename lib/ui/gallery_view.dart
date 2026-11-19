@@ -11,6 +11,7 @@ import '../data/dates.dart';
 import '../scan/scan_controller.dart';
 import 'desktop_keys.dart';
 import 'desktop_layout.dart';
+import 'marquee.dart';
 import 'face_refresh.dart';
 import 'fast_thumb.dart';
 import 'glass.dart';
@@ -229,6 +230,14 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
   int? _cursor;
   int? _anchor;
 
+  /// Desktop: the last click, to tell a double-click (open) from a click
+  /// (select).
+  int? _lastClick;
+  DateTime _lastClickAt = DateTime(0);
+
+  /// Desktop: the selection kept while a drag box adds to it.
+  Set<String> _boxBase = {};
+
   /// A touchpad pinch is under way (Windows precision touchpads send
   /// pan-zoom events rather than two pointers).
   bool _padPinch = false;
@@ -246,6 +255,11 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
     if (k == LogicalKeyboardKey.escape) {
       if (repeat || _selected.isEmpty) return false;
       _clearSelection();
+      return true;
+    }
+    // F5 or Ctrl + R: read the folders again.
+    if (k == LogicalKeyboardKey.f5 || (keys.isControlPressed && k == LogicalKeyboardKey.keyR)) {
+      if (!repeat) _reset();
       return true;
     }
     if (_assets.isEmpty || keys.isAltPressed) return false;
@@ -303,9 +317,12 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
     to = to.clamp(0, _assets.length - 1);
     if (to > _assets.length - _pageSize ~/ 2) _loadMore();
     if (keys.isShiftPressed) {
+      // As in Explorer: the selection becomes the run from the anchor.
       final a = _anchor ??= cur ?? to;
       final lo = math.min(a, to), hi = math.max(a, to);
-      setState(() => _selected.addAll([for (var i = lo; i <= hi; i++) _assets[i].id]));
+      setState(() => _selected
+        ..clear()
+        ..addAll([for (var i = lo; i <= hi; i++) _assets[i].id]));
     } else {
       _anchor = to;
     }
@@ -396,29 +413,66 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
     }
   }
 
-  /// A click on tile [i]: Ctrl adds or removes it, Shift selects the range
-  /// from the last one, otherwise it opens (or toggles while selecting).
+  /// A click on tile [i]. On a computer it works as in Explorer or Finder:
+  /// a click selects just that photo, a double-click opens it, Ctrl adds or
+  /// removes it, Shift selects the run from the last one clicked (Ctrl +
+  /// Shift adds that run). On a phone a tap opens (or toggles while
+  /// selecting).
   void _click(int i) {
+    if (!_desk || widget.onPicked != null) {
+      _selecting ? _toggle(i) : _open(i);
+      return;
+    }
     final keys = HardwareKeyboard.instance;
-    if (_desk && keys.isShiftPressed && (_anchor ?? _cursor) != null) {
+    final ctrl = keys.isControlPressed || keys.isMetaPressed;
+    final now = DateTime.now();
+    final again = _lastClick == i && now.difference(_lastClickAt) < const Duration(milliseconds: 450);
+    _lastClick = i;
+    _lastClickAt = now;
+    if (keys.isShiftPressed && (_anchor ?? _cursor) != null) {
       final a = (_anchor ?? _cursor)!.clamp(0, _assets.length - 1);
       final lo = math.min(a, i), hi = math.max(a, i);
       Haptics.tick();
       setState(() {
+        if (!ctrl) _selected.clear();
         _selected.addAll([for (var k = lo; k <= hi; k++) _assets[k].id]);
         _cursor = i;
       });
       return;
     }
-    if (_desk) {
-      _cursor = i;
-      _anchor = i;
-    }
-    if (_desk && keys.isControlPressed) {
+    _cursor = i;
+    _anchor = i;
+    if (ctrl) {
       _toggle(i);
       return;
     }
-    _selecting ? _toggle(i) : _open(i);
+    if (again) {
+      _open(i);
+      return;
+    }
+    setState(() => _selected
+      ..clear()
+      ..add(_assets[i].id));
+  }
+
+  /// Desktop: the tiles inside [r], a box in the scroll content (see
+  /// [MarqueeSelect.hitTest]).
+  Set<int> _tilesIn(Rect r) {
+    final out = <int>{};
+    final top = MediaQuery.paddingOf(context).top;
+    final rows = _layoutRows, tile = _layoutTile, g = _g;
+    for (var i = 0; i < rows.length; i++) {
+      final row = rows[i];
+      if (row is! _Photos) continue;
+      final y0 = top + _layoutOffsets[i];
+      if (y0 > r.bottom) break;
+      if (y0 + tile < r.top) continue;
+      for (var k = 0; k < row.count; k++) {
+        final x0 = _padX + k * (tile + g);
+        if (x0 <= r.right && x0 + tile >= r.left && row.start + k < _assets.length) out.add(row.start + k);
+      }
+    }
+    return out;
   }
 
   /// Right-click on tile [i]: what you can do with it (or with the whole
@@ -835,7 +889,7 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
       child: Center(
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Glass(
-            radius: 28,
+            radius: 14,
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               IconButton(
@@ -872,7 +926,7 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
             ),
           ),
         ]),
-      ).animate().fadeIn(duration: 200.ms).moveY(begin: 30, curve: Curves.easeOutBack),
+      ).animate().fadeIn(duration: 180.ms).moveY(begin: 12, curve: Curves.easeOutCubic),
     );
   }
 
@@ -984,9 +1038,8 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
           builder: (context, hovered) => Padding(
             padding: const EdgeInsets.fromLTRB(_deskPadX, 14, _deskPadX + 40, 4),
             child: Row(children: [
-              Text(_byMonth ? formatMonth(day) : formatSectionDay(day),
-                  style: const TextStyle(fontSize: TextSize.headline, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
-              const SizedBox(width: 8),
+              _monthTitle(_byMonth ? formatMonth(day) : formatSectionDay(day), scheme),
+              const SizedBox(width: 10),
               Text('$count ${count == 1 ? 'photo' : 'photos'}',
                   style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant)),
               const Spacer(),
@@ -1034,6 +1087,21 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
           ]),
         );
     }
+  }
+
+  /// "November 2026": the month bold, the year lighter (as in a photo
+  /// library); other titles plain.
+  static Widget _monthTitle(String title, ColorScheme scheme) {
+    final m = RegExp(r'^(.*\D)\s(\d{4})$').firstMatch(title);
+    const big = TextStyle(fontSize: TextSize.title3, fontWeight: FontWeight.w700, letterSpacing: -0.3);
+    if (m == null) return Text(title, style: big);
+    return Text.rich(TextSpan(children: [
+      TextSpan(text: m.group(1), style: big),
+      TextSpan(
+        text: ' ${m.group(2)}',
+        style: big.copyWith(fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
+      ),
+    ]));
   }
 
   Widget _grid(BuildContext context) {
@@ -1181,11 +1249,28 @@ class _GalleryViewState extends State<GalleryView> with SingleTickerProviderStat
           onPointerPanZoomEnd: _padEnd,
           child: Stack(children: [
             GestureDetector(
-              onLongPressStart: _dragStart,
-              onLongPressMoveUpdate: _dragMove,
-              onLongPressEnd: (_) => _dragEnd(),
-              onLongPressCancel: _dragEnd,
-              child: ClipRect(child: FaceRefresh(onRefresh: _reset, child: zoomable)),
+              // A touch screen's long-press selection; a mouse draws a box.
+              onLongPressStart: _desk ? null : _dragStart,
+              onLongPressMoveUpdate: _desk ? null : _dragMove,
+              onLongPressEnd: _desk ? null : (_) => _dragEnd(),
+              onLongPressCancel: _desk ? null : _dragEnd,
+              child: _desk
+                  // Drag a box to select, as in Explorer or Finder.
+                  ? MarqueeSelect(
+                      enabled: widget.onPicked == null,
+                      scroll: _scroll,
+                      hitTest: _tilesIn,
+                      onStart: (adding) => _boxBase = adding ? Set.of(_selected) : {},
+                      onUpdate: (tiles) => setState(() => _selected
+                        ..clear()
+                        ..addAll(_boxBase)
+                        ..addAll([for (final i in tiles) _assets[i].id])),
+                      onEmptyClick: () {
+                        if (_selected.isNotEmpty) _clearSelection();
+                      },
+                      child: ClipRect(child: zoomable),
+                    )
+                  : ClipRect(child: FaceRefresh(onRefresh: _reset, child: zoomable)),
             ),
             if (!_selecting)
               // Between the top bar and the floating nav bar, so the handle

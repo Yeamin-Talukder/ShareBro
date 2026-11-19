@@ -937,6 +937,10 @@ Before sending a pull request, run `flutter analyze` and `flutter test`.
   face-recognition model (`w600k_mbf`, MobileFaceNet trained on
   WebFace600K), converted to TensorFlow Lite. InsightFace's pretrained
   models are licensed for **non-commercial research use only**.
+- **[MediaPipe](https://github.com/google-ai-edge/mediapipe) face landmark
+  model** (Apache-2.0, Google): the 468-point face mesh behind the 3D face
+  model on each person's page (TensorFlow Lite on phones, converted to ONNX on
+  computers). Worked out on the device; never sent anywhere.
 - **Gender model:** from
   [shubham0204/Age-Gender_Estimation_TF-Android](https://github.com/shubham0204/Age-Gender_Estimation_TF-Android)
   (MIT).

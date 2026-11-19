@@ -38,6 +38,7 @@ import 'desktop_layout.dart';
 import 'send_to_sheet.dart';
 import '../share/prepare.dart' show SendItem;
 import 'people_sync_screen.dart';
+import 'face_image.dart';
 
 /// Room under the last row for the Scan button floating above the nav bar.
 const _fabClearance = 88.0;
@@ -466,6 +467,7 @@ class _HomeScreenState extends State<HomeScreen> {
   /// the right. Each opens a short list instead of spreading its choices
   /// across the page.
   Widget _filterBar(List<PersonSummary>? people) {
+    if (DesktopLayout.on) return _deskFilterBar(people);
     Widget item(Widget chip) =>
         Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: Center(child: chip));
     final trip = _trip;
@@ -518,6 +520,133 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
       ]),
     );
+  }
+
+  /// Desktop: pop-up buttons for the trip, who and when on the left (each
+  /// opens a short menu right there), "Clear filters" while any is on, and
+  /// the views as one row of icons on the right.
+  Widget _deskFilterBar(List<PersonSummary>? people) {
+    final trip = _trip;
+    final everyone = _everyone ?? const <PersonSummary>[];
+    final filtered = trip != null || _gender != null || _groupId != null || _dates != null;
+    final views = people != null && people.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+      child: Row(children: [
+        Expanded(
+          child: Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            if (_trips.isNotEmpty)
+              PopupButton(
+                icon: Icons.luggage_rounded,
+                label: trip?.name ?? 'All trips',
+                active: trip != null,
+                tooltip: 'Only people from one trip',
+                onTap: _tripMenu,
+                onClear: () => _pickTrip(null),
+              ),
+            if (everyone.isNotEmpty || _groups.isNotEmpty)
+              PopupButton(
+                icon: Icons.people_alt_rounded,
+                label: _whoLabel,
+                active: _gender != null || _groupId != null,
+                tooltip: 'Men, women or one of your groups',
+                onTap: _whoMenu,
+                onClear: _clearWho,
+              ),
+            DateChip(
+              value: _dates,
+              onChanged: (d) {
+                _dates = d;
+                _reload();
+              },
+            ),
+            if (filtered)
+              TextButton(
+                style: TextButton.styleFrom(minimumSize: const Size(0, 30)),
+                onPressed: () {
+                  _tripId = null;
+                  _dates = null;
+                  _groupId = null;
+                  _gender = null;
+                  _reload();
+                },
+                child: const Text('Clear filters'),
+              ),
+          ]),
+        ),
+        if (views) _ViewSwitcher(value: _layout, onChanged: _setLayout),
+      ]),
+    );
+  }
+
+  void _clearWho() {
+    _pickGender(null);
+    if (_groupId != null) {
+      _groupId = null;
+      _reload();
+    }
+  }
+
+  Future<void> _tripMenu(BuildContext button) async {
+    final trip = _trip;
+    final picked = await showMenuBelow<Object>(button, [
+      menuChoice<Object>(context, 'all', 'All trips', selected: trip == null),
+      const PopupMenuDivider(),
+      for (final t in _trips)
+        menuChoice<Object>(context, t.id, t.name, selected: t.id == _tripId, count: t.photoCount, icon: Icons.luggage_rounded),
+      if (trip != null) ...[
+        const PopupMenuDivider(),
+        menuChoice<Object>(context, 'edit', 'Rename or remove "${_short(trip.name)}"…', icon: Icons.edit_outlined),
+      ],
+    ]);
+    if (!mounted || picked == null) return;
+    if (picked == 'all') {
+      _pickTrip(null);
+    } else if (picked == 'edit' && trip != null) {
+      await _editTrip(trip);
+    } else if (picked is int) {
+      _pickTrip(picked);
+    }
+  }
+
+  Future<void> _whoMenu(BuildContext button) async {
+    final everyone = _everyone ?? const <PersonSummary>[];
+    final group = _groups.where((g) => g.id == _groupId).firstOrNull;
+    final scheme = Theme.of(context).colorScheme;
+    PopupMenuItem<String> heading(String text) => PopupMenuItem<String>(
+          enabled: false,
+          height: 26,
+          child: Text(text,
+              style: TextStyle(fontSize: TextSize.small, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant)),
+        );
+    final picked = await showMenuBelow<String>(button, [
+      heading('Show'),
+      menuChoice(context, 'g:all', 'Everyone', selected: _gender == null, count: everyone.length),
+      for (final g in Gender.values)
+        if (everyone.any((p) => p.gender == g))
+          menuChoice(context, 'g:${g.name}', g == Gender.male ? 'Men' : 'Women',
+              selected: _gender == g, count: everyone.where((p) => p.gender == g).length),
+      const PopupMenuDivider(),
+      heading('Groups'),
+      for (final g in _groups)
+        menuChoice(context, 'grp:${g.id}', g.name,
+            selected: g.id == _groupId, count: g.members.length, icon: Icons.diversity_3_rounded),
+      menuChoice(context, 'new', 'New group…', icon: Icons.add_rounded),
+      if (group != null) menuChoice(context, 'edit', 'Edit "${_short(group.name)}"…', icon: Icons.edit_outlined),
+    ]);
+    if (!mounted || picked == null) return;
+    if (picked.startsWith('g:')) {
+      final name = picked.substring(2);
+      _pickGender(name == 'all' ? null : Gender.values.byName(name));
+    } else if (picked.startsWith('grp:')) {
+      final id = int.parse(picked.substring(4));
+      _groupId = _groupId == id ? null : id;
+      _reload();
+    } else if (picked == 'new') {
+      if (await showGroupEditor(context, c)) c.changed();
+    } else if (picked == 'edit' && group != null) {
+      if (await showGroupEditor(context, c, group: group)) c.changed();
+    }
   }
 
   /// Long names would push the other filters off the bar.
@@ -732,9 +861,13 @@ class _HomeScreenState extends State<HomeScreen> {
         else if (DesktopLayout.on) ...[
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-              child: Text('Drag one person onto another to merge them.',
-                  style: Theme.of(context).textTheme.bodySmall),
+              padding: const EdgeInsets.fromLTRB(26, 4, 24, 0),
+              child: Row(children: [
+                Icon(Icons.merge_rounded, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Text('Drag one person onto another to merge them · right-click for more',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              ]),
             ),
           ),
           SliverPadding(
@@ -1077,18 +1210,22 @@ class _PersonCardState extends State<_PersonCard> {
         final card = AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
-          transform: Matrix4.translationValues(0, _hover && !over ? -2 : 0, 0),
-          padding: const EdgeInsets.all(14),
+          transform: Matrix4.translationValues(0, _hover && !over ? -1 : 0, 0),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1C1A22) : Colors.white,
-            borderRadius: BorderRadius.circular(18),
+            color: Mac.card(context),
+            borderRadius: BorderRadius.circular(Mac.cardRadius),
             border: Border.all(
-              color: over ? scheme.primary : scheme.onSurface.withValues(alpha: _hover ? 0.14 : 0.07),
-              width: over ? 2 : 1,
+              color: over ? scheme.primary : _hover ? scheme.onSurface.withValues(alpha: 0.16) : Mac.hairline(context),
+              width: over ? 2 : 0.5,
             ),
-            boxShadow: _hover
-                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.28), blurRadius: 30, offset: const Offset(0, 12))]
-                : null,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: _hover ? 0.12 : 0.04),
+                blurRadius: _hover ? 16 : 3,
+                offset: Offset(0, _hover ? 6 : 1),
+              ),
+            ],
           ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Row(children: [
@@ -1442,7 +1579,7 @@ class _MissingCard extends StatelessWidget {
                         CircleAvatar(
                           radius: 20,
                           backgroundImage:
-                              p.coverThumb == null ? null : MemoryImage(p.coverThumb!),
+                              p.coverThumb == null ? null : FaceImage(p.coverThumb!),
                         ),
                         const SizedBox(height: 4),
                         Text('${p.displayName.split(' ').first} · ${p.photoCount}',
@@ -1456,5 +1593,49 @@ class _MissingCard extends StatelessWidget {
         ),
       ),
     ).animate().fadeIn().moveY(begin: -6);
+  }
+}
+
+/// Desktop People: every view as one row of icons, like a Mac segmented
+/// control; the chosen one sits on a raised thumb.
+class _ViewSwitcher extends StatelessWidget {
+  const _ViewSwitcher({required this.value, required this.onChanged});
+
+  final PeopleLayout value;
+  final ValueChanged<PeopleLayout> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(color: capsuleFill(context), borderRadius: BorderRadius.circular(Mac.controlRadius)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        for (final l in PeopleLayout.values)
+          Tooltip(
+            message: l.label,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () => onChanged(l),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  width: 32,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: l == value ? (dark ? const Color(0xFF636366) : Colors.white) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                    boxShadow: l == value
+                        ? const [BoxShadow(color: Color(0x1F000000), blurRadius: 3, offset: Offset(0, 1))]
+                        : null,
+                  ),
+                  child: Icon(l.icon, size: 16, color: l == value ? scheme.primary : scheme.onSurfaceVariant),
+                ),
+              ),
+            ),
+          ),
+      ]),
+    );
   }
 }

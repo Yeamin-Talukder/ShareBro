@@ -12,6 +12,7 @@ import '../data/duplicates.dart';
 import '../data/group_shots.dart';
 import 'best_shots_screen.dart';
 import 'desktop_layout.dart';
+import 'face_image.dart';
 import 'duplicates_screen.dart';
 import 'gallery_view.dart';
 import 'glass.dart';
@@ -169,6 +170,9 @@ class _ExploreTabState extends State<ExploreTab> {
       backgroundColor: Colors.transparent,
       body: GlassScrollView(
         title: 'Explore',
+        subtitle: DesktopLayout.on && counts != null && counts.isNotEmpty
+            ? 'Sorted into ${counts.length} ${counts.length == 1 ? 'category' : 'categories'} while scanning'
+            : null,
         actions: [
             DateChip(
               value: _dates,
@@ -301,83 +305,71 @@ class _ExploreTabState extends State<ExploreTab> {
   void _push(Widget screen) =>
       Navigator.push(context, MaterialPageRoute(builder: (_) => screen)).then((_) => _load());
 
-  /// Desktop: the app's tools as a grid of cards (2 or 3 across), each with
-  /// a few of its photos. Cards with nothing to show are left out.
+  /// Desktop, like a photo library's "For You": Places as a wide banner of
+  /// photos, then the app's tools as an even row of tiles, each with its
+  /// number and a few of its photos. Tools with nothing to show are left out.
   Widget _deskFeatures(BuildContext context) {
     final extra = _dupes.fold<int>(0, (n, d) => n + d.photos.length - 1);
-    final cards = <({bool wide, Widget card})>[
-      (
-        wide: true,
-        card: _FeatureCard(
-          icon: Icons.map_rounded,
-          color: const Color(0xFF2BB5A6),
-          title: 'Places',
-          note: _located > 0 ? '$_located photos on the map' : 'Your photos by where they were taken',
-          photos: _placeCovers,
-          onTap: () => _push(PlacesScreen(controller: c)),
-        ),
-      ),
+    final tools = <Widget>[
       if (_bursts.isNotEmpty)
-        (
-          wide: false,
-          card: _FeatureCard(
-            icon: Icons.auto_awesome_rounded,
-            color: const Color(0xFFFF9F0A),
-            title: 'Best group shots',
-            note: '${_bursts.length} ${_bursts.length == 1 ? 'moment' : 'moments'}',
-            photos: [for (final b in _bursts.take(3)) b.bestShot.shot.assetId],
-            onTap: () => _push(BestShotsScreen(controller: c)),
-          ),
+        _ToolTile(
+          icon: Icons.auto_awesome_rounded,
+          color: const Color(0xFFFF9F0A),
+          title: 'Best group shots',
+          value: '${_bursts.length}',
+          unit: _bursts.length == 1 ? 'moment' : 'moments',
+          photos: [for (final b in _bursts.take(3)) b.bestShot.shot.assetId],
+          onTap: () => _push(BestShotsScreen(controller: c)),
         ),
       if (_dupes.isNotEmpty)
-        (
-          wide: false,
-          card: _FeatureCard(
-            icon: Icons.filter_none_rounded,
-            color: const Color(0xFF0A84FF),
-            title: 'Duplicates',
-            note: '${_dupes.length} sets · $extra extra',
-            photos: [for (final p in _dupes.first.photos.take(2)) p.assetId],
-            onTap: () => _push(DuplicatesScreen(controller: c)),
-          ),
+        _ToolTile(
+          icon: Icons.filter_none_rounded,
+          color: const Color(0xFF0A84FF),
+          title: 'Duplicates',
+          value: '$extra',
+          unit: extra == 1 ? 'extra copy' : 'extra copies',
+          photos: [for (final p in _dupes.first.photos.take(3)) p.assetId],
+          onTap: () => _push(DuplicatesScreen(controller: c)),
         ),
       if (_people2.length >= 2)
-        (
-          wide: false,
-          card: _FeatureCard(
-            icon: Icons.favorite_rounded,
-            color: const Color(0xFFE8457A),
-            title: 'Together',
-            note: 'Photos with two or more people',
-            faces: [for (final p in _people2.take(4)) ?p.coverThumb],
-            onTap: () => _push(TogetherScreen(controller: c)),
-          ),
+        _ToolTile(
+          icon: Icons.favorite_rounded,
+          color: const Color(0xFFFF2D55),
+          title: 'Together',
+          value: '${_people2.length}',
+          unit: 'people to pair up',
+          faces: [for (final p in _people2.take(5)) ?p.coverThumb],
+          onTap: () => _push(TogetherScreen(controller: c)),
         ),
-      (
-        wide: false,
-        card: _FeatureCard(
-          icon: Icons.pie_chart_rounded,
-          color: const Color(0xFF8E8E93),
-          title: 'Storage',
-          note: 'What takes up the most space',
-          onTap: () => _push(StorageScreen(controller: c)),
-        ),
+      _ToolTile(
+        icon: Icons.pie_chart_rounded,
+        color: const Color(0xFF8E8E93),
+        title: 'Storage',
+        unit: 'What takes up the most space',
+        onTap: () => _push(StorageScreen(controller: c)),
       ),
     ];
     return LayoutBuilder(builder: (context, box) {
       const gap = 14.0, pad = 24.0;
       final width = box.maxWidth - 2 * pad;
-      final columns = width >= 1000 ? 3 : 2;
+      final columns = width >= 900 ? 4 : 2;
       final cell = (width - (columns - 1) * gap) / columns;
       return Padding(
-        padding: const EdgeInsets.fromLTRB(pad, 8, pad, 0),
-        child: Wrap(spacing: gap, runSpacing: gap, children: [
-          for (final (i, c) in cards.indexed)
-            SizedBox(
-              width: c.wide ? cell * 2 + gap : cell,
-              height: 210,
-              child: c.card,
-            ).animate().fadeIn(delay: (40 * i).ms).moveY(begin: 8, curve: Curves.easeOutCubic),
+        padding: const EdgeInsets.fromLTRB(pad, 4, pad, 0),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          _PlacesBanner(
+            covers: _placeCovers,
+            located: _located,
+            onOpen: () => _push(PlacesScreen(controller: c)),
+          ).animate().fadeIn(duration: 250.ms).moveY(begin: 6, curve: Curves.easeOutCubic),
+          const SizedBox(height: 14),
+          Wrap(spacing: gap, runSpacing: gap, children: [
+            for (final (i, t) in tools.indexed)
+              SizedBox(width: cell, height: 150, child: t)
+                  .animate()
+                  .fadeIn(delay: (50 + 40 * i).ms, duration: 220.ms)
+                  .moveY(begin: 6, curve: Curves.easeOutCubic),
+          ]),
         ]),
       );
     });
@@ -394,23 +386,27 @@ class _ExploreTabState extends State<ExploreTab> {
     return [
       SliverToBoxAdapter(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 26, 24, 12),
-          child: Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+          padding: const EdgeInsets.fromLTRB(26, 28, 24, 12),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(width: 8),
+            Text('${cards.length}', style: TextStyle(fontSize: TextSize.small, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          ]),
         ),
       ),
       SliverPadding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         sliver: SliverGrid.builder(
           gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 190,
-            mainAxisSpacing: 14,
-            crossAxisSpacing: 14,
-            childAspectRatio: _cardWidth / 170,
+            maxCrossAxisExtent: 180,
+            mainAxisExtent: 214,
+            mainAxisSpacing: 18,
+            crossAxisSpacing: 16,
           ),
           itemCount: cards.length,
           itemBuilder: (context, i) {
             final (tag, name, icon, info) = cards[i];
-            return _CategoryCard(
+            return _AlbumTile(
               key: ValueKey('$tag$_dates'),
               title: name,
               icon: icon,
@@ -418,10 +414,9 @@ class _ExploreTabState extends State<ExploreTab> {
               cover: info.cover,
               tag: tag,
               loadCovers: () => c.db.tagCovers(tag, dates: _dates, limit: 9),
-              scroll: null,
               index: i,
               onTap: (cover) => _open(tag, name, cover),
-            ).animate().fadeIn(delay: (30 * i.clamp(0, 12)).ms).scaleXY(begin: 0.92, curve: Curves.easeOutBack);
+            ).animate().fadeIn(delay: (30 * i.clamp(0, 12)).ms, duration: 220.ms);
           },
         ),
       ),
@@ -599,7 +594,7 @@ class _CategoryCardState extends State<_CategoryCard>
 
   Widget _back() {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(DesktopLayout.on ? Mac.cardRadius : 22),
       child: GestureDetector(
         onTap: () => widget.onTap(_covers[_i]),
         onLongPress: _toggleFlip,
@@ -629,10 +624,17 @@ class _CategoryCardState extends State<_CategoryCard>
     final scheme = Theme.of(context).colorScheme;
     final dark = Theme.of(context).brightness == Brightness.dark;
     // The cover on top, the name and count underneath on a quiet card.
+    final desk = DesktopLayout.on;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(desk ? Mac.cardRadius : 22),
       child: Material(
-        color: dark ? const Color(0xC71C1C1F) : const Color(0xD9FFFFFF),
+        color: desk ? Mac.card(context) : dark ? const Color(0xC71C1C1F) : const Color(0xD9FFFFFF),
+        shape: desk
+            ? RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(Mac.cardRadius),
+                side: BorderSide(color: Mac.hairline(context), width: 0.5),
+              )
+            : null,
         child: InkWell(
           onTap: () => widget.onTap(_covers[_i]),
           onLongPress: _toggleFlip,
@@ -796,80 +798,365 @@ IconData categoryIcon(String tag) =>
     _labelIcons[tag.startsWith(labelPrefix) ? tag.substring(labelPrefix.length) : tag] ??
     Icons.label_outline;
 
-/// Desktop Explore: one of the app's tools as a card: its icon and name,
-/// a line about it, and a few of its photos (or faces) underneath.
-class _FeatureCard extends StatelessWidget {
-  const _FeatureCard({
+/// Desktop Explore: Places as a wide banner, a collage of photos taken
+/// somewhere known, with the count and Open map.
+class _PlacesBanner extends StatefulWidget {
+  const _PlacesBanner({required this.covers, required this.located, required this.onOpen});
+
+  final List<String> covers;
+  final int located;
+  final VoidCallback onOpen;
+
+  @override
+  State<_PlacesBanner> createState() => _PlacesBannerState();
+}
+
+class _PlacesBannerState extends State<_PlacesBanner> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final c = widget.covers;
+    Widget photo(int i) => i < c.length
+        ? AnimatedScale(
+            scale: _hover ? 1.03 : 1,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOutCubic,
+            child: AssetThumb(id: c[i], size: 600),
+          )
+        : ColoredBox(color: scheme.surfaceContainerHighest);
+    final Widget collage = c.isEmpty
+        ? ColoredBox(
+            color: scheme.surfaceContainerHighest,
+            child: Center(child: Icon(Icons.map_rounded, size: 56, color: scheme.onSurfaceVariant.withValues(alpha: 0.5))),
+          )
+        : Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Expanded(flex: 3, child: ClipRect(child: photo(0))),
+            if (c.length > 1) ...[
+              const SizedBox(width: 3),
+              Expanded(
+                flex: 2,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Expanded(
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      Expanded(child: ClipRect(child: photo(1))),
+                      const SizedBox(width: 3),
+                      Expanded(child: ClipRect(child: photo(2))),
+                    ]),
+                  ),
+                  const SizedBox(height: 3),
+                  Expanded(
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      Expanded(child: ClipRect(child: photo(3))),
+                      const SizedBox(width: 3),
+                      Expanded(child: ClipRect(child: photo(4))),
+                    ]),
+                  ),
+                ]),
+              ),
+            ],
+          ]);
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        onTap: widget.onOpen,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 230,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Mac.hairline(context), width: 0.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: _hover ? 0.18 : 0.06),
+                blurRadius: _hover ? 18 : 4,
+                offset: Offset(0, _hover ? 6 : 1),
+              ),
+            ],
+          ),
+          child: Stack(fit: StackFit.expand, children: [
+            collage,
+            Positioned(
+              left: 14,
+              bottom: 14,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(color: const Color(0xFF2BB5A6), borderRadius: BorderRadius.circular(9)),
+                    child: const Icon(Icons.map_rounded, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                    const Text('Places',
+                        style: TextStyle(color: Colors.white, fontSize: TextSize.headline, fontWeight: FontWeight.w700)),
+                    Text(
+                      widget.located > 0 ? '${widget.located} photos on the map' : 'Your photos by where they were taken',
+                      style: const TextStyle(color: Color(0xDDFFFFFF), fontSize: TextSize.small),
+                    ),
+                  ]),
+                  const SizedBox(width: 18),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      minimumSize: const Size(0, 32),
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                    ),
+                    onPressed: widget.onOpen,
+                    child: const Text('Open map'),
+                  ),
+                ]),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// Desktop Explore: one tool (Best group shots, Duplicates…): its icon,
+/// name, a big number and a strip of its photos or faces.
+class _ToolTile extends StatefulWidget {
+  const _ToolTile({
     required this.icon,
     required this.color,
     required this.title,
-    required this.note,
+    required this.unit,
     required this.onTap,
+    this.value,
     this.photos = const [],
     this.faces = const [],
   });
 
   final IconData icon;
   final Color color;
-  final String title, note;
+  final String title, unit;
+  final String? value;
   final VoidCallback onTap;
   final List<String> photos;
   final List<Uint8List> faces;
 
   @override
+  State<_ToolTile> createState() => _ToolTileState();
+}
+
+class _ToolTileState extends State<_ToolTile> {
+  bool _hover = false;
+
+  @override
   Widget build(BuildContext context) {
+    final w = widget;
     final scheme = Theme.of(context).colorScheme;
-    final Widget visual;
-    if (photos.isNotEmpty) {
-      visual = Row(children: [
-        for (final (i, id) in photos.indexed) ...[
+    Widget strip;
+    if (w.photos.isNotEmpty) {
+      strip = Row(children: [
+        for (final (i, id) in w.photos.indexed) ...[
           if (i > 0) const SizedBox(width: 3),
-          Expanded(child: AssetThumb(id: id, size: 300)),
+          Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(6), child: AssetThumb(id: id, size: 160))),
         ],
       ]);
-    } else if (faces.isNotEmpty) {
-      visual = ColoredBox(
-        color: scheme.surfaceContainerHighest,
-        child: Center(
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            for (final f in faces)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: CircleAvatar(radius: 24, backgroundImage: MemoryImage(f)),
-              ),
-          ]),
-        ),
-      );
+    } else if (w.faces.isNotEmpty) {
+      strip = Row(children: [
+        for (final (i, f) in w.faces.indexed)
+          Align(
+            widthFactor: 0.72,
+            child: Container(
+              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Mac.card(context), width: 2)),
+              child: CircleAvatar(radius: 18, backgroundImage: FaceImage(f)),
+            ),
+          ).animate().fadeIn(delay: (40 * i).ms),
+      ]);
     } else {
-      visual = ColoredBox(
-        color: scheme.surfaceContainerHighest,
-        child: Center(child: Icon(icon, size: 40, color: color)),
+      strip = Align(
+        alignment: Alignment.centerLeft,
+        child: Text(w.unit, style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
       );
     }
-    return SectionCard(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        onTap: w.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            color: Mac.card(context),
+            borderRadius: BorderRadius.circular(Mac.cardRadius),
+            border: Border.all(color: _hover ? w.color.withValues(alpha: 0.5) : Mac.hairline(context), width: 0.8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: _hover ? 0.12 : 0.03),
+                blurRadius: _hover ? 14 : 3,
+                offset: Offset(0, _hover ? 5 : 1),
+              ),
+            ],
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              IconTile(icon: icon, color: color),
-              const SizedBox(width: 10),
-              Text(title, style: const TextStyle(fontSize: TextSize.callout, fontWeight: FontWeight.w700)),
-              const SizedBox(width: 10),
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(color: w.color, borderRadius: BorderRadius.circular(7)),
+                child: Icon(w.icon, size: 16, color: Colors.white),
+              ),
+              const SizedBox(width: 9),
               Expanded(
-                child: Text(note,
-                    textAlign: TextAlign.right,
+                child: Text(w.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
+                    style: const TextStyle(fontSize: TextSize.label, fontWeight: FontWeight.w600)),
               ),
+              Icon(Icons.chevron_right_rounded, size: 18, color: scheme.onSurfaceVariant.withValues(alpha: _hover ? 1 : 0.5)),
             ]),
-            const SizedBox(height: 12),
-            Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(12), child: visual)),
+            const SizedBox(height: 8),
+            if (w.value != null)
+              Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+                Text(w.value!, style: const TextStyle(fontSize: TextSize.title2, fontWeight: FontWeight.w700)),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(w.unit,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
+                ),
+              ]),
+            const SizedBox(height: 8),
+            Expanded(child: strip),
           ]),
         ),
+      ),
+    );
+  }
+}
+
+/// Desktop Explore: a category as an album: a rounded square of its
+/// photos (slowly changing), with the name and count underneath.
+class _AlbumTile extends StatefulWidget {
+  const _AlbumTile({
+    super.key,
+    required this.tag,
+    required this.title,
+    required this.icon,
+    required this.count,
+    required this.cover,
+    required this.loadCovers,
+    required this.index,
+    required this.onTap,
+  });
+
+  final String tag, title, cover;
+  final IconData icon;
+  final int count, index;
+  final Future<List<String>> Function() loadCovers;
+  final ValueChanged<String> onTap;
+
+  @override
+  State<_AlbumTile> createState() => _AlbumTileState();
+}
+
+class _AlbumTileState extends State<_AlbumTile> {
+  late List<String> _covers = [widget.cover];
+  int _i = 0;
+  Timer? _timer;
+  bool _hover = false;
+  ValueListenable<TickerModeData>? _active;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.loadCovers().then((all) {
+      if (!mounted || all.length < 2) return;
+      _covers = all.take(4).toList();
+      _timer = Timer.periodic(Duration(milliseconds: 4500 + 600 * (widget.index % 5)), (_) {
+        if (mounted && !_hover && (_active?.value.enabled ?? true)) setState(() => _i = (_i + 1) % _covers.length);
+      });
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _active = TickerMode.getValuesNotifier(context);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final id = _covers[_i];
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        onTap: () => widget.onTap(id),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: scheme.surfaceContainerHighest,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: _hover ? 0.2 : 0.06),
+                    blurRadius: _hover ? 14 : 3,
+                    offset: Offset(0, _hover ? 5 : 1),
+                  ),
+                ],
+              ),
+              child: Stack(fit: StackFit.expand, children: [
+                Hero(
+                  tag: 'cat-${widget.tag}',
+                  child: AnimatedScale(
+                    scale: _hover ? 1.05 : 1,
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeOutCubic,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 700),
+                      child: KeyedSubtree(key: ValueKey(id), child: AssetThumb(id: id, size: 320)),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 8,
+                  top: 8,
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.45), borderRadius: BorderRadius.circular(7)),
+                    child: Icon(widget.icon, color: Colors.white, size: 15),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(widget.title,
+              maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: TextSize.caption, fontWeight: FontWeight.w600)),
+          Text('${widget.count} ${widget.count == 1 ? 'photo' : 'photos'}',
+              style: TextStyle(fontSize: TextSize.small, color: scheme.onSurfaceVariant)),
+        ]),
       ),
     );
   }

@@ -1,14 +1,19 @@
 import 'dart:async';
-import 'dart:typed_data';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'anim.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../data/dates.dart';
 import '../data/db.dart';
 import '../scan/scan_controller.dart';
+import 'desktop_keys.dart';
+import 'desktop_layout.dart';
 import 'explore_screen.dart';
+import 'face_model_view.dart';
+import 'marquee.dart';
 import 'glass.dart';
 import 'motion.dart';
 import 'photo_viewer.dart';
@@ -19,6 +24,7 @@ import 'theme.dart';
 import 'together_screen.dart';
 import 'widgets.dart';
 import '../platform/desktop_library.dart';
+import 'face_image.dart';
 
 /// Messaging apps cap how many files one share can carry, so big sets go out
 /// in batches.
@@ -73,6 +79,20 @@ class _PersonScreenState extends State<PersonScreen> {
   /// "Choose photos" mode: tap photos to pick exactly which ones to send.
   bool _choosing = false;
 
+  /// Desktop: the 3D face model under the header is showing.
+  bool _faceModel = true;
+  static const _faceModelKey = 'face_model_open';
+
+  Future<void> _loadFaceModelSetting() async {
+    final saved = await c.db.setting(_faceModelKey);
+    if (mounted && saved == '0') setState(() => _faceModel = false);
+  }
+
+  void _toggleFaceModel() {
+    setState(() => _faceModel = !_faceModel);
+    c.db.setSetting(_faceModelKey, _faceModel ? '1' : '0');
+  }
+
   void _startChoosing() {
     Haptics.lift();
     setState(() {
@@ -86,6 +106,13 @@ class _PersonScreenState extends State<PersonScreen> {
 
   void _stopChoosing() => setState(() {
         _choosing = false;
+        _selected.clear();
+      });
+
+  /// Desktop: a click, Ctrl-click or drag box in the grid starts choosing
+  /// with nothing picked yet; the grid then picks.
+  void _chooseFromGrid() => setState(() {
+        _choosing = true;
         _selected.clear();
       });
 
@@ -172,6 +199,7 @@ class _PersonScreenState extends State<PersonScreen> {
   @override
   void initState() {
     super.initState();
+    if (DesktopLayout.on) _loadFaceModelSetting();
     _load();
   }
 
@@ -295,6 +323,13 @@ class _PersonScreenState extends State<PersonScreen> {
     final person = _person;
     if (person == null) return;
     switch (action) {
+      case 'facemodel':
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => FaceModelScreen(db: c.db, personId: person.id, name: person.displayName),
+          ),
+        );
       case 'nickname':
         final text = TextEditingController(text: person.nickname ?? '');
         final nick = await showDialog<String>(
@@ -425,7 +460,7 @@ class _PersonScreenState extends State<PersonScreen> {
         left: centre.dx - 18,
         top: centre.dy - 18,
         child: IgnorePointer(
-          child: CircleAvatar(radius: 18, backgroundImage: MemoryImage(thumb))
+          child: CircleAvatar(radius: 18, backgroundImage: FaceImage(thumb))
               .animate(onComplete: (_) => entry.remove())
               .scaleXY(begin: 0.3, end: 1, duration: 250.ms, curve: Curves.easeOutBack)
               .move(
@@ -612,13 +647,23 @@ class _PersonScreenState extends State<PersonScreen> {
       );
     }
     final base = Theme.of(context);
-    final scheme = _scheme ?? base.colorScheme;
+    final face = _scheme;
+    // A computer keeps the window's neutral greys; only the accent comes
+    // from the person's face.
+    final scheme = face == null
+        ? base.colorScheme
+        : DesktopLayout.on
+            ? base.colorScheme.copyWith(primary: face.primary, onPrimary: face.onPrimary)
+            : face;
     final visible = _visible;
     final selecting = _choosing;
     final sendCount = selecting
         ? visible.where((p) => _selected.contains(p.assetId)).length
         : visible.length;
     final allPicked = sendCount == visible.length;
+    if (DesktopLayout.on) {
+      return _desktop(context, person, base.copyWith(colorScheme: scheme), visible, selecting, sendCount, allPicked);
+    }
 
     // Plain Theme, not AnimatedTheme: re-theming the whole page every frame
     // while it slides in made opening a person stutter.
@@ -655,15 +700,7 @@ class _PersonScreenState extends State<PersonScreen> {
                     ),
                   PopupMenuButton<String>(
                     onSelected: _menu,
-                    itemBuilder: (_) => [
-                      const PopupMenuItem(value: 'nickname', child: Text('Set nickname')),
-                      const PopupMenuItem(value: 'together', child: Text('Photos with someone…')),
-                      const PopupMenuItem(value: 'gender', child: Text('Male or female…')),
-                      PopupMenuItem(
-                        value: 'ignore',
-                        child: Text(_ignored ? 'Bring back to People' : 'Not in our group'),
-                      ),
-                    ],
+                    itemBuilder: (_) => _menuItems(),
                   ),
                 ],
                 flexibleSpace: FlexibleSpaceBar(
@@ -847,6 +884,260 @@ class _PersonScreenState extends State<PersonScreen> {
     );
   }
 
+  List<PopupMenuEntry<String>> _menuItems() => [
+        // A computer shows it under the header already.
+        if (!DesktopLayout.on) const PopupMenuItem(value: 'facemodel', child: Text('Face model')),
+        const PopupMenuItem(value: 'nickname', child: Text('Set nickname')),
+        const PopupMenuItem(value: 'together', child: Text('Photos with someone…')),
+        const PopupMenuItem(value: 'gender', child: Text('Male or female…')),
+        PopupMenuItem(
+          value: 'ignore',
+          child: Text(_ignored ? 'Bring back to People' : 'Not in our group'),
+        ),
+      ];
+
+  /// Desktop, like a person in a Mac's Photos: a compact header (the face,
+  /// the name and count on the left; Select, Send and More on the right), a
+  /// toolbar with Photos / Faces and the filters, then the grid. No
+  /// floating bar over the photos.
+  Widget _desktop(BuildContext context, PersonSummary person, ThemeData theme, List<PersonPhoto> visible,
+      bool selecting, int sendCount, bool allPicked) {
+    final scheme = theme.colorScheme;
+    final text = theme.textTheme;
+    final faint = scheme.onSurfaceVariant;
+    final details = [
+      if (person.nickname != null) '"${person.nickname}"',
+      '${_all.length} ${_all.length == 1 ? 'photo' : 'photos'}',
+      if (_sentCount > 0) '$_sentCount sent',
+      ?_tripName,
+      if (_dates != null) formatSpan(_dates!),
+    ].join(' · ');
+    final nameStyle = text.headlineSmall?.copyWith(fontWeight: FontWeight.w700);
+    final n = _activeFilters;
+    return Theme(
+      data: theme,
+      child: DefaultTabController(
+        length: 2,
+        child: Builder(builder: (context) {
+          final tabs = DefaultTabController.of(context);
+          return Scaffold(
+            backgroundColor: scheme.surface,
+            body: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 20, 14),
+                child: Row(children: [
+                  GlassIconButton(
+                    tooltip: 'Back (Esc)',
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    onPressed: () => Navigator.maybePop(context),
+                  ),
+                  const SizedBox(width: 10),
+                  // Click the face to play their best photos as a reel.
+                  Tooltip(
+                    message: 'Play their best photos',
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: _playReel,
+                        child: Stack(key: _avatarKey, clipBehavior: Clip.none, children: [
+                          Container(
+                            padding: const EdgeInsets.all(2.5),
+                            decoration: BoxDecoration(shape: BoxShape.circle, color: scheme.primary),
+                            child: FaceAvatar(personId: person.id, thumb: person.coverThumb, radius: 30),
+                          ),
+                          Positioned(
+                            right: -3,
+                            bottom: -3,
+                            child: Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: scheme.primary,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: scheme.surface, width: 2),
+                              ),
+                              child: Icon(Icons.play_arrow_rounded, size: 15, color: scheme.onPrimary),
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                      Row(mainAxisSize: MainAxisSize.min, children: [
+                        Flexible(
+                          child: _revealName > 0
+                              ? TypewriterText(person.displayName, key: ValueKey(_revealName), style: nameStyle)
+                              : Text(person.displayName, maxLines: 1, overflow: TextOverflow.ellipsis, style: nameStyle),
+                        ),
+                        const SizedBox(width: 2),
+                        IconButton(
+                          tooltip: 'Rename',
+                          iconSize: 16,
+                          style: IconButton.styleFrom(minimumSize: const Size(28, 28), padding: const EdgeInsets.all(5)),
+                          color: faint,
+                          onPressed: _rename,
+                          icon: const Icon(Icons.edit_outlined),
+                        ),
+                      ]),
+                      Text(details, maxLines: 1, overflow: TextOverflow.ellipsis, style: text.bodyMedium?.copyWith(color: faint)),
+                    ]),
+                  ),
+                  const SizedBox(width: 12),
+                  if (selecting) ...[
+                    TextButton(
+                      onPressed: () => setState(() => allPicked
+                          ? _selected.clear()
+                          : _selected.addAll(visible.map((p) => p.assetId))),
+                      child: Text(allPicked ? 'Select none' : 'Select all'),
+                    ),
+                    if (_selected.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message: "Take ${person.displayName} off the selected photos",
+                        child: OutlinedButton.icon(
+                          onPressed: _notThem,
+                          icon: const Icon(Icons.person_remove_outlined, size: 17),
+                          label: const Text('Not them'),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 8),
+                    OutlinedButton(onPressed: _stopChoosing, child: const Text('Cancel')),
+                  ] else
+                    Tooltip(
+                      message: 'Pick which photos to send',
+                      child: OutlinedButton.icon(
+                        onPressed: visible.isEmpty ? null : _startChoosing,
+                        icon: const Icon(Icons.checklist_rounded, size: 17),
+                        label: const Text('Select'),
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 200,
+                    child: _SendButton(
+                      label: selecting ? 'Send $sendCount selected' : 'Send all $sendCount',
+                      enabled: sendCount > 0,
+                      onSend: _send,
+                      compact: true,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    tooltip: _faceModel ? 'Hide the face model' : 'Show the face model',
+                    isSelected: _faceModel,
+                    selectedIcon: Icon(Icons.view_in_ar_rounded, color: scheme.primary),
+                    icon: const Icon(Icons.view_in_ar_outlined),
+                    onPressed: _toggleFaceModel,
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'More',
+                    icon: const Icon(Icons.more_horiz_rounded),
+                    onSelected: _menu,
+                    itemBuilder: (_) => _menuItems(),
+                  ),
+                ]),
+              ),
+              // The person's face in 3D, lit where ShareBro knows it.
+              AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: _faceModel
+                    ? FaceModelPanel(
+                        key: ValueKey('face-${person.id}'),
+                        db: c.db,
+                        personId: person.id,
+                        name: person.displayName,
+                      )
+                    : const SizedBox(width: double.infinity),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: AnimatedBuilder(
+                  animation: tabs,
+                  builder: (context, _) => Row(children: [
+                    SizedBox(
+                      width: 230,
+                      child: CapsuleSwitch<int>(
+                        value: tabs.index,
+                        options: [(0, 'Photos', visible.length), (1, 'Faces', _faces.length)],
+                        onChanged: tabs.animateTo,
+                      ),
+                    ),
+                    if (tabs.index == 0) ...[
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 230,
+                        child: CapsuleSwitch<PhotoKind>(
+                          value: _kind,
+                          options: const [
+                            (PhotoKind.all, 'All', null),
+                            (PhotoKind.solo, 'Solo', null),
+                            (PhotoKind.group, 'Group', null),
+                          ],
+                          onChanged: (k) => setState(() => _kind = k),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Badge(
+                        isLabelVisible: n > 0,
+                        label: Text('$n'),
+                        child: IconButton(
+                          tooltip: 'Filters: best shots, smiling, dates…',
+                          onPressed: _openFilters,
+                          icon: const Icon(Icons.tune_rounded),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        tabs.index == 1
+                            ? "Click a face that isn't ${person.displayName} to remove it · right-click to make it the cover"
+                            : selecting
+                                ? '$sendCount of ${visible.length} selected · click photos to change'
+                                : '',
+                        textAlign: TextAlign.end,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: text.bodySmall?.copyWith(color: faint),
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
+              Divider(height: 0.5, thickness: 0.5, color: Mac.hairline(context)),
+              Expanded(
+                child: TabBarView(physics: const NeverScrollableScrollPhysics(), children: [
+                  _PhotoGrid(
+                    photos: visible,
+                    selected: _selected,
+                    choosing: selecting,
+                    onChanged: _selectionChanged,
+                    onOpen: (i) => _openViewer(visible, i),
+                    onChoose: _chooseFromGrid,
+                    onCancel: _stopChoosing,
+                  ),
+                  _FacesGrid(
+                    faces: _faces,
+                    leaving: _leaving,
+                    onTap: _rejectFace,
+                    onLongPress: _useAsCover,
+                    hint: false,
+                  ),
+                ]),
+              ),
+            ]),
+          );
+        }),
+      ),
+    );
+  }
+
   /// "Category" chip listing the categories this person's photos fall in.
   Widget _categoryChip() {
     final counts = <String, int>{};
@@ -1015,6 +1306,8 @@ class _PersonScreenState extends State<PersonScreen> {
 /// others to select (or deselect) them all, with a tick of haptics for each.
 class _PhotoGrid extends StatefulWidget {
   const _PhotoGrid({
+    this.onChoose,
+    this.onCancel,
     required this.photos,
     required this.selected,
     required this.choosing,
@@ -1024,6 +1317,9 @@ class _PhotoGrid extends StatefulWidget {
 
   final List<PersonPhoto> photos;
   final Set<String> selected;
+
+  /// Desktop: start choosing with nothing picked, and stop choosing.
+  final VoidCallback? onChoose, onCancel;
 
   /// In "Choose photos" mode a tap selects/deselects instead of opening.
   final bool choosing;
@@ -1035,8 +1331,110 @@ class _PhotoGrid extends StatefulWidget {
 }
 
 class _PhotoGridState extends State<_PhotoGrid> {
-  static const _gap = 3.0;
-  static const _pad = 3.0;
+  // ---- Desktop: selecting as in Explorer or Finder ----
+
+  bool get _desk => DesktopLayout.on;
+  int? _clickAnchor, _lastClick;
+  DateTime _lastClickAt = DateTime(0);
+  Set<String> _boxBase = {};
+
+  @override
+  void initState() {
+    super.initState();
+    if (_desk) HardwareKeyboard.instance.addHandler(_key);
+  }
+
+  @override
+  void didUpdateWidget(_PhotoGrid old) {
+    super.didUpdateWidget(old);
+    // While choosing, Esc clears the choice rather than leaving the page.
+    if (_desk) widget.choosing ? DesktopKeys.escClaims.add(this) : DesktopKeys.escClaims.remove(this);
+  }
+
+  void _choose() {
+    if (!widget.choosing) widget.onChoose?.call();
+  }
+
+  /// Ctrl + A picks every photo; Esc stops choosing.
+  bool _key(KeyEvent e) {
+    if (e is! KeyDownEvent || !mounted) return false;
+    if (!(ModalRoute.of(context)?.isCurrent ?? true) || !TickerMode.valuesOf(context).enabled) return false;
+    if (FocusManager.instance.primaryFocus?.context?.widget is EditableText) return false;
+    final keys = HardwareKeyboard.instance;
+    final k = e.logicalKey;
+    if ((keys.isControlPressed || keys.isMetaPressed) && k == LogicalKeyboardKey.keyA) {
+      _choose();
+      widget.selected.addAll(widget.photos.map((p) => p.assetId));
+      widget.onChanged();
+      return true;
+    }
+    if (k == LogicalKeyboardKey.escape && widget.choosing) {
+      widget.onCancel?.call();
+      return true;
+    }
+    return false;
+  }
+
+  /// A click: selects just this photo; double-click opens; Ctrl adds or
+  /// removes; Shift selects the run from the last one clicked (Ctrl +
+  /// Shift adds the run).
+  void _deskClick(int i) {
+    final keys = HardwareKeyboard.instance;
+    final ctrl = keys.isControlPressed || keys.isMetaPressed;
+    final id = widget.photos[i].assetId;
+    final now = DateTime.now();
+    final again = _lastClick == i && now.difference(_lastClickAt) < const Duration(milliseconds: 450);
+    _lastClick = i;
+    _lastClickAt = now;
+    if (keys.isShiftPressed && _clickAnchor != null) {
+      final a = _clickAnchor!.clamp(0, widget.photos.length - 1);
+      _choose();
+      if (!ctrl) widget.selected.clear();
+      for (var k = math.min(a, i); k <= math.max(a, i); k++) {
+        widget.selected.add(widget.photos[k].assetId);
+      }
+      widget.onChanged();
+      return;
+    }
+    _clickAnchor = i;
+    if (ctrl) {
+      _choose();
+      widget.selected.contains(id) ? widget.selected.remove(id) : widget.selected.add(id);
+      widget.onChanged();
+      return;
+    }
+    if (again) {
+      widget.onOpen(i);
+      return;
+    }
+    _choose();
+    widget.selected
+      ..clear()
+      ..add(id);
+    widget.onChanged();
+  }
+
+  /// The tiles inside [r], a box in the scroll content.
+  Set<int> _tilesIn(Rect r) {
+    final out = <int>{};
+    final n = widget.photos.length, step = _tile + _gap;
+    if (step <= 0) return out;
+    for (var row = math.max(0, ((r.top - _pad) / step).floor());; row++) {
+      final y0 = _pad + row * step;
+      if (y0 > r.bottom || row * _columns >= n) break;
+      if (y0 + _tile < r.top) continue;
+      for (var c = 0; c < _columns; c++) {
+        final i = row * _columns + c;
+        if (i >= n) break;
+        final x0 = _pad + c * step;
+        if (x0 <= r.right && x0 + _tile >= r.left) out.add(i);
+      }
+    }
+    return out;
+  }
+
+  static double get _gap => DesktopLayout.on ? 4.0 : 3.0;
+  static double get _pad => DesktopLayout.on ? 20.0 : 3.0;
   final _scroll = ScrollController();
 
   int? _anchor;
@@ -1051,6 +1449,10 @@ class _PhotoGridState extends State<_PhotoGrid> {
 
   @override
   void dispose() {
+    if (_desk) {
+      HardwareKeyboard.instance.removeHandler(_key);
+      DesktopKeys.escClaims.remove(this);
+    }
     _autoScroll?.cancel();
     _scroll.dispose();
     super.dispose();
@@ -1137,15 +1539,16 @@ class _PhotoGridState extends State<_PhotoGrid> {
       return const EmptyIllustration(message: 'No photos match these filters.');
     }
     return LayoutBuilder(builder: (context, box) {
-      _columns = (box.maxWidth / 120).floor().clamp(3, 8);
+      _columns = DesktopLayout.on ? (box.maxWidth / 190).floor().clamp(3, 12) : (box.maxWidth / 120).floor().clamp(3, 8);
       _tile = (box.maxWidth - 2 * _pad - (_columns - 1) * _gap) / _columns;
       final selecting = widget.choosing;
       return GestureDetector(
-        onLongPressStart: (d) => _start(d.localPosition),
-        onLongPressMoveUpdate: (d) => _move(d.localPosition, box.maxHeight),
-        onLongPressEnd: (_) => _end(),
-        onLongPressCancel: _end,
-        child: GridView.builder(
+        // A touch screen's long-press selection; a mouse draws a box.
+        onLongPressStart: _desk ? null : (d) => _start(d.localPosition),
+        onLongPressMoveUpdate: _desk ? null : (d) => _move(d.localPosition, box.maxHeight),
+        onLongPressEnd: _desk ? null : (_) => _end(),
+        onLongPressCancel: _desk ? null : _end,
+        child: _boxSelect(GridView.builder(
           controller: _scroll,
           padding: EdgeInsets.fromLTRB(
               _pad, _pad, _pad, MediaQuery.paddingOf(context).bottom + _pad),
@@ -1158,8 +1561,10 @@ class _PhotoGridState extends State<_PhotoGrid> {
           itemBuilder: (context, i) {
             final photo = widget.photos[i];
             final isSelected = widget.selected.contains(photo.assetId);
-            return GestureDetector(
-              onTap: () {
+            return MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+              onTap: _desk ? () => _deskClick(i) : () {
                 if (selecting) {
                   Haptics.tick();
                   isSelected
@@ -1176,11 +1581,12 @@ class _PhotoGridState extends State<_PhotoGrid> {
                   duration: 180.ms,
                   curve: Curves.easeOut,
                   child: AnimatedOpacity(
-                    // Photos left out of the send are dimmed.
-                    opacity: selecting && !isSelected ? 0.4 : 1,
+                    // Photos left out of the send are dimmed (on a phone; a
+                    // computer marks the chosen ones instead).
+                    opacity: selecting && !isSelected && !_desk ? 0.4 : 1,
                     duration: 180.ms,
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(selecting && isSelected ? 14 : 4),
+                      borderRadius: BorderRadius.circular(selecting && isSelected ? 14 : DesktopLayout.on ? 6 : 4),
                       child: Hero(
                         tag: 'photo-${photo.assetId}',
                         child: AssetThumb(id: photo.assetId),
@@ -1200,6 +1606,20 @@ class _PhotoGridState extends State<_PhotoGrid> {
                       icon: const Icon(Icons.open_in_full_rounded,
                           color: Colors.white, size: 18,
                           shadows: [Shadow(color: Colors.black54, blurRadius: 4)]),
+                    ),
+                  ),
+                // Desktop: chosen photos get an accent outline.
+                if (_desk && selecting && isSelected)
+                  IgnorePointer(
+                    child: AnimatedScale(
+                      scale: 0.88,
+                      duration: 180.ms,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: scheme.primary, width: 3),
+                        ),
+                      ),
                     ),
                   ),
                 if (photo.isBlurry && !selecting)
@@ -1229,12 +1649,36 @@ class _PhotoGridState extends State<_PhotoGrid> {
                   ),
                 ),
               ]),
+            ),
             );
           },
-        ),
+        )),
       );
     });
   }
+
+  /// Desktop: drag a box over the photos to choose them.
+  Widget _boxSelect(Widget grid) => !_desk
+      ? grid
+      : MarqueeSelect(
+          scroll: _scroll,
+          hitTest: _tilesIn,
+          onStart: (adding) {
+            _boxBase = adding ? Set.of(widget.selected) : {};
+            _choose();
+          },
+          onUpdate: (tiles) {
+            widget.selected
+              ..clear()
+              ..addAll(_boxBase)
+              ..addAll([for (final i in tiles) widget.photos[i].assetId]);
+            widget.onChanged();
+          },
+          onEmptyClick: () {
+            if (widget.choosing) widget.onCancel?.call();
+          },
+          child: grid,
+        );
 }
 
 class _FacesGrid extends StatelessWidget {
@@ -1243,7 +1687,11 @@ class _FacesGrid extends StatelessWidget {
     required this.leaving,
     required this.onTap,
     required this.onLongPress,
+    this.hint = true,
   });
+
+  /// The line explaining tap and long-press (the desktop toolbar says it).
+  final bool hint;
 
   final List<FaceThumb> faces;
   final Set<int> leaving;
@@ -1254,7 +1702,9 @@ class _FacesGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final desk = DesktopLayout.on;
     return Column(children: [
+      if (hint)
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
         child: Text('Tap a face that isn\'t this person to remove it. Long-press to make it the cover.',
@@ -1262,11 +1712,13 @@ class _FacesGrid extends StatelessWidget {
       ),
       Expanded(
         child: GridView.builder(
-          padding: EdgeInsets.fromLTRB(8, 8, 8, MediaQuery.paddingOf(context).bottom + 8),
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 80,
-            mainAxisSpacing: 6,
-            crossAxisSpacing: 6,
+          padding: desk
+              ? const EdgeInsets.all(20)
+              : EdgeInsets.fromLTRB(8, 8, 8, MediaQuery.paddingOf(context).bottom + 8),
+          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: desk ? 112 : 80,
+            mainAxisSpacing: desk ? 10 : 6,
+            crossAxisSpacing: desk ? 10 : 6,
           ),
           itemCount: faces.length,
           itemBuilder: (context, i) {
@@ -1276,6 +1728,7 @@ class _FacesGrid extends StatelessWidget {
               key: ValueKey(face.id),
               onTap: gone ? null : () => onTap(face),
               onLongPress: gone ? null : () => onLongPress(face),
+              onSecondaryTap: gone ? null : () => onLongPress(face),
               child: AnimatedSlide(
                 offset: gone ? const Offset(0, -1.2) : Offset.zero,
                 duration: 400.ms,
@@ -1289,7 +1742,10 @@ class _FacesGrid extends StatelessWidget {
                     duration: 400.ms,
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.memory(face.thumb, fit: BoxFit.cover),
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: Image.memory(face.thumb, fit: BoxFit.cover, gaplessPlayback: true),
+                      ),
                     ),
                   ),
                 ),
@@ -1308,10 +1764,13 @@ enum _SendState { idle, working, done }
 /// prepared, flashes a tick, then returns.
 class _SendButton extends StatefulWidget {
   const _SendButton(
-      {required this.label, required this.enabled, required this.onSend});
+      {required this.label, required this.enabled, required this.onSend, this.compact = false});
 
   final String label;
   final bool enabled;
+
+  /// A computer's toolbar size: 36 tall with Mac corners.
+  final bool compact;
   final Future<void> Function() onSend;
 
   @override
@@ -1340,6 +1799,9 @@ class _SendButtonState extends State<_SendButton> {
     final scheme = Theme.of(context).colorScheme;
     final idle = _state == _SendState.idle;
     final enabled = widget.enabled && idle;
+    final small = widget.compact;
+    final h = small ? 36.0 : 56.0;
+    final radius = small ? Mac.controlRadius : 28.0;
     return LayoutBuilder(builder: (context, box) {
       // heightFactor 1: only as tall as the button, never the whole screen
       // (the bottom bar is given the full screen height to lay out in).
@@ -1348,20 +1810,20 @@ class _SendButtonState extends State<_SendButton> {
         child: AnimatedContainer(
           duration: 350.ms,
           curve: Curves.easeInOutCubic,
-          width: idle ? box.maxWidth : 56,
-          height: 56,
+          width: idle ? box.maxWidth : h,
+          height: h,
           decoration: BoxDecoration(
             color: _state == _SendState.done
                 ? Colors.green
                 : enabled || !idle
                     ? scheme.primary
                     : scheme.onSurface.withAlpha(30),
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(radius),
           ),
           child: Material(
             type: MaterialType.transparency,
             child: InkWell(
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(radius),
               onTap: enabled ? _tap : null,
               child: Center(
                 child: AnimatedSwitcher(
@@ -1371,23 +1833,23 @@ class _SendButtonState extends State<_SendButton> {
                     _SendState.idle => FittedBox(
                         key: const ValueKey('label'),
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(Icons.send_rounded, color: scheme.onPrimary),
-                          const SizedBox(width: 10),
+                          Icon(Icons.send_rounded, color: scheme.onPrimary, size: small ? 17 : null),
+                          SizedBox(width: small ? 8 : 10),
                           Text(widget.label,
                               style: TextStyle(
                                   color: scheme.onPrimary,
                                   fontWeight: FontWeight.w600,
-                                  fontSize: TextSize.body)),
+                                  fontSize: small ? TextSize.caption : TextSize.body)),
                         ]),
                       ),
                     _SendState.working => SizedBox.square(
                         key: const ValueKey('ring'),
-                        dimension: 26,
+                        dimension: small ? 18 : 26,
                         child: CircularProgressIndicator(
-                            strokeWidth: 3, color: scheme.onPrimary),
+                            strokeWidth: small ? 2.5 : 3, color: scheme.onPrimary),
                       ),
-                    _SendState.done => const Icon(Icons.check_rounded,
-                        key: ValueKey('done'), color: Colors.white, size: 30),
+                    _SendState.done => Icon(Icons.check_rounded,
+                        key: const ValueKey('done'), color: Colors.white, size: small ? 22 : 30),
                   },
                 ),
               ),

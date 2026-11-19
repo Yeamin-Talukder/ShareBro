@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../update/release.dart';
 import 'glass.dart';
+import 'desktop_shell.dart' show DesktopNav;
 import 'island.dart' show islandNavigator;
 import 'motion.dart';
 import 'theme.dart';
@@ -79,6 +80,8 @@ class _BannerState extends State<_Banner> with SingleTickerProviderStateMixin {
   void _open() {
     final nav = islandNavigator.currentState;
     _hide();
+    // Desktop: Settings › Software update, beside the sidebar.
+    if (DesktopNav.openSettings('updates')) return;
     if (nav != null) showUpdateSheet(nav.context);
   }
 
