@@ -25,7 +25,7 @@ for group trips, weddings and events: the friend who took 2,000 photos can
 share them with everyone in minutes instead of hours. **Works 100% offline:
 no cloud, no uploads, no account.**
 
-### [⬇️ Download the APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) &nbsp;·&nbsp; [🖥️ Windows (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.8.0-windows) &nbsp;·&nbsp; [🌐 Website](https://yeamin-talukder.github.io/ShareBro/) &nbsp;·&nbsp; [▶️ 1-minute video](https://yeamin-talukder.github.io/ShareBro/#video)
+### [⬇️ Download the APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) &nbsp;·&nbsp; [🖥️ Windows (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.0-windows) &nbsp;·&nbsp; [🌐 Website](https://yeamin-talukder.github.io/ShareBro/) &nbsp;·&nbsp; [▶️ 1-minute video](https://yeamin-talukder.github.io/ShareBro/#video)
 
 <sub>Most phones: <code>ShareBro-…-arm64-v8a.apk</code> · Android 9 or newer · Windows 10 and 11 in preview · free</sub>
 
@@ -44,7 +44,7 @@ no cloud, no uploads, no account.**
 | **Internet** | Not needed. Face recognition, search and sharing all run on the phone and the local network |
 | **Privacy** | Photos are never uploaded. No account, no analytics |
 | **Works with** | [LocalSend](https://localsend.org) on Android, iPhone, Windows, macOS and Linux, and any web browser |
-| **Get it** | APK from [GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) (not on the Play Store yet); [Windows installer](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.8.0-windows) in preview |
+| **Get it** | APK from [GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) (not on the Play Store yet); [Windows installer](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.0-windows) in preview |
 | **Website** | [yeamin-talukder.github.io/ShareBro](https://yeamin-talukder.github.io/ShareBro/) |
 
 ---
@@ -166,6 +166,7 @@ shows the whole flow.</sub>
 | 👥 **Face grouping** | On-device face detection and recognition, tuned to cope with glasses, angles and lighting |
 | 🧳 **Trip groups** | Everyone joins with a 4-digit code; each photo goes only to the people in it |
 | 🔎 **Find my photos** | Friends scan a QR code, take a selfie in their browser, and get a gallery of just their photos |
+| 💻 **Scan with my computer** | Pair your phone with ShareBro on your PC: during a scan the PC finds faces in small copies of the photos on its graphics chip and sends back only the results, with live progress and speed on the PC |
 | 🔄 **Sync people between devices** | Name someone once: your phone and computer swap who's who (names and face fingerprints, never photos), both ways, after you accept on the other device |
 | 📤 **LocalSend-compatible** | Send photos, videos, files, folders, text and apps to any device running LocalSend (Android, iPhone, Windows, Mac, Linux) |
 | 📡 **No network needed** | ShareBro phones can send to each other over Bluetooth and Wi-Fi Direct |
@@ -456,8 +457,8 @@ checksum of every APK.
 
 ### Windows (preview)
 
-1. Download **[`ShareBro-1.8.0-windows-setup.exe`](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.8.0-windows/ShareBro-1.8.0-windows-setup.exe)** (Windows 10
-   and 11, 64-bit) from the [Windows release](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.8.0-windows).
+1. Download **[`ShareBro-1.9.0-windows-setup.exe`](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.9.0-windows/ShareBro-1.9.0-windows-setup.exe)** (Windows 10
+   and 11, 64-bit) from the [Windows release](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.0-windows).
 2. Open it. If Windows says **"Windows protected your PC"**, choose
    **More info › Run anyway**: the installer isn't signed yet.
 3. Follow the steps. ShareBro installs for your user (no admin password)
@@ -865,8 +866,10 @@ from History.
 
 | Version | Highlights |
 |---|---|
-| [**v1.8.0**](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.8.0) | Sync people with your other devices: phone and computer swap names and face fingerprints (never photos), both ways, so nobody is named twice |
-| [**Windows 1.8.0** (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.8.0-windows) | Sync people with your phone, both ways |
+| [**v1.9.0**](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.0) | Scan with my computer (your PC scans alongside your phone; it may remember face results only if you allow it); scan speed in photos per second; a new QR share page with finger-precise zoom, full-quality zoom, videos and share-to-gallery |
+| [**Windows 1.9.0** (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.0-windows) | Helps your phone scan, with live details; scans about 12-17% faster; a new look, a 3D face model on each person's page, drag-box selection and drag-and-drop sharing |
+| [v1.8.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.8.0) | Sync people with your other devices: phone and computer swap names and face fingerprints (never photos), both ways, so nobody is named twice |
+| [Windows 1.8.0 (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.8.0-windows) | Sync people with your phone, both ways |
 | [v1.7.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.7.0) | Face scanning uses the phone's GPU or NPU when they work (they were wrongly turned down); "Test the chips again" in Settings; solid menus and sheets; faster saving of scan results |
 | [Windows 1.7.0 (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.7.0-windows) | Scanning about 10× faster (graphics chip, photos read once, nothing scanned twice); a PC layout with sidebar, People cards and a photo viewer with face names |
 | [Windows 1.6.0 (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.6.0-windows) | First desktop version: scan folders on your PC, People cards, a photo viewer with face names, and sending to phones nearby |
