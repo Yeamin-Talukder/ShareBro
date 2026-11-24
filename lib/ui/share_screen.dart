@@ -786,7 +786,11 @@ class _ActivityCard extends StatelessWidget {
             icon: Icons.south_west_rounded,
             color: const Color(0xFF30D158),
             title: r.finished ? 'Received from ${r.from}' : 'Receiving from ${r.from}',
-            subtitle: r.finished ? '$files · ${formatTime(r.started)}' : '$files · saving to Downloads\\ShareBro',
+            subtitle: r.finished
+                ? '$files · ${formatTime(r.started)}'
+                : DesktopLayout.on
+                    ? '$files · saving to ${s.receiver.desktopShown}'
+                    : '$files · saving',
             progress: r.finished || r.totalBytes == 0 ? null : (r.bytes / r.totalBytes).clamp(0.0, 1.0),
             done: r.finished,
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ReceiveScreen(controller: controller))),
@@ -1173,10 +1177,11 @@ class _ReceivePanelState extends State<_ReceivePanel> {
             },
           );
         final where = SectionFooter(DesktopLayout.on
-            ? 'Everything is saved to Downloads\\$receivedAlbum, and photos are scanned for faces. '
-                'Messages pop up so you can copy them. Receiving works while ShareBro is open.'
-            : 'Photos and videos go to the "$receivedAlbum" album and are scanned for faces; other files go to '
-                'Download/$receivedAlbum; messages pop up so you can copy them. Receiving keeps working in the background.');
+            ? 'Everything is saved to ${s.receiver.desktopShown} (change it in Settings › Sharing), and photos are '
+                'scanned for faces. Messages pop up so you can copy them. Receiving works while ShareBro is open.'
+            : 'Photos and videos go to ${s.receiver.mediaShown} and are scanned for faces; other files go to '
+                '${s.receiver.filesShown} (change either in Settings › Sharing); messages pop up so you can copy '
+                'them. Receiving keeps working in the background.');
 
         if (wide) {
           // Two columns like Send: being visible on the left, how files

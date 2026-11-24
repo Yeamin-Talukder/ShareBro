@@ -315,7 +315,7 @@ class NotifyBridge with WidgetsBindingObserver {
         kind: 'request',
         title: '${req.from} wants to send you ${req.summary}',
         text: '${formatBytes(req.totalBytes)} · ${req.via} · '
-            '${req.allMedia ? 'saves to the $receivedAlbum album' : 'saves to Download/$receivedAlbum'}',
+            '${req.allMedia ? 'saves to ${r.mediaShown}' : 'saves to ${r.filesShown}'}',
         open: 'receive',
         actions: const [('decline', 'Decline'), ('accept', 'Accept')],
       );
@@ -351,7 +351,9 @@ class NotifyBridge with WidgetsBindingObserver {
       await _done(
         _received,
         '${s.done.length} $what from ${s.from}',
-        photos > 0 ? 'In the $receivedAlbum album · faces are being found' : 'In Download/$receivedAlbum',
+        photos > 0
+            ? 'In ${c.sharing.receiver.mediaShown} · faces are being found'
+            : 'In ${c.sharing.receiver.filesShown}',
         picture: await _sheet(s.savedIds),
         open: 'receive',
         actions: const [('open:receive', 'View photos')],

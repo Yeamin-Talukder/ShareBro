@@ -23,7 +23,6 @@ import '../face/face_engine.dart';
 import '../face/gender.dart';
 import '../face/tags.dart';
 import '../platform/device.dart';
-import '../share/receive.dart' show receivedAlbum;
 import '../share/send_center.dart';
 import '../share/server.dart' show FindLink, WebShare;
 import 'background.dart';
@@ -648,7 +647,9 @@ class ScanController extends ChangeNotifier {
     // The gallery takes a moment to list newly saved photos.
     await Future<void>.delayed(const Duration(seconds: 2));
     final albums = await Gallery.albums();
-    final album = albums.where((a) => a.name == receivedAlbum).firstOrNull;
+    // The folder chosen in Settings shows in the gallery under its own name.
+    final name = sharing.receiver.album;
+    final album = albums.where((a) => a.name == name).firstOrNull;
     if (album != null) await scan(album);
   }
 

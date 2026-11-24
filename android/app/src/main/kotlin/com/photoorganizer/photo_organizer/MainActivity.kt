@@ -54,7 +54,8 @@ class MainActivity : FlutterFragmentActivity() {
             }
         }
 
-        // Received files that aren't photos go to Download/ShareBro, where
+        // Received files that aren't photos go to Download/ShareBro (or the
+        // folder chosen in Settings, inside Download or Documents), where
         // every Files app can see them; and they can be opened from history.
         MethodChannel(messenger, "photo_organizer/files").setMethodCallHandler { call, result ->
             try {
@@ -64,7 +65,8 @@ class MainActivity : FlutterFragmentActivity() {
                         val name = call.argument<String>("name")!!
                         val mime = call.argument<String>("mime") ?: "application/octet-stream"
                         val dir = call.argument<String>("dir")
-                        result.success(saveToDownloads(File(path), name, mime, dir))
+                        val root = call.argument<String>("root") ?: "Download/ShareBro"
+                        result.success(saveToDownloads(File(path), name, mime, root, dir))
                     }
                     "open" -> {
                         val target = call.argument<String>("uri")!!
@@ -94,28 +96,38 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    /** Copies [file] into Download/ShareBro[/dir] and returns its content:// URI. */
-    private fun saveToDownloads(file: File, name: String, mime: String, dir: String?): String {
-        val sub = if (dir.isNullOrBlank()) "ShareBro" else "ShareBro/" + dir.trim('/')
+    /**
+     * Copies [file] into [root][/dir] ([root] is a folder inside Download or
+     * Documents, like "Download/ShareBro") and returns its content:// URI.
+     */
+    private fun saveToDownloads(file: File, name: String, mime: String, root: String, dir: String?): String {
+        val sub = root.trim('/') + if (dir.isNullOrBlank()) "" else "/" + dir.trim('/')
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val values = ContentValues().apply {
-                put(MediaStore.Downloads.DISPLAY_NAME, name)
-                put(MediaStore.Downloads.MIME_TYPE, mime)
-                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/" + sub)
-                put(MediaStore.Downloads.IS_PENDING, 1)
+                put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                put(MediaStore.MediaColumns.MIME_TYPE, mime)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, sub)
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
             val resolver = contentResolver
-            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: throw IllegalStateException("Couldn't create the file in Downloads")
+            // The Downloads list only takes Download/…; Documents/… goes in
+            // the general files list.
+            val collection = if (sub.startsWith(Environment.DIRECTORY_DOWNLOADS)) {
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI
+            } else {
+                MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+            }
+            val uri = resolver.insert(collection, values)
+                ?: throw IllegalStateException("Couldn't create the file in $sub")
             resolver.openOutputStream(uri)!!.use { out -> file.inputStream().use { it.copyTo(out) } }
             values.clear()
-            values.put(MediaStore.Downloads.IS_PENDING, 0)
+            values.put(MediaStore.MediaColumns.IS_PENDING, 0)
             resolver.update(uri, values, null, null)
             return uri.toString()
         }
-        // Android 9: plain file in the public Downloads folder.
+        // Android 9: a plain file in the phone's storage.
         @Suppress("DEPRECATION")
-        val folder = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), sub)
+        val folder = File(Environment.getExternalStorageDirectory(), sub)
         folder.mkdirs()
         var out = File(folder, name)
         var n = 2

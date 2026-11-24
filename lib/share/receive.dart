@@ -13,8 +13,21 @@ import '../platform/device.dart';
 import '../scan/background.dart';
 import 'native_files.dart';
 
-/// Gallery album received photos are saved into.
+/// Gallery album received photos are saved into unless Settings says
+/// otherwise (see [Receiver.mediaFolder]).
 const receivedAlbum = 'ShareBro';
+
+/// Phone defaults, relative to the phone's storage: photos in
+/// Pictures/ShareBro (videos in Movies/ShareBro), other files in
+/// Download/ShareBro.
+const defaultMediaFolder = 'Pictures/$receivedAlbum';
+const defaultFilesFolder = 'Download/$receivedAlbum';
+const _defaultVideoFolder = 'Movies/$receivedAlbum';
+
+/// Top folders Android lets an app put photos and videos in, and other
+/// files in.
+const mediaRoots = ['DCIM', 'Pictures'];
+const filesRoots = ['Download', 'Documents'];
 
 /// How long a request waits for you to tap Accept.
 const _askTimeout = Duration(seconds: 90);
@@ -23,6 +36,29 @@ const _onKey = 'receive_on';
 const _autoKey = 'receive_auto_paired';
 const _pinKey = 'receive_pin';
 const _quickKey = 'receive_quick';
+const _desktopDirKey = 'receive_dir';
+const _mediaDirKey = 'receive_media_dir';
+const _filesDirKey = 'receive_files_dir';
+
+/// A folder the phone's folder picker gave ([picked], a full path), as
+/// somewhere received files can go: relative to the phone's storage, under
+/// one of [roots]. Null with the reason when Android won't allow it.
+({String? folder, String? problem}) phoneFolder(String picked, List<String> roots) {
+  final path = picked.replaceAll('\\', '/');
+  final m = RegExp(r'^/storage/emulated/\d+/?(.*)$').firstMatch(path) ?? RegExp(r'^/sdcard/?(.*)$').firstMatch(path);
+  if (m == null) {
+    return (
+      folder: null,
+      problem: "Choose a folder on the phone's own storage: Android doesn't let apps save received files to a memory card",
+    );
+  }
+  final parts = m.group(1)!.split('/').where((s) => s.isNotEmpty).toList();
+  final root = parts.isEmpty ? null : roots.where((r) => r.toLowerCase() == parts.first.toLowerCase()).firstOrNull;
+  if (root == null) {
+    return (folder: null, problem: 'Android only lets apps save these inside ${roots.join(' or ')}: choose a folder there');
+  }
+  return (folder: [root, ...parts.skip(1)].join('/'), problem: null);
+}
 
 /// A text message someone sent (LocalSend's "Text" option).
 class IncomingMessage {
@@ -124,12 +160,62 @@ class Receiver extends ChangeNotifier {
   /// Called with the gallery ids of newly saved photos.
   void Function(List<String> assetIds)? onSaved;
 
+  /// Computer: the folder received files go to; null for Downloads\ShareBro.
+  String? desktopFolder;
+
+  /// Phone: where received photos and videos go, relative to the phone's
+  /// storage (inside DCIM or Pictures).
+  String mediaFolder = defaultMediaFolder;
+
+  /// Phone: where other received files go (inside Download or Documents).
+  String filesFolder = defaultFilesFolder;
+
+  /// The gallery album received photos land in: their folder's own name.
+  String get album => mediaFolder.split('/').last;
+
+  /// Computer: the folder received files go to, for showing
+  /// ("Downloads\ShareBro" when it's the default).
+  String get desktopShown => desktopFolder ?? (Platform.isWindows ? r'Downloads\ShareBro' : 'Downloads/ShareBro');
+
+  /// Where received photos and other files go, in a sentence's words.
+  String get mediaShown => 'the "$album" album';
+  String get filesShown => filesFolder;
+
+  /// Computer: where received files go right now.
+  Future<String> desktopTarget() async => desktopFolder ?? await NativeFiles.defaultDesktopFolder();
+
   Future<void> load() async {
     enabled = (await db.setting(_onKey)) == '1';
     autoAcceptPaired = (await db.setting(_autoKey)) != '0';
     quickSave = (await db.setting(_quickKey)) == '1';
     final p = await db.setting(_pinKey);
     pin = p == null || p.isEmpty ? null : p;
+    final desk = await db.setting(_desktopDirKey);
+    desktopFolder = desk == null || desk.isEmpty ? null : desk;
+    final media = await db.setting(_mediaDirKey);
+    mediaFolder = media == null || media.isEmpty ? defaultMediaFolder : media;
+    final files = await db.setting(_filesDirKey);
+    filesFolder = files == null || files.isEmpty ? defaultFilesFolder : files;
+  }
+
+  /// Computer: [path], or null for Downloads\ShareBro.
+  Future<void> setDesktopFolder(String? path) async {
+    desktopFolder = path == null || path.isEmpty ? null : path;
+    await db.setSetting(_desktopDirKey, desktopFolder ?? '');
+    notifyListeners();
+  }
+
+  /// Phone: a folder from [phoneFolder], or null for the default.
+  Future<void> setMediaFolder(String? folder) async {
+    mediaFolder = folder ?? defaultMediaFolder;
+    await db.setSetting(_mediaDirKey, folder ?? '');
+    notifyListeners();
+  }
+
+  Future<void> setFilesFolder(String? folder) async {
+    filesFolder = folder ?? defaultFilesFolder;
+    await db.setSetting(_filesDirKey, folder ?? '');
+    notifyListeners();
   }
 
   Future<void> setEnabled(bool v) async {
@@ -252,20 +338,24 @@ class Receiver extends ChangeNotifier {
       final folder = parts.length > 1 ? parts.sublist(0, parts.length - 1).join('/') : null;
       final String location;
       if (!Device.photoLibrary) {
-        // No phone gallery on desktop: everything goes to Downloads\ShareBro.
-        location = await NativeFiles.saveToDownloads(tmp.path, name, f.mime, dir: folder) ?? '';
+        // No phone gallery on desktop: everything goes to the chosen folder
+        // (Downloads\ShareBro unless changed in Settings).
+        location =
+            await NativeFiles.saveToDownloads(tmp.path, name, f.mime, dir: folder, root: await desktopTarget()) ?? '';
         s.savedFiles++;
       } else if (f.mime.startsWith('video/')) {
-        final saved = await PhotoManager.editor.saveVideo(tmp, title: name, relativePath: 'Movies/$receivedAlbum');
+        // With the default folder, videos keep going to Movies/ShareBro;
+        // a chosen folder takes photos and videos alike.
+        final where = mediaFolder == defaultMediaFolder ? _defaultVideoFolder : mediaFolder;
+        final saved = await PhotoManager.editor.saveVideo(tmp, title: name, relativePath: where);
         s.savedIds.add(saved.id);
         location = saved.id;
       } else if (f.mime.startsWith('image/')) {
-        final saved = await PhotoManager.editor.saveImageWithPath(tmp.path,
-            title: name, relativePath: 'Pictures/$receivedAlbum');
+        final saved = await PhotoManager.editor.saveImageWithPath(tmp.path, title: name, relativePath: mediaFolder);
         s.savedIds.add(saved.id);
         location = saved.id;
       } else {
-        location = await NativeFiles.saveToDownloads(tmp.path, name, f.mime, dir: folder) ?? '';
+        location = await NativeFiles.saveToDownloads(tmp.path, name, f.mime, dir: folder, root: filesFolder) ?? '';
         s.savedFiles++;
       }
       await db.addTransfer(Transfer(

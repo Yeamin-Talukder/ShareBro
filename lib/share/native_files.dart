@@ -13,8 +13,10 @@ import '../platform/device.dart';
 class NativeFiles {
   static const _channel = MethodChannel('photo_organizer/files');
 
-  /// Copies [path] into Download/ShareBro[/dir] as [name]; returns where
-  /// it landed (a content:// URI, or a path on Android 9, iOS and desktop).
+  /// Copies [path] into [root][/dir] as [name]; returns where it landed (a
+  /// content:// URI, or a path on Android 9, iOS and desktop). [root] is a
+  /// full path on a computer (default Downloads\ShareBro) and a folder
+  /// inside Download or Documents on Android (default Download/ShareBro).
   /// iOS has no shared Downloads: files go into the app's Documents folder,
   /// which the Files app shows as On My iPhone › ShareBro.
   static Future<String?> saveToDownloads(
@@ -22,18 +24,23 @@ class NativeFiles {
     String name,
     String mime, {
     String? dir,
+    String? root,
   }) async {
-    if (Device.desktop) {
-      final downloads = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
-      return _saveInto(p.join(downloads.path, 'ShareBro'), path, name, dir);
-    }
+    if (Device.desktop) return _saveInto(root ?? await defaultDesktopFolder(), path, name, dir);
     if (Device.ios) return _saveInto((await getApplicationDocumentsDirectory()).path, path, name, dir);
     return _channel.invokeMethod<String>('saveToDownloads', {
       'path': path,
       'name': name,
       'mime': mime,
       'dir': dir,
+      'root': root ?? 'Download/ShareBro',
     });
+  }
+
+  /// Computer: where received files go unless Settings says otherwise.
+  static Future<String> defaultDesktopFolder() async {
+    final downloads = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+    return p.join(downloads.path, 'ShareBro');
   }
 
   static int? _sdk;

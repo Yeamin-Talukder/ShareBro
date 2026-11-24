@@ -17,6 +17,7 @@ import '../scan/scan_controller.dart';
 import '../share/native_files.dart';
 import '../share/net.dart';
 import '../share/prepare.dart';
+import '../share/receive.dart';
 import '../update/updater.dart';
 import 'app_lock.dart';
 import 'desktop_layout.dart';
@@ -62,6 +63,92 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) setState(() => _current = _preview = n);
     });
     _loadChips();
+    NativeFiles.androidSdk().then((v) {
+      if (mounted) setState(() => _sdk = v);
+    });
+  }
+
+  /// Android's version (0 elsewhere): Android 9 can't put received photos
+  /// in a chosen folder.
+  int _sdk = 0;
+
+  Receiver get _receiver => c.sharing.receiver;
+
+  /// Computer: pick the folder received files are saved in.
+  Future<void> _pickDesktopFolder() async {
+    final path = await FilePicker.getDirectoryPath(
+      dialogTitle: 'Choose where received files are saved',
+      initialDirectory: await _receiver.desktopTarget(),
+    );
+    if (path == null) return;
+    await _receiver.setDesktopFolder(path);
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Received files will be saved to $path')));
+  }
+
+  Future<void> _openDesktopFolder() async {
+    final folder = Directory(await _receiver.desktopTarget());
+    await folder.create(recursive: true);
+    await NativeFiles.open(folder.path);
+  }
+
+  /// Phone: where received photos and videos ([media]) or other files go:
+  /// a folder from the system picker, or back to the default.
+  Future<void> _pickPhoneFolder({required bool media}) async {
+    final current = media ? _receiver.mediaFolder : _receiver.filesFolder;
+    final fallback = media ? defaultMediaFolder : defaultFilesFolder;
+    final roots = media ? mediaRoots : filesRoots;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: const Icon(Icons.folder_open_rounded),
+            title: const Text('Choose a folder…'),
+            subtitle: Text('Inside ${roots.join(' or ')}. You can make a new folder in the picker'),
+            onTap: () => Navigator.pop(context, 'pick'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.restart_alt_rounded),
+            title: Text(fallback),
+            subtitle: Text(media ? 'The default: the "$receivedAlbum" album' : 'The default'),
+            trailing: current == fallback ? const Icon(Icons.check) : null,
+            onTap: () => Navigator.pop(context, 'default'),
+          ),
+        ]),
+      ),
+    );
+    if (choice == null) return;
+    if (choice == 'pick') {
+      final picked = await FilePicker.getDirectoryPath(dialogTitle: 'Choose a folder');
+      if (picked == null) return;
+      final (:folder, :problem) = phoneFolder(picked, roots);
+      if (folder == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(problem!)));
+        return;
+      }
+      if (media) {
+        await _receiver.setMediaFolder(folder);
+      } else {
+        await _receiver.setFilesFolder(folder);
+      }
+    } else {
+      if (media) {
+        await _receiver.setMediaFolder(null);
+      } else {
+        await _receiver.setFilesFolder(null);
+      }
+    }
+    if (!mounted) return;
+    setState(() {});
+    final now = media ? _receiver.mediaFolder : _receiver.filesFolder;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(media
+          ? 'Received photos and videos will go to $now (the "${_receiver.album}" album)'
+          : 'Received files will go to $now'),
+    ));
   }
 
   /// What scanning has learned about this phone's chips so far.
@@ -559,6 +646,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
           chevron: true,
           onTap: _pickQuality,
         ),
+        // Where received files are saved.
+        if (desk) ...[
+          SectionRow(
+            leading: const IconTile(icon: Icons.folder_rounded, color: Color(0xFF30D158)),
+            title: 'Save received files to',
+            subtitle: _receiver.desktopShown,
+            trailing: IconButton(
+              tooltip: 'Open the folder',
+              icon: const Icon(Icons.open_in_new_rounded, size: 18),
+              onPressed: _openDesktopFolder,
+            ),
+            onTap: _pickDesktopFolder,
+          ),
+          if (_receiver.desktopFolder != null)
+            SectionRow(
+              leading: const IconTile(icon: Icons.restart_alt_rounded, color: Color(0xFF8E8E93)),
+              title: 'Use the Downloads folder again',
+              onTap: () async {
+                await _receiver.setDesktopFolder(null);
+                if (mounted) setState(() {});
+              },
+            ),
+        ] else if (!Device.ios) ...[
+          // Android 9 always puts received photos in Pictures.
+          if (_sdk == 0 || _sdk >= 29)
+            SectionRow(
+              leading: const IconTile(icon: Icons.photo_library_rounded, color: Color(0xFF30D158)),
+              title: 'Received photos and videos',
+              subtitle: _receiver.mediaFolder,
+              chevron: true,
+              onTap: () => _pickPhoneFolder(media: true),
+            ),
+          SectionRow(
+            leading: const IconTile(icon: Icons.folder_rounded, color: Color(0xFFFF9F0A)),
+            title: 'Received files',
+            subtitle: _receiver.filesFolder,
+            chevron: true,
+            onTap: () => _pickPhoneFolder(media: false),
+          ),
+        ],
       ]),
     ];
 
@@ -762,8 +889,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           keywords: const ['dark', 'light', 'theme', 'mode', 'colour', 'color']),
       _Section('sharing', 'Sharing', Icons.swap_horiz_rounded, sharing,
           color: const Color(0xFF0A84FF),
-          note: 'How you show up on other devices, and what you send',
-          keywords: const ['send', 'device', 'name', 'quality', 'location', 'gps', 'original']),
+          note: 'How you show up on other devices, what you send, and where received files go',
+          keywords: const [
+            'send', 'device', 'name', 'quality', 'location', 'gps', 'original', //
+            'receive', 'received', 'folder', 'directory', 'save', 'download', 'location',
+          ]),
       _Section('general', 'General', Icons.settings_rounded, general,
           color: const Color(0xFF8E8E93),
           note: 'Scanning, app lock and the island',

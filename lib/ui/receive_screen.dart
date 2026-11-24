@@ -144,8 +144,8 @@ class _ReceiveScreenState extends State<ReceiveScreen> {
               Text(
                 'On Wi-Fi or your hotspot, friends use the free LocalSend app and pick "${s.identity.alias}". '
                 'Friends with this app can also send with no network at all (Nearby). '
-                'Photos go to the "$receivedAlbum" album and are scanned for faces; other files go to '
-                'Download/$receivedAlbum. '
+                'Photos go to ${s.receiver.mediaShown} and are scanned for faces; other files go to '
+                '${s.receiver.filesShown} (change either in Settings › Sharing). '
                 'You can leave the app — it keeps receiving in the background.',
                 style: text.bodySmall,
               ),
