@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 /// What this device can do. ShareBro was built for Android; on desktop
-/// (Windows first) the phone-only parts are switched off until they have
-/// desktop versions. See design/windows-port-plan.md.
+/// (Windows first, then macOS) and iOS the Android-only parts are switched
+/// off until they have versions there. See design/windows-port-plan.md.
 ///
 /// Uses [defaultTargetPlatform] rather than `dart:io`'s `Platform`, so widget
 /// tests (which run on a desktop but report Android) keep the phone behaviour.
@@ -47,4 +47,10 @@ abstract final class Device {
   static bool get selfUpdate => android || windows;
 
   static bool get windows => !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+
+  /// iPhone and iPad. Received files go to the app's own folder (the Files
+  /// app shows it) instead of a shared Downloads folder.
+  static bool get ios => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
+  static bool get macos => !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
 }

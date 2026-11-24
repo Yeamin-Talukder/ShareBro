@@ -4,6 +4,20 @@
 <dict>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>ShareBro looks for faces in your photos on this device to group them by person. Nothing is uploaded.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>ShareBro saves photos and videos your friends send you into your library.</string>
+	<key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
+	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>ShareBro uses the camera only when you take a profile photo.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>ShareBro uses Face ID to unlock the app when App Lock is on.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>ShareBro finds phones and computers on your Wi-Fi to send photos to them directly, without the internet.</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

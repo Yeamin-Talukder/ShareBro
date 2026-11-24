@@ -515,7 +515,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ]),
               ),
             ),
-            const SectionFooter('Automatic follows Windows\' light or dark mode.'),
+            SectionFooter('Automatic follows ${Device.macos ? 'macOS' : 'Windows'}\' light or dark mode.'),
           ]
         : [
       SectionCard(
@@ -642,7 +642,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ? 'Fingerprint, face or screen lock to open the app'
               : windows
                   ? 'Windows Hello (face, fingerprint or PIN) to open the app'
-                  : 'Your computer\'s sign-in to open the app',
+                  : Device.macos
+                      ? 'Touch ID or your Mac\'s password to open the app'
+                      : 'Your computer\'s sign-in to open the app',
           trailing: Switch(value: c.appLock, onChanged: setLock),
           onTap: () => setLock(!c.appLock),
         ),
@@ -756,7 +758,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           keywords: const ['strict', 'loose', 'merge', 'regroup', 'people', 'faces']),
       _Section('appearance', 'Appearance', Icons.contrast_rounded, appearance,
           color: const Color(0xFF3A3A3C),
-          note: 'Light, dark, or the same as ${desk ? 'Windows' : 'your phone'}',
+          note: 'Light, dark, or the same as ${desk ? (Device.macos ? 'macOS' : 'Windows') : 'your phone'}',
           keywords: const ['dark', 'light', 'theme', 'mode', 'colour', 'color']),
       _Section('sharing', 'Sharing', Icons.swap_horiz_rounded, sharing,
           color: const Color(0xFF0A84FF),

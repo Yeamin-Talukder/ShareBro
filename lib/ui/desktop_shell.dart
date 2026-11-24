@@ -726,7 +726,7 @@ class _Brand extends StatelessWidget {
               const SizedBox(width: 6),
               logo,
               const SizedBox(width: 9),
-              const Text('ShareBro',
+              Text('ShareBro',
                   style: TextStyle(
                     fontFamily: Mac.fontDisplay,
                     fontFamilyFallback: Mac.fontFallback,

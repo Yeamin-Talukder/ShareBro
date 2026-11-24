@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:photo_manager/photo_manager.dart';
@@ -180,6 +180,8 @@ foreach ($f in [IO.File]::ReadAllLines($env:SHAREBRO_TRASH_LIST, [Text.Encoding]
           await list.delete();
         } catch (_) {}
       }
+    } else if (Platform.isMacOS && await _macTrash(paths)) {
+      // Done natively (MacFilesChannel in MainFlutterWindow.swift).
     } else if (Platform.isMacOS) {
       for (final f in paths) {
         await Process.run('osascript', [
@@ -202,4 +204,18 @@ foreach ($f in [IO.File]::ReadAllLines($env:SHAREBRO_TRASH_LIST, [Text.Encoding]
     for (final f in paths)
       if (!await File(f).exists()) f,
   };
+}
+
+/// Sends [paths] to the Trash through FileManager (no "control Finder"
+/// prompt). False if the native side isn't there, so the caller falls back
+/// to asking Finder.
+Future<bool> _macTrash(List<String> paths) async {
+  try {
+    await const MethodChannel('photo_organizer/mac_files').invokeMethod<List<Object?>>('trash', {'paths': paths});
+    return true;
+  } on MissingPluginException {
+    return false;
+  } on PlatformException {
+    return false;
+  }
 }

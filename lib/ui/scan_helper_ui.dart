@@ -240,7 +240,7 @@ class _ScanHelperScreenState extends State<ScanHelperScreen> {
           SectionCard(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'Open ShareBro on your Windows computer, on the same Wi‑Fi or hotspot as this phone.',
+              'Open ShareBro on your computer, on the same Wi‑Fi or hotspot as this phone.',
               style: TextStyle(fontSize: TextSize.caption, color: scheme.onSurfaceVariant),
             ),
           )

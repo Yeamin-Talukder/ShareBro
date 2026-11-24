@@ -1349,7 +1349,9 @@ class _TransferHistoryScreenState extends State<TransferHistoryScreen> {
     final loc = t.location;
     if (loc == null || loc.isEmpty) return;
     // Gallery items are stored by id; files by their path or content:// URI.
-    if (!loc.contains('/') && !loc.contains(':')) {
+    // (iOS gallery ids contain slashes, "ABC-123/L0/001", but never start
+    // with one.)
+    if (!loc.startsWith('/') && !loc.contains(':')) {
       if (!mounted) return;
       await Navigator.push(
         context,

@@ -101,9 +101,10 @@ abstract final class Mac {
   static bool _dark(BuildContext context) => Theme.of(context).brightness == Brightness.dark;
 
   /// Windows' own UI font (the closest to Apple's SF on a PC), with the
-  /// older Segoe UI when it isn't installed.
-  static const font = 'Segoe UI Variable Text';
-  static const fontDisplay = 'Segoe UI Variable Display';
+  /// older Segoe UI when it isn't installed. Null on a Mac, which keeps
+  /// Flutter's default there: SF itself.
+  static String? get font => Device.macos ? null : 'Segoe UI Variable Text';
+  static String? get fontDisplay => Device.macos ? null : 'Segoe UI Variable Display';
   static const fontFallback = ['Segoe UI', 'Helvetica Neue', 'Arial'];
 }
 

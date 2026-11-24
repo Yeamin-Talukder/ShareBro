@@ -28,6 +28,29 @@ void main() {
     expect(Device.selfUpdate, isTrue);
   });
 
+  test('iOS keeps the photo library but not the Android-only parts', () {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    expect(Device.ios, isTrue);
+    expect(Device.phone, isTrue);
+    expect(Device.desktop, isFalse);
+    expect(Device.photoLibrary, isTrue);
+    expect(Device.systemNotifications, isFalse);
+    expect(Device.nearbyNoNetwork, isFalse);
+    expect(Device.installedApps, isFalse);
+    // Apple doesn't allow apps to install their own updates.
+    expect(Device.selfUpdate, isFalse);
+  });
+
+  test('macOS is a desktop without self-update', () {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    expect(Device.macos, isTrue);
+    expect(Device.desktop, isTrue);
+    expect(Device.windows, isFalse);
+    expect(Device.photoLibrary, isFalse);
+    expect(Device.selfUpdate, isFalse);
+    expect(Device.noun, 'computer');
+  });
+
   testWidgets('desktop placeholder points to the Share tab', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(home: DesktopSoon(title: 'Photos')),

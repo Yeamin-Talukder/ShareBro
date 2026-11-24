@@ -706,6 +706,31 @@ The APKs are written to `build/app/outputs/flutter-apk/`.
 > - Release builds are signed with the debug key for now. Use your own
 >   signing key before publishing anywhere else.
 
+#### iPhone and Mac (not tested yet)
+
+The project is set up for iOS and macOS, but neither build has been run
+yet. You need a Mac with Xcode and CocoaPods.
+
+```bash
+flutter run -d <your iPhone>    # iOS 15.5 or newer, a real phone (ML Kit needs arm64)
+flutter run -d macos            # macOS 12 or newer
+```
+
+- **Signing:** open `ios/Runner.xcworkspace` in Xcode, pick your team under
+  Runner › Signing & Capabilities, and turn on Developer Mode on the iPhone.
+  A free Apple ID works for your own phone, but the install expires after
+  7 days.
+- **iPhone:** received files that aren't photos go to Files › On My iPhone ›
+  ShareBro. Finding devices uses the subnet scan: UDP multicast needs Apple's
+  multicast entitlement (`com.apple.developer.networking.multicast`), which a
+  paid account has to request. The in-app updater and background scanning
+  are off.
+- **Mac:** faces are found with ONNX Runtime on the CPU (the bundled
+  `libonnxruntime` from the `onnxruntime` package; no DirectML). The app
+  isn't sandboxed, so it's meant for Developer ID distribution, not the Mac
+  App Store. To give it to others, sign it with a Developer ID and notarize
+  it.
+
 #### Tests and checks
 
 ```bash

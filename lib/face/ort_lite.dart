@@ -3,6 +3,7 @@
 // the same runtime through the plugin's generated bindings instead.
 // ignore_for_file: implementation_imports
 import 'dart:ffi' as ffi;
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -10,8 +11,9 @@ import 'package:onnxruntime/onnxruntime.dart' show OrtEnv;
 import 'package:onnxruntime/src/bindings/onnxruntime_bindings_generated.dart' as bg;
 
 /// A lean ONNX Runtime session for float models on desktop: tensors are
-/// copied in and out as whole blocks, and it runs on the graphics chip
-/// (DirectML) when the bundled runtime and the PC support it.
+/// copied in and out as whole blocks, and on Windows it runs on the graphics
+/// chip (DirectML) when the bundled runtime and the PC support it. macOS
+/// runs on the CPU.
 class LiteSession {
   LiteSession._(this._session, this._options, this._memory, this._inputNames, this._outputNames, this.onGpu);
 
@@ -74,6 +76,9 @@ class LiteSession {
         }
       }
       if (gpu) {
+        // DirectML is Windows only. On macOS the plugin's own CPU runtime
+        // (libonnxruntime.dylib) runs everything; callers fall back to it.
+        if (!Platform.isWindows) throw UnsupportedError('No graphics-chip runtime on this system');
         // DirectML wants one run at a time and no memory-pattern planning.
         _check(api.DisableMemPattern.asFunction<bg.OrtStatusPtr Function(ffi.Pointer<bg.OrtSessionOptions>)>()(options));
         _check(api.SetSessionExecutionMode

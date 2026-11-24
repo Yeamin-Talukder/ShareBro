@@ -8,19 +8,26 @@ import '../platform/device.dart';
 
 /// Helpers for files that aren't photos: saving into Download/ShareBro and
 /// opening them (or a web link) in another app. Android goes through
-/// FilesChannel.kt; desktop uses the Downloads folder and the shell.
+/// FilesChannel.kt and iOS through FilesChannel in AppDelegate.swift;
+/// desktop uses the Downloads folder and the shell.
 class NativeFiles {
   static const _channel = MethodChannel('photo_organizer/files');
 
   /// Copies [path] into Download/ShareBro[/dir] as [name]; returns where
-  /// it landed (a content:// URI, or a path on Android 9 and desktop).
+  /// it landed (a content:// URI, or a path on Android 9, iOS and desktop).
+  /// iOS has no shared Downloads: files go into the app's Documents folder,
+  /// which the Files app shows as On My iPhone › ShareBro.
   static Future<String?> saveToDownloads(
     String path,
     String name,
     String mime, {
     String? dir,
-  }) {
-    if (Device.desktop) return _saveOnDesktop(path, name, dir);
+  }) async {
+    if (Device.desktop) {
+      final downloads = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+      return _saveInto(p.join(downloads.path, 'ShareBro'), path, name, dir);
+    }
+    if (Device.ios) return _saveInto((await getApplicationDocumentsDirectory()).path, path, name, dir);
     return _channel.invokeMethod<String>('saveToDownloads', {
       'path': path,
       'name': name,
@@ -49,21 +56,21 @@ class NativeFiles {
           false;
     } on PlatformException {
       return false;
+    } on MissingPluginException {
+      return false;
     }
   }
 
-  static Future<String?> _saveOnDesktop(
+  /// Copies [path] into [root][/dir] as [name], never over an existing file.
+  static Future<String?> _saveInto(
+    String root,
     String path,
     String name,
     String? dir,
   ) async {
-    final downloads =
-        await getDownloadsDirectory() ??
-        await getApplicationDocumentsDirectory();
     final folder = Directory(
       p.joinAll([
-        downloads.path,
-        'ShareBro',
+        root,
         if (dir != null && dir.isNotEmpty) ...p.split(dir),
       ]),
     );
