@@ -25,7 +25,7 @@ for group trips, weddings and events: the friend who took 2,000 photos can
 share them with everyone in minutes instead of hours. **Works 100% offline:
 no cloud, no uploads, no account.**
 
-### [⬇️ Download the APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) &nbsp;·&nbsp; [🖥️ Windows (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.2-windows) &nbsp;·&nbsp; [🌐 Website](https://yeamin-talukder.github.io/ShareBro/) &nbsp;·&nbsp; [▶️ 1-minute video](https://yeamin-talukder.github.io/ShareBro/#video)
+### [⬇️ Download the APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) &nbsp;·&nbsp; [🖥️ Windows (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-windows) &nbsp;·&nbsp; [🌐 Website](https://yeamin-talukder.github.io/ShareBro/) &nbsp;·&nbsp; [▶️ 1-minute video](https://yeamin-talukder.github.io/ShareBro/#video)
 
 <sub>Most phones: <code>ShareBro-…-arm64-v8a.apk</code> · Android 9 or newer · Windows 10 and 11 in preview · free</sub>
 
@@ -44,7 +44,7 @@ no cloud, no uploads, no account.**
 | **Internet** | Not needed. Face recognition, search and sharing all run on the phone and the local network |
 | **Privacy** | Photos are never uploaded. No account, no analytics |
 | **Works with** | [LocalSend](https://localsend.org) on Android, iPhone, Windows, macOS and Linux, and any web browser |
-| **Get it** | APK from [GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) (not on the Play Store yet); [Windows installer](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.2-windows) in preview |
+| **Get it** | APK from [GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) (not on the Play Store yet); [Windows installer](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-windows) in preview |
 | **Website** | [yeamin-talukder.github.io/ShareBro](https://yeamin-talukder.github.io/ShareBro/) |
 
 ---
@@ -391,6 +391,10 @@ and Linux, as well as with other ShareBro phones.
   - photos and videos: the **ShareBro** album, where they're scanned for
     faces;
   - other files: **Download/ShareBro**;
+  - on a PC, everything goes to **Downloads\ShareBro**;
+  - change any of these in **Settings › Sharing**: photos and videos to
+    any folder inside DCIM or Pictures, files to one inside Download or
+    Documents, or any folder at all on a PC;
   - received apps: open Android's installer from History;
   - text messages: pop up with a Copy button.
 
@@ -457,8 +461,8 @@ checksum of every APK.
 
 ### Windows (preview)
 
-1. Download **[`ShareBro-1.9.2-windows-setup.exe`](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.9.2-windows/ShareBro-1.9.2-windows-setup.exe)** (Windows 10
-   and 11, 64-bit) from the [Windows release](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.2-windows).
+1. Download **[`ShareBro-1.10.0-windows-setup.exe`](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0-windows/ShareBro-1.10.0-windows-setup.exe)** (Windows 10
+   and 11, 64-bit) from the [Windows release](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-windows).
 2. Open it. If Windows says **"Windows protected your PC"**, choose
    **More info › Run anyway**: the installer isn't signed yet.
 3. Follow the steps. ShareBro installs for your user (no admin password)
@@ -794,7 +798,7 @@ lib/
 │   ├── find_page.dart     The "Find my photos" web page
 │   ├── web_page.dart      The shared-link web gallery
 │   ├── zip_stream.dart    "Download all" ZIPs, streamed
-│   ├── native_files.dart  Saving to Download/ShareBro, opening files
+│   ├── native_files.dart  Saving received files (Download/ShareBro or your folder), opening files
 │   ├── send_center.dart   The queue of sends
 │   └── notify.dart        Rich Android notifications
 └── ui/                    Screens and widgets
@@ -891,8 +895,10 @@ from History.
 
 | Version | Highlights |
 |---|---|
-| [**v1.9.2**](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.2) | Scan with my computer and sending work over your phone's own hotspot |
-| [**Windows 1.9.2** (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.2-windows) | Found by your phone over its hotspot (listens and announces on every network) |
+| [**v1.10.0**](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0) | Choose where received photos, videos and files are saved (Settings › Sharing) |
+| [**Windows 1.10.0** (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-windows) | Save received files to any folder, on any drive |
+| [v1.9.2](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.2) | Scan with my computer and sending work over your phone's own hotspot |
+| [Windows 1.9.2 (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.2-windows) | Found by your phone over its hotspot (listens and announces on every network) |
 | [v1.9.1](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.1) | Your computer joins a scan that's already running; Scan with my computer offered where scans start |
 | [Windows 1.9.1 (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.1-windows) | Fixes 1.9.0 not opening on some PCs; a starting screen that explains problems; one copy at a time |
 | [v1.9.0](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.0) | Scan with my computer (your PC scans alongside your phone; it may remember face results only if you allow it); scan speed in photos per second; a new QR share page with finger-precise zoom, full-quality zoom, videos and share-to-gallery |
