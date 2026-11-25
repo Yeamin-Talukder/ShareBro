@@ -24,6 +24,18 @@
 	<string>public.app-category.photography</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>ShareBro finds phones and computers on your network to send photos to them directly, without the internet.</string>
+	<key>NSDesktopFolderUsageDescription</key>
+	<string>ShareBro scans the photo folders you choose for faces, and can save received files there.</string>
+	<key>NSDocumentsFolderUsageDescription</key>
+	<string>ShareBro scans the photo folders you choose for faces, and can save received files there.</string>
+	<key>NSDownloadsFolderUsageDescription</key>
+	<string>ShareBro saves files your phone and friends send you in Downloads/ShareBro, and scans photo folders you choose there.</string>
+	<key>NSRemovableVolumesUsageDescription</key>
+	<string>ShareBro scans photo folders you choose on USB drives and memory cards, and can save received files there.</string>
+	<key>NSNetworkVolumesUsageDescription</key>
+	<string>ShareBro scans photo folders you choose on network drives, and can save received files there.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>ShareBro only reads photo folders you choose; it doesn't open your Photos library.</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHumanReadableCopyright</key>
