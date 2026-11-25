@@ -25,9 +25,20 @@ for group trips, weddings and events: the friend who took 2,000 photos can
 share them with everyone in minutes instead of hours. **Works 100% offline:
 no cloud, no uploads, no account.**
 
-### [⬇️ Download the APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) &nbsp;·&nbsp; [🖥️ Windows (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-windows) &nbsp;·&nbsp; [🌐 Website](https://yeamin-talukder.github.io/ShareBro/) &nbsp;·&nbsp; [▶️ 1-minute video](https://yeamin-talukder.github.io/ShareBro/#video)
+### ⬇️ Download
 
-<sub>Most phones: <code>ShareBro-…-arm64-v8a.apk</code> · Android 9 or newer · Windows 10 and 11 in preview · free</sub>
+| Your device | Download | Size | Needs |
+|---|---|---|---|
+| 📱 **Android phone or tablet** (most from 2017 on) | [**ShareBro-v1.10.0-arm64-v8a.apk**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0/ShareBro-v1.10.0-arm64-v8a.apk) | 99.3 MB | Android 9+ |
+| 📱 Older 32-bit Android phone | [ShareBro-v1.10.0-armeabi-v7a.apk](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0/ShareBro-v1.10.0-armeabi-v7a.apk) | 88.3 MB | Android 9+ |
+| 💻 Chromebook or Android emulator (x86) | [ShareBro-v1.10.0-x86_64.apk](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0/ShareBro-v1.10.0-x86_64.apk) | 104.9 MB | Android 9+ |
+| 🪟 **Windows PC** (preview) | [**ShareBro-1.10.0-windows-setup.exe**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0-windows/ShareBro-1.10.0-windows-setup.exe) | 56.4 MB | Windows 10 or 11 |
+| 🍎 iPhone or iPad | Coming soon · [build it yourself](#iphone-and-mac-not-tested-yet) | | iOS 15.5+ |
+| 🍏 Mac | Coming soon · [build it yourself](#iphone-and-mac-not-tested-yet) | | macOS 12+ |
+
+<sub>Not sure which Android file? Take <b>arm64-v8a</b>: it fits almost every phone. All files and checksums are on the <a href="https://github.com/Yeamin-Talukder/ShareBro/releases">Releases page</a>. Free, no account.</sub>
+
+[🌐 Website](https://yeamin-talukder.github.io/ShareBro/) &nbsp;·&nbsp; [▶️ 1-minute video](https://yeamin-talukder.github.io/ShareBro/#video)
 
 </div>
 
