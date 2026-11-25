@@ -41,13 +41,13 @@ void main() {
     expect(Device.selfUpdate, isFalse);
   });
 
-  test('macOS is a desktop without self-update', () {
+  test('macOS is a desktop that updates itself', () {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     expect(Device.macos, isTrue);
     expect(Device.desktop, isTrue);
     expect(Device.windows, isFalse);
     expect(Device.photoLibrary, isFalse);
-    expect(Device.selfUpdate, isFalse);
+    expect(Device.selfUpdate, isTrue);
     expect(Device.noun, 'computer');
   });
 

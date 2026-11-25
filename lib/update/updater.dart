@@ -169,7 +169,7 @@ class Updater extends ChangeNotifier {
       final r = await fetchLatest();
       checkedAt = DateTime.now();
       unawaited(_db?.setSetting(_lastKey, checkedAt!.toIso8601String()));
-      final asset = Device.windows ? r.windowsSetup : r.apkFor(abis);
+      final asset = Device.desktop ? r.desktopAsset : r.apkFor(abis);
       final newer = r.version > current && asset != null;
       if (newer && release?.tag != r.tag) {
         // A different version than one half downloaded: start again.
@@ -198,27 +198,28 @@ class Updater extends ChangeNotifier {
     }
   }
 
-  /// The latest release from the GitHub API. On Windows: the newest one
-  /// with a Windows installer, pre-releases included.
+  /// The latest release from the GitHub API. On a computer: the newest one
+  /// with a download for it (Windows installer, zipped Mac app),
+  /// pre-releases included.
   Future<Release> fetchLatest() async {
     final client = _newClient();
     try {
-      final req = await client.getUrl(Uri.parse(Device.windows ? _recent : _latest));
+      final req = await client.getUrl(Uri.parse(Device.desktop ? _recent : _latest));
       req.headers
         ..set(HttpHeaders.acceptHeader, 'application/vnd.github+json')
         ..set('X-GitHub-Api-Version', '2022-11-28');
       final res = await req.close().timeout(const Duration(seconds: 20));
       if (res.statusCode != 200) throw HttpException('GitHub answered ${res.statusCode}');
       final body = await res.transform(utf8.decoder).join().timeout(const Duration(seconds: 20));
-      if (!Device.windows) return Release.fromGitHub((jsonDecode(body) as Map).cast<String, Object?>());
+      if (!Device.desktop) return Release.fromGitHub((jsonDecode(body) as Map).cast<String, Object?>());
       Release? best;
       for (final j in (jsonDecode(body) as List).cast<Map>()) {
         if (j['draft'] == true) continue;
         final r = Release.fromGitHub(j.cast<String, Object?>());
-        if (r.windowsSetup == null) continue;
+        if (r.desktopAsset == null) continue;
         if (best == null || r.version > best.version) best = r;
       }
-      if (best == null) throw const HttpException('No Windows release found');
+      if (best == null) throw HttpException('No ${Device.macos ? 'Mac' : 'Windows'} release found');
       return best;
     } finally {
       client.close(force: true);
@@ -448,9 +449,9 @@ class Updater extends ChangeNotifier {
   }
 
   /// Can ShareBro open Android's installer? (Settings › Install unknown apps.)
-  /// Always on Windows.
+  /// Always on a computer.
   static Future<bool> canInstall() async {
-    if (Device.windows) return true;
+    if (Device.desktop) return true;
     try {
       return await _channel.invokeMethod<bool>('canInstall') ?? false;
     } on MissingPluginException {
@@ -484,6 +485,7 @@ class Updater extends ChangeNotifier {
     if (!await canInstall()) return InstallResult.needsPermission;
     await _db?.setSetting(_installingKey, r.version.toString());
     if (Device.windows) return _installOnWindows(file);
+    if (Device.macos) return _installOnMac(file);
     try {
       final ok = await _channel.invokeMethod<bool>('install', {'path': file.path}) ?? false;
       return ok ? InstallResult.started : InstallResult.failed;
@@ -513,6 +515,69 @@ class Updater extends ChangeNotifier {
     }
     // A moment for the installer to start, then get out of its way.
     unawaited(Future<void>.delayed(const Duration(milliseconds: 800), () async {
+      try {
+        await _db?.close();
+      } catch (_) {
+        // Closing anyway.
+      }
+      exit(0);
+    }));
+    return InstallResult.started;
+  }
+
+  /// Mac: unzips the downloaded app next to the old one, then a small
+  /// script waits for ShareBro to close, swaps the new app in and opens it.
+  /// If the swap fails, the old app is put back.
+  Future<InstallResult> _installOnMac(File zip) async {
+    try {
+      // .../ShareBro.app/Contents/MacOS/ShareBro
+      final app = File(Platform.resolvedExecutable).parent.parent.parent.path;
+      if (!app.endsWith('.app')) throw StateError('Not running from an app bundle: $app');
+      final work = Directory('${(await getTemporaryDirectory()).path}/updates/unpacked');
+      if (await work.exists()) await work.delete(recursive: true);
+      await work.create(recursive: true);
+      final unzip = await Process.run('/usr/bin/ditto', ['-x', '-k', zip.path, work.path]);
+      if (unzip.exitCode != 0) throw StateError('Unzip failed: ${unzip.stderr}');
+      final fresh = work
+          .listSync()
+          .whereType<Directory>()
+          .where((d) => d.path.endsWith('.app'))
+          .firstOrNull;
+      if (fresh == null) throw StateError('No app in the download');
+      // Where the old app lives must be writable (it is for apps you
+      // dragged into Applications yourself).
+      final parent = Directory(app).parent.path;
+      final probe = File('$parent/.sharebro_update_probe');
+      await probe.writeAsString('');
+      await probe.delete();
+      final script = File('${work.path}/swap.sh');
+      await script.writeAsString('''
+#!/bin/sh
+# Wait for ShareBro ($pid) to close, swap in the new app, open it.
+while kill -0 "\$SB_PID" 2>/dev/null; do sleep 0.3; done
+OLD="\$SB_OLD"; NEW="\$SB_NEW"
+/usr/bin/xattr -dr com.apple.quarantine "\$NEW" 2>/dev/null
+BACKUP="\$OLD.old-\$\$"
+/bin/mv "\$OLD" "\$BACKUP" || exit 1
+if /bin/mv "\$NEW" "\$OLD"; then
+  /bin/rm -rf "\$BACKUP"
+else
+  /bin/mv "\$BACKUP" "\$OLD"
+fi
+/usr/bin/open "\$OLD"
+''');
+      await Process.start(
+        '/bin/sh',
+        [script.path],
+        environment: {'SB_PID': '$pid', 'SB_OLD': app, 'SB_NEW': fresh.path},
+        mode: ProcessStartMode.detached,
+      );
+    } catch (e) {
+      debugPrint('Install failed: $e');
+      await _db?.setSetting(_installingKey, '');
+      return InstallResult.failed;
+    }
+    unawaited(Future<void>.delayed(const Duration(milliseconds: 400), () async {
       try {
         await _db?.close();
       } catch (_) {

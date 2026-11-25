@@ -43,8 +43,8 @@ abstract final class Device {
 
   /// The in-app updater, which downloads and installs a new APK.
   /// Updates itself from GitHub releases: the APK on Android, the
-  /// installer (.exe) on Windows.
-  static bool get selfUpdate => android || windows;
+  /// installer (.exe) on Windows, the zipped app on a Mac.
+  static bool get selfUpdate => android || windows || macos;
 
   static bool get windows => !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
 

@@ -17,7 +17,8 @@ class MainFlutterWindow: NSWindow {
 }
 
 /// Answers the updater's "info" (lib/update/updater.dart) with this app's
-/// version, so Settings shows it. Self-updating isn't built for the Mac yet.
+/// version, so Settings shows it and updates know what's newer (see
+/// _installOnMac in lib/update/updater.dart).
 final class VersionChannel: NSObject, FlutterPlugin {
   static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "photo_organizer/update", binaryMessenger: registrar.messenger)

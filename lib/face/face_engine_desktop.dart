@@ -91,7 +91,8 @@ class _DesktopFaceEngine implements FaceEngine {
     final fp = debugFingerprintConfig ?? _fingerprintConfig;
     _DesktopSetup setup({required int threads, required bool gpu}) => _DesktopSetup(
           detector: copy(detector),
-          detectorGpu: gpu ? copy(detectorGpu) : null,
+          // Core ML on a Mac picks its own precision: it gets the original.
+          detectorGpu: gpu ? copy(Platform.isMacOS ? detector : detectorGpu) : null,
           fingerprints: copy(fingerprints),
           threads: threads,
           gpu: gpu,

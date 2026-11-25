@@ -11,9 +11,9 @@ import 'package:onnxruntime/onnxruntime.dart' show OrtEnv;
 import 'package:onnxruntime/src/bindings/onnxruntime_bindings_generated.dart' as bg;
 
 /// A lean ONNX Runtime session for float models on desktop: tensors are
-/// copied in and out as whole blocks, and on Windows it runs on the graphics
-/// chip (DirectML) when the bundled runtime and the PC support it. macOS
-/// runs on the CPU.
+/// copied in and out as whole blocks, and it runs on the graphics chip when
+/// the bundled runtime and the computer support it: DirectML on Windows,
+/// Core ML on a Mac (which also uses Apple's Neural Engine).
 class LiteSession {
   LiteSession._(this._session, this._options, this._memory, this._inputNames, this._outputNames, this.onGpu);
 
@@ -31,8 +31,8 @@ class LiteSession {
 
   static ffi.Pointer<bg.OrtApi> get _api => OrtEnv.instance.ortApiPtr;
 
-  /// Opens [model] on the graphics chip (DirectML); throws if the runtime,
-  /// the driver or the model can't use it.
+  /// Opens [model] on the graphics chip (DirectML, or Core ML on a Mac);
+  /// throws if the runtime, the driver or the model can't use it.
   static LiteSession openGpu(Uint8List model) => _open(model, threads: 1, gpu: true);
 
   /// Opens [model]. With [gpu], tries DirectML first and falls back to the
@@ -75,9 +75,11 @@ class LiteSession {
           malloc.free(off);
         }
       }
-      if (gpu) {
-        // DirectML is Windows only. On macOS the plugin's own CPU runtime
-        // (libonnxruntime.dylib) runs everything; callers fall back to it.
+      if (gpu && Platform.isMacOS) {
+        // Core ML hands what it can to the Mac's graphics chip and Neural
+        // Engine; anything it can't run stays on the CPU.
+        _check(_appendCoreML()(options, 0));
+      } else if (gpu) {
         if (!Platform.isWindows) throw UnsupportedError('No graphics-chip runtime on this system');
         // DirectML wants one run at a time and no memory-pattern planning.
         _check(api.DisableMemPattern.asFunction<bg.OrtStatusPtr Function(ffi.Pointer<bg.OrtSessionOptions>)>()(options));
@@ -108,6 +110,14 @@ class LiteSession {
     } finally {
       malloc.free(data);
     }
+  }
+
+  /// Core ML's hook, in the Mac runtime the onnxruntime plugin bundles.
+  static int Function(ffi.Pointer<bg.OrtSessionOptions>, int) _appendCoreML() {
+    final lib = ffi.DynamicLibrary.open('libonnxruntime.1.15.1.dylib');
+    final fn = lib.lookupFunction<bg.OrtStatusPtr Function(ffi.Pointer<bg.OrtSessionOptions>, ffi.Uint32),
+        bg.OrtStatusPtr Function(ffi.Pointer<bg.OrtSessionOptions>, int)>('OrtSessionOptionsAppendExecutionProvider_CoreML');
+    return (options, flags) => fn(options, flags).address;
   }
 
   /// DirectML's hook, only in the runtime's DirectML build.

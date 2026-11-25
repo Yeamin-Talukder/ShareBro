@@ -83,6 +83,20 @@ void main() {
       expect(u.apkFor(['arm64-v8a'])?.url, 'https://x/all.apk');
     });
 
+    test('finds the Windows installer and the zipped Mac app', () {
+      final d = Release.fromGitHub({
+        'tag_name': 'v1.11.0',
+        'assets': [
+          {'name': 'SHA256SUMS.txt', 'browser_download_url': 'https://x/sums', 'size': 1},
+          {'name': 'ShareBro-1.11.0-windows-setup.exe', 'browser_download_url': 'https://x/win.exe', 'size': 1},
+          {'name': 'ShareBro-1.11.0-macos.zip', 'browser_download_url': 'https://x/mac.zip', 'size': 1},
+        ],
+      });
+      expect(d.windowsSetup?.url, 'https://x/win.exe');
+      expect(d.macosZip?.url, 'https://x/mac.zip');
+      expect(r.macosZip, isNull);
+    });
+
     test('takes only "What\'s new" points, without Markdown', () {
       expect(r.notes.map((n) => n.title), ['Memories', 'Faster scans', '']);
       expect(r.notes[0].text, 'A "this day last year" card on People.');

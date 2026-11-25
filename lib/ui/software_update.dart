@@ -97,7 +97,7 @@ class _SoftwareUpdatePanelState extends State<SoftwareUpdatePanel> {
           UpdateStage.verifying => const SizedBox(
               width: 34, height: 34, child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator(strokeWidth: 2.5))),
           UpdateStage.ready => FilledButton(
-              onPressed: _install, child: Text(Device.windows ? 'Restart and update' : 'Install update')),
+              onPressed: _install, child: Text(Device.desktop ? 'Restart and update' : 'Install update')),
           UpdateStage.checking => const OutlinedButton(
               onPressed: null,
               child: Row(mainAxisSize: MainAxisSize.min, children: [

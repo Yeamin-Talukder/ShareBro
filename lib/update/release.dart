@@ -3,6 +3,8 @@
 /// phone, reading SHA256SUMS.txt and turning release notes into a list.
 library;
 
+import 'dart:io' show Platform;
+
 /// "1.4.0", "v1.5.0", "1.5.0+8" or "1.5.0-beta.1" as numbers to compare.
 class Version implements Comparable<Version> {
   Version(this.parts);
@@ -116,6 +118,19 @@ class Release {
     }
     return null;
   }
+
+  /// The zipped Mac app ("ShareBro-1.10.1-macos.zip"); null if the
+  /// release has none.
+  ReleaseAsset? get macosZip {
+    for (final a in assets) {
+      final n = a.name.toLowerCase();
+      if (n.endsWith('.zip') && n.contains('macos')) return a;
+    }
+    return null;
+  }
+
+  /// This computer's download: the Windows installer or the Mac app.
+  ReleaseAsset? get desktopAsset => Platform.isMacOS ? macosZip : windowsSetup;
 
   ReleaseAsset? get checksums {
     for (final a in assets) {
