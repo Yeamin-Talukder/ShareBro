@@ -33,8 +33,8 @@ no cloud, no uploads, no account.**
 | 📱 Older 32-bit Android phone | [ShareBro-v1.10.0-armeabi-v7a.apk](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0/ShareBro-v1.10.0-armeabi-v7a.apk) | 88.3 MB | Android 9+ |
 | 💻 Chromebook or Android emulator (x86) | [ShareBro-v1.10.0-x86_64.apk](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0/ShareBro-v1.10.0-x86_64.apk) | 104.9 MB | Android 9+ |
 | 🪟 **Windows PC** (preview) | [**ShareBro-1.10.0-windows-setup.exe**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0-windows/ShareBro-1.10.0-windows-setup.exe) | 56.4 MB | Windows 10 or 11 |
-| 🍎 iPhone or iPad | Coming soon · [build it yourself](#iphone-and-mac-not-tested-yet) | | iOS 15.5+ |
-| 🍏 Mac | Coming soon · [build it yourself](#iphone-and-mac-not-tested-yet) | | macOS 12+ |
+| 🍏 **Mac** (preview) | [**ShareBro-1.10.0-macos.zip**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0-macos/ShareBro-1.10.0-macos.zip) | 77.8 MB | macOS 12+, Apple Silicon or Intel |
+| 🍎 iPhone or iPad | Coming soon · [build it yourself](#building-for-iphone-and-mac) | | iOS 15.5+ |
 
 <sub>Not sure which Android file? Take <b>arm64-v8a</b>: it fits almost every phone. All files and checksums are on the <a href="https://github.com/Yeamin-Talukder/ShareBro/releases">Releases page</a>. Free, no account.</sub>
 
@@ -55,7 +55,7 @@ no cloud, no uploads, no account.**
 | **Internet** | Not needed. Face recognition, search and sharing all run on the phone and the local network |
 | **Privacy** | Photos are never uploaded. No account, no analytics |
 | **Works with** | [LocalSend](https://localsend.org) on Android, iPhone, Windows, macOS and Linux, and any web browser |
-| **Get it** | APK from [GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) (not on the Play Store yet); [Windows installer](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-windows) in preview |
+| **Get it** | APK from [GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) (not on the Play Store yet); [Windows installer](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-windows) and [Mac app](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-macos) in preview |
 | **Website** | [yeamin-talukder.github.io/ShareBro](https://yeamin-talukder.github.io/ShareBro/) |
 
 ---
@@ -468,7 +468,7 @@ and Linux, as well as with other ShareBro phones.
 and settings are kept.
 
 **Checking a download:** each release includes `SHA256SUMS.txt` with the
-checksum of every APK.
+checksum of every file.
 
 ### Windows (preview)
 
@@ -486,6 +486,24 @@ On Windows, photos are read from the folders you scan (nothing is copied
 or moved), faces are matched the same way as on the phone, and received
 files go to `Downloads\ShareBro`. Not there yet: scene categories,
 smile / eyes-open picks, HEIC and RAW photos, and videos.
+
+### Mac (preview)
+
+1. Download **[`ShareBro-1.10.0-macos.zip`](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0-macos/ShareBro-1.10.0-macos.zip)** (macOS 12 or newer,
+   Apple Silicon or Intel) from the [Mac release](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-macos) and open it.
+2. Drag **ShareBro.app** into **Applications** and open it.
+3. The app isn't signed by Apple yet, so the first time macOS says it
+   can't check it for malicious software. Click **Done**, then go to
+   **System Settings › Privacy & Security** and click **Open Anyway** next
+   to ShareBro. You only do this once.
+4. Click **Scan folder** to pick a folder of photos. If macOS asks whether
+   ShareBro may accept incoming network connections, click **Allow** so
+   phones can find your Mac.
+
+The Mac version works like the Windows one: it finds faces with Core ML
+(the Mac's graphics chip and Neural Engine), received files go to
+`Downloads/ShareBro`, and it updates itself from Settings › Software
+update.
 
 ## FAQ
 
@@ -721,10 +739,14 @@ The APKs are written to `build/app/outputs/flutter-apk/`.
 > - Release builds are signed with the debug key for now. Use your own
 >   signing key before publishing anywhere else.
 
-#### iPhone and Mac (not tested yet)
+#### Building for iPhone and Mac
 
-The project is set up for iOS and macOS, but neither build has been run
-yet. You need a Mac with Xcode and CocoaPods.
+The project is set up for iOS and macOS. The Mac build is tested and
+released; the iPhone build hasn't been run yet. You need a Mac with Xcode
+and CocoaPods (with macOS's built-in Ruby 2.6, install older versions of a
+few CocoaPods add-ons first, with `gem install --user-install`: `nap 1.1.1`,
+`ffi 1.16.3`, `securerandom 0.3.2`, `drb 2.0.6`, `i18n 1.14.8`,
+`zeitwerk 2.6.18`, `concurrent-ruby 1.3.4`, `activesupport 6.1.7.10`).
 
 ```bash
 flutter run -d <your iPhone>    # iOS 15.5 or newer, a real phone (ML Kit needs arm64)
@@ -740,11 +762,14 @@ flutter run -d macos            # macOS 12 or newer
   multicast entitlement (`com.apple.developer.networking.multicast`), which a
   paid account has to request. The in-app updater and background scanning
   are off.
-- **Mac:** faces are found with ONNX Runtime on the CPU (the bundled
-  `libonnxruntime` from the `onnxruntime` package; no DirectML). The app
-  isn't sandboxed, so it's meant for Developer ID distribution, not the Mac
-  App Store. To give it to others, sign it with a Developer ID and notarize
-  it.
+- **Mac:** faces are found with ONNX Runtime (the `libonnxruntime` the
+  `onnxruntime` package bundles), on Core ML where it helps. The app isn't
+  sandboxed, so it's meant for Developer ID distribution, not the Mac App
+  Store. Releases are only ad-hoc signed for now; signing with a Developer
+  ID and notarizing would remove the "Open Anyway" step. For a release,
+  `flutter build macos --release`, then
+  `ditto -c -k --keepParent ShareBro.app ShareBro-<version>-macos.zip`:
+  the in-app updater looks for a `-macos.zip`.
 
 #### Tests and checks
 
@@ -908,6 +933,7 @@ from History.
 |---|---|
 | [**v1.10.0**](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0) | Choose where received photos, videos and files are saved (Settings › Sharing) |
 | [**Windows 1.10.0** (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-windows) | Save received files to any folder, on any drive |
+| [**Mac 1.10.0** (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-macos) | First Mac version: scan folders for faces (Core ML), share with phones and PCs, sync people, updates itself |
 | [v1.9.2](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.2) | Scan with my computer and sending work over your phone's own hotspot |
 | [Windows 1.9.2 (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.2-windows) | Found by your phone over its hotspot (listens and announces on every network) |
 | [v1.9.1](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.9.1) | Your computer joins a scan that's already running; Scan with my computer offered where scans start |
@@ -931,8 +957,8 @@ from History.
 
 ## Known limitations
 
-- **Android and Windows (preview) only.** The iOS, macOS and Linux folders
-  are Flutter scaffolding and aren't tested. iPhones can still receive
+- **Android, plus Windows and Mac in preview.** The iOS and Linux folders
+  aren't tested yet. iPhones can still receive
   photos (LocalSend or a browser).
 - **Not on the Play Store yet.** Install the APK from GitHub Releases.
 - **Sharing needs the same network.** Nearby sending, links and Find my
