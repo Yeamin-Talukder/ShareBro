@@ -37,6 +37,14 @@ android {
         }
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // The release workflow restores ShareBro's signing key to a known
+            // file and names it here, wherever Gradle would look by default.
+            System.getenv("SHAREBRO_KEYSTORE")?.let { storeFile = file(it) }
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.

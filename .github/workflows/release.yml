@@ -109,13 +109,23 @@ jobs:
             echo "::error::Secret ANDROID_DEBUG_KEYSTORE_BASE64 is missing; see the top of release.yml"
             exit 1
           fi
-          mkdir -p ~/.android
-          echo "$KEYSTORE" | base64 -d > ~/.android/debug.keystore
+          echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/sharebro.keystore"
+          echo "SHAREBRO_KEYSTORE=$RUNNER_TEMP/sharebro.keystore" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
+
+      - name: Check the key is ShareBro's (before spending time on the build)
+        run: |
+          cert=$(keytool -list -v -keystore "$SHAREBRO_KEYSTORE" -storepass android -alias androiddebugkey \
+            | sed -nE 's/^[[:space:]]*SHA256: ([0-9A-F:]+).*/\1/p' | tr -d ':' | tr 'A-F' 'a-f')
+          echo "The secret's key: ${cert:-unreadable}"
+          if [ "$cert" != "$APK_CERT_SHA256" ]; then
+            echo "::error::ANDROID_DEBUG_KEYSTORE_BASE64 holds a different key (${cert:-unreadable}), not the one every ShareBro APK is signed with ($APK_CERT_SHA256). Set it again from the debug.keystore that signed 1.10.0."
+            exit 1
+          fi
 
       - uses: subosito/flutter-action@v2
         with:
@@ -157,7 +167,7 @@ jobs:
 
       - name: Remove the key from the runner
         if: always()
-        run: rm -f ~/.android/debug.keystore
+        run: rm -f "$RUNNER_TEMP/sharebro.keystore"
 
   windows:
     name: Windows release
