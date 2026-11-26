@@ -1,8 +1,8 @@
 # ShareBro
 
-> ShareBro is a free, offline Android app that groups your photos by face with on-device AI and sends each friend only the photos they're in, over Wi-Fi, a phone hotspot, or Bluetooth / Wi-Fi Direct. No cloud, no uploads, no account. It is compatible with the LocalSend protocol.
+> ShareBro is a free, offline app for Android (with Windows, Mac and iPhone versions in preview) that groups your photos by face with on-device AI and sends each friend only the photos they're in, over Wi-Fi, a phone hotspot, or Bluetooth / Wi-Fi Direct. No cloud, no uploads, no account. It is compatible with the LocalSend protocol.
 
-ShareBro is made by Md Yeamin Talukder (GitHub: Yeamin-Talukder). It is built with Flutter for Android 9 and newer, and is distributed as APK files on GitHub Releases (not the Play Store). It is free, with no ads or in-app purchases. All rights reserved; no open-source licence has been chosen.
+ShareBro is made by Md Yeamin Talukder (GitHub: Yeamin-Talukder). It is built with Flutter for Android 9 and newer, with previews for Windows 10 and 11, macOS 12 or newer and iOS 15.5 or newer, and is distributed on GitHub Releases (not the Play Store or App Store): APK files, a Windows installer, a Mac .dmg and an unsigned iPhone .ipa that is installed with a sideloading tool such as Sideloadly. It is free, with no ads or in-app purchases. All rights reserved; no open-source licence has been chosen.
 
 Key facts:
 
@@ -23,6 +23,7 @@ Key facts:
 - [Download the latest APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest): use the arm64-v8a file for almost every phone
 - [ShareBro for Mac (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-macos): disk image (.dmg) for macOS 12 or newer (Apple Silicon and Intel); the same folder scanning, sharing and people sync as on Windows
 - [ShareBro for Windows (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-windows): installer for Windows 10 and 11; scans folders of photos on a PC, groups them by face and sends them to phones
+- [ShareBro for iPhone (early preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-ios): unsigned .ipa for iOS 15.5 or newer, installed with Sideloadly or AltStore; not tested on an iPhone yet, and with a free Apple ID it has to be reinstalled every 7 days
 - [All releases and changelog](https://github.com/Yeamin-Talukder/ShareBro/releases)
 - [Report a bug or request a feature](https://github.com/Yeamin-Talukder/ShareBro/issues)
 
