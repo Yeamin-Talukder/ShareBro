@@ -33,7 +33,7 @@ no cloud, no uploads, no account.**
 | 📱 Older 32-bit Android phone | [ShareBro-v1.10.0-armeabi-v7a.apk](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0/ShareBro-v1.10.0-armeabi-v7a.apk) | 88.3 MB | Android 9+ |
 | 💻 Chromebook or Android emulator (x86) | [ShareBro-v1.10.0-x86_64.apk](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0/ShareBro-v1.10.0-x86_64.apk) | 104.9 MB | Android 9+ |
 | 🪟 **Windows PC** (preview) | [**ShareBro-1.10.0-windows-setup.exe**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0-windows/ShareBro-1.10.0-windows-setup.exe) | 56.4 MB | Windows 10 or 11 |
-| 🍏 **Mac** (preview) | [**ShareBro-1.10.0-macos.zip**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0-macos/ShareBro-1.10.0-macos.zip) | 77.8 MB | macOS 12+, Apple Silicon or Intel |
+| 🍏 **Mac** (preview) | [**ShareBro-1.10.0-macos.dmg**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0-macos/ShareBro-1.10.0-macos.dmg) | 78.7 MB | macOS 12+, Apple Silicon or Intel |
 | 🍎 iPhone or iPad | Coming soon · [build it yourself](#building-for-iphone-and-mac) | | iOS 15.5+ |
 
 <sub>Not sure which Android file? Take <b>arm64-v8a</b>: it fits almost every phone. All files and checksums are on the <a href="https://github.com/Yeamin-Talukder/ShareBro/releases">Releases page</a>. Free, no account.</sub>
@@ -489,9 +489,10 @@ smile / eyes-open picks, HEIC and RAW photos, and videos.
 
 ### Mac (preview)
 
-1. Download **[`ShareBro-1.10.0-macos.zip`](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0-macos/ShareBro-1.10.0-macos.zip)** (macOS 12 or newer,
-   Apple Silicon or Intel) from the [Mac release](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-macos) and open it.
-2. Drag **ShareBro.app** into **Applications** and open it.
+1. Download **[`ShareBro-1.10.0-macos.dmg`](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0-macos/ShareBro-1.10.0-macos.dmg)** (macOS 12 or newer,
+   Apple Silicon or Intel) from the [Mac release](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-macos).
+2. Open it and drag **ShareBro** onto **Applications** in the window that
+   appears, eject the disk, and open ShareBro from Applications.
 3. The app isn't signed by Apple yet, so the first time macOS says it
    can't check it for malicious software. Click **Done**, then go to
    **System Settings › Privacy & Security** and click **Open Anyway** next
@@ -768,8 +769,11 @@ flutter run -d macos            # macOS 12 or newer
   Store. Releases are only ad-hoc signed for now; signing with a Developer
   ID and notarizing would remove the "Open Anyway" step. For a release,
   `flutter build macos --release`, then
-  `ditto -c -k --keepParent ShareBro.app ShareBro-<version>-macos.zip`:
-  the in-app updater looks for a `-macos.zip`.
+  `ditto -c -k --keepParent ShareBro.app ShareBro-<version>-macos.zip`
+  (the in-app updater looks for a `-macos.zip`). For the download page,
+  also make a disk image: put the app and an `Applications` shortcut
+  (`ln -s /Applications`) in a folder, then
+  `hdiutil create -volname "ShareBro <version>" -srcfolder <folder> -format UDZO ShareBro-<version>-macos.dmg`.
 
 #### Tests and checks
 
