@@ -29,11 +29,11 @@ no cloud, no uploads, no account.**
 
 | Your device | Download | Size | Needs |
 |---|---|---|---|
-| 📱 **Android phone or tablet** (most from 2017 on) | [**ShareBro-v1.10.0-arm64-v8a.apk**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0/ShareBro-v1.10.0-arm64-v8a.apk) | 99.3 MB | Android 9+ |
-| 📱 Older 32-bit Android phone | [ShareBro-v1.10.0-armeabi-v7a.apk](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0/ShareBro-v1.10.0-armeabi-v7a.apk) | 88.3 MB | Android 9+ |
-| 💻 Chromebook or Android emulator (x86) | [ShareBro-v1.10.0-x86_64.apk](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0/ShareBro-v1.10.0-x86_64.apk) | 104.9 MB | Android 9+ |
-| 🪟 **Windows PC** (preview) | [**ShareBro-1.10.0-windows-setup.exe**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0-windows/ShareBro-1.10.0-windows-setup.exe) | 56.4 MB | Windows 10 or 11 |
-| 🍏 **Mac** (preview) | [**ShareBro-1.10.0-macos.dmg**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0-macos/ShareBro-1.10.0-macos.dmg) | 78.7 MB | macOS 12+, Apple Silicon or Intel |
+| 📱 **Android phone or tablet** (most from 2017 on) | [**ShareBro-v1.10.1-arm64-v8a.apk**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.1/ShareBro-v1.10.1-arm64-v8a.apk) | 99.3 MB | Android 9+ |
+| 📱 Older 32-bit Android phone | [ShareBro-v1.10.1-armeabi-v7a.apk](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.1/ShareBro-v1.10.1-armeabi-v7a.apk) | 88.3 MB | Android 9+ |
+| 💻 Chromebook or Android emulator (x86) | [ShareBro-v1.10.1-x86_64.apk](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.1/ShareBro-v1.10.1-x86_64.apk) | 104.9 MB | Android 9+ |
+| 🪟 **Windows PC** (preview) | [**ShareBro-1.10.1-windows-setup.exe**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.1-windows/ShareBro-1.10.1-windows-setup.exe) | 56.4 MB | Windows 10 or 11 |
+| 🍏 **Mac** (preview) | [**ShareBro-1.10.1-macos.dmg**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.1-macos/ShareBro-1.10.1-macos.dmg) | 78.9 MB | macOS 12+, Apple Silicon or Intel |
 | 🍎 iPhone or iPad | Coming soon · [build it yourself](#building-for-iphone-and-mac) | | iOS 15.5+ |
 
 <sub>Not sure which Android file? Take <b>arm64-v8a</b>: it fits almost every phone. All files and checksums are on the <a href="https://github.com/Yeamin-Talukder/ShareBro/releases">Releases page</a>. Free, no account.</sub>
@@ -55,7 +55,7 @@ no cloud, no uploads, no account.**
 | **Internet** | Not needed. Face recognition, search and sharing all run on the phone and the local network |
 | **Privacy** | Photos are never uploaded. No account, no analytics |
 | **Works with** | [LocalSend](https://localsend.org) on Android, iPhone, Windows, macOS and Linux, and any web browser |
-| **Get it** | APK from [GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) (not on the Play Store yet); [Windows installer](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-windows) and [Mac app](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-macos) in preview |
+| **Get it** | APK from [GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) (not on the Play Store yet); [Windows installer](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-windows) and [Mac app](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-macos) in preview |
 | **Website** | [yeamin-talukder.github.io/ShareBro](https://yeamin-talukder.github.io/ShareBro/) |
 
 ---
@@ -472,8 +472,8 @@ checksum of every file.
 
 ### Windows (preview)
 
-1. Download **[`ShareBro-1.10.0-windows-setup.exe`](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0-windows/ShareBro-1.10.0-windows-setup.exe)** (Windows 10
-   and 11, 64-bit) from the [Windows release](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-windows).
+1. Download **[`ShareBro-1.10.1-windows-setup.exe`](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.1-windows/ShareBro-1.10.1-windows-setup.exe)** (Windows 10
+   and 11, 64-bit) from the [Windows release](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-windows).
 2. Open it. If Windows says **"Windows protected your PC"**, choose
    **More info › Run anyway**: the installer isn't signed yet.
 3. Follow the steps. ShareBro installs for your user (no admin password)
@@ -489,8 +489,8 @@ smile / eyes-open picks, HEIC and RAW photos, and videos.
 
 ### Mac (preview)
 
-1. Download **[`ShareBro-1.10.0-macos.dmg`](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.0-macos/ShareBro-1.10.0-macos.dmg)** (macOS 12 or newer,
-   Apple Silicon or Intel) from the [Mac release](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-macos).
+1. Download **[`ShareBro-1.10.1-macos.dmg`](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.1-macos/ShareBro-1.10.1-macos.dmg)** (macOS 12 or newer,
+   Apple Silicon or Intel) from the [Mac release](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-macos).
 2. Open it and drag **ShareBro** onto **Applications** in the window that
    appears, eject the disk, and open ShareBro from Applications.
 3. The app isn't signed by Apple yet, so the first time macOS says it
@@ -961,6 +961,9 @@ from History.
 
 | Version | Highlights |
 |---|---|
+| [**v1.10.1**](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1) | First release built, tested and published by GitHub Actions; same app as 1.10.0 |
+| [**Windows 1.10.1** (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-windows) | Built by GitHub Actions; same app as 1.10.0 |
+| [**Mac 1.10.1** (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-macos) | Built by GitHub Actions; the first update a Mac can install from inside the app |
 | [**v1.10.0**](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0) | Choose where received photos, videos and files are saved (Settings › Sharing) |
 | [**Windows 1.10.0** (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-windows) | Save received files to any folder, on any drive |
 | [**Mac 1.10.0** (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-macos) | First Mac version: scan folders for faces (Core ML), share with phones and PCs, sync people, updates itself |

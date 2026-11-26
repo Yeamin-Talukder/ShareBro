@@ -21,8 +21,8 @@ Key facts:
 
 - [README](https://github.com/Yeamin-Talukder/ShareBro/blob/main/README.md): features, how it works, FAQ, comparison with Google Photos, LocalSend and WhatsApp
 - [Download the latest APK](https://github.com/Yeamin-Talukder/ShareBro/releases/latest): use the arm64-v8a file for almost every phone
-- [ShareBro for Mac (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-macos): disk image (.dmg) for macOS 12 or newer (Apple Silicon and Intel); the same folder scanning, sharing and people sync as on Windows
-- [ShareBro for Windows (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.0-windows): installer for Windows 10 and 11; scans folders of photos on a PC, groups them by face and sends them to phones
+- [ShareBro for Mac (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-macos): disk image (.dmg) for macOS 12 or newer (Apple Silicon and Intel); the same folder scanning, sharing and people sync as on Windows
+- [ShareBro for Windows (preview)](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-windows): installer for Windows 10 and 11; scans folders of photos on a PC, groups them by face and sends them to phones
 - [All releases and changelog](https://github.com/Yeamin-Talukder/ShareBro/releases)
 - [Report a bug or request a feature](https://github.com/Yeamin-Talukder/ShareBro/issues)
 
