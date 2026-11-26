@@ -556,3 +556,35 @@ footer li a { display: inline-block; transition: color .2s, transform .25s var(-
   .gh-actions { flex-direction: column; gap: 6px; }
   .gh-actions .btn { width: 100%; justify-content: center; }
 }
+
+/* ---------- phone + computer (Scan with your computer, Sync people) ---------- */
+.together { background: var(--bg-2); border-block: 1px solid var(--line); }
+.duo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.duo-card { background: var(--card); border: 1px solid var(--line); border-radius: 32px; padding: 26px 30px 34px; display: flex; flex-direction: column; }
+.duo-art { border-radius: 22px; background: var(--bg); border: 1px solid var(--line); padding: 14px 8px; margin-bottom: 26px; }
+.duo-art svg { width: 100%; height: auto; overflow: visible; }
+.duo-art text { font-family: var(--font); }
+.duo-art .t-head { font-size: 12px; font-weight: 800; fill: var(--text); }
+.duo-art .t-big { font-size: 17px; font-weight: 800; fill: var(--text); letter-spacing: -.01em; }
+.duo-art .t-name { font-size: 12px; font-weight: 700; fill: var(--text); }
+.duo-art .t-name.sm { font-size: 11px; }
+.duo-art .t-small { font-size: 10.5px; fill: var(--dim); }
+.duo-art .t-lane { font-size: 11px; font-weight: 700; fill: var(--sub); text-anchor: middle; }
+.duo-tag { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; padding: 6px 14px 6px 10px; border-radius: 999px; background: var(--card-2); border: 1px solid var(--line); color: var(--coral); font-weight: 800; font-size: 14px; }
+.duo-tag .icon { width: 18px; height: 18px; }
+.duo-card h3 { font-size: clamp(26px, 2.6vw, 34px); letter-spacing: -.025em; line-height: 1.1; margin: 16px 0 10px; }
+.duo-card > p { color: var(--sub); font-size: 17px; }
+.duo-card > p b { color: var(--text); }
+.duo-card .list { margin-top: 22px; gap: 12px; }
+.duo-card .list li { font-size: 16px; }
+/* Copies go out, results come back; people travel both ways. */
+.duo-art .pkt { animation: pktOut 2.4s linear infinite; }
+.duo-art .pkt.back { animation-name: pktBack; }
+.duo-art .pkt.slow { animation-duration: 3s; }
+.duo-art .bar-fill { transform-box: fill-box; transform-origin: left center; animation: barFill 6s var(--ease) infinite; }
+@keyframes pktOut { 0% { transform: translateX(0); opacity: 0; } 12%, 82% { opacity: 1; } 100% { transform: translateX(128px); opacity: 0; } }
+@keyframes pktBack { 0% { transform: translateX(0); opacity: 0; } 12%, 82% { opacity: 1; } 100% { transform: translateX(-128px); opacity: 0; } }
+@keyframes barFill { 0% { transform: scaleX(.08); } 85%, 100% { transform: scaleX(1); } }
+@media (max-width: 1000px) { .duo { grid-template-columns: minmax(0, 1fr); max-width: 640px; margin-inline: auto; } }
+@media (max-width: 760px) { .duo-card { padding: 18px 18px 26px; border-radius: 26px; } .duo-art { padding: 10px 4px; } .duo-art .t-lane { font-size: 13px; } .duo-art .t-name { font-size: 13px; } .duo-art .t-big { font-size: 18px; } }
+@media (prefers-reduced-motion: reduce) { .duo-art .pkt { opacity: 1; } .duo-art .pkt.back { transform: translateX(-60px); } .duo-art .pkt:not(.back) { transform: translateX(60px); } }
