@@ -588,3 +588,18 @@ footer li a { display: inline-block; transition: color .2s, transform .25s var(-
 @media (max-width: 1000px) { .duo { grid-template-columns: minmax(0, 1fr); max-width: 640px; margin-inline: auto; } }
 @media (max-width: 760px) { .duo-card { padding: 18px 18px 26px; border-radius: 26px; } .duo-art { padding: 10px 4px; } .duo-art .t-lane { font-size: 13px; } .duo-art .t-name { font-size: 13px; } .duo-art .t-big { font-size: 18px; } }
 @media (prefers-reduced-motion: reduce) { .duo-art .pkt { opacity: 1; } .duo-art .pkt.back { transform: translateX(-60px); } .duo-art .pkt:not(.back) { transform: translateX(60px); } }
+
+/* ---------- when it's unsure (review) ---------- */
+.review-shot { display: flex; justify-content: center; }
+.review-shot .device { position: relative; width: min(300px, 82%); }
+
+/* ---------- the computer app's own features ---------- */
+.desk-extras { margin-top: 22px; background: var(--card); border: 1px solid var(--line); border-radius: 32px; padding: 26px 30px 28px; }
+.desk-extras h3 { font-size: 21px; letter-spacing: -.015em; }
+.desk-extras ul { list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px 24px; margin-top: 16px; }
+.desk-extras li { display: flex; gap: 10px; align-items: flex-start; color: var(--sub); font-size: 15px; line-height: 1.45; }
+.desk-extras li b { color: var(--text); }
+.desk-extras .icon { color: var(--coral); width: 20px; height: 20px; margin-top: 1px; }
+@media (max-width: 1000px) { .desk-extras { max-width: 640px; margin-inline: auto; } .desk-extras ul { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .desk-extras ul { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) { .desk-extras { padding: 20px 18px 22px; border-radius: 26px; } }

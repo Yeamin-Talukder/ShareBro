@@ -88,6 +88,10 @@
         "Auto-scan of new photos, in the background on Android",
         "Hide strangers and save person groups",
         "Back up and restore names, faces, trips and groups",
+        "Send to everyone: each paired friend gets the photos they don't have yet",
+        "Asks about faces it's unsure of; unmatched faces, one-tap removal with Undo, and a grouping strictness slider",
+        "Best group shots, duplicate clean-up and automatic categories",
+        "Live transfer screen, history and rich notifications",
         "Works fully offline; nothing is uploaded"
       ]
     },
@@ -171,6 +175,8 @@
     <symbol id="i-sync" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11A8 8 0 0 0 5.7 6.1L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/></symbol>
     <symbol id="i-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 6.1A9.7 9.7 0 0 1 12 6c5 0 8.5 4 9.5 6a12.4 12.4 0 0 1-2.6 3.4M6.6 6.7C4.6 8 3.2 10 2.5 12c1 2 4.5 6 9.5 6a9.5 9.5 0 0 0 4.3-1M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
     <symbol id="i-backup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V9M10 13h4"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3.5 12.9 8.6 18 10.5l-5.1 1.9L11 17.5l-1.9-5.1L4 10.5l5.1-1.9zM18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h5l1.5 3h5l1.5-3h5"/><path d="M5.6 5h12.8L21 13v5.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5V13z"/></symbol>
     <symbol id="i-desktop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></symbol>
     <symbol id="i-android" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16a7 7 0 0 1 14 0zM8 10 6.5 7.5M16 10l1.5-2.5"/><path d="M9.5 13h.01M14.5 13h.01"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
@@ -309,7 +315,7 @@
         <article class="step reveal">
           <div class="n">1</div>
           <h3>Scan the trip</h3>
-          <p>Pick the trip's album or folder. Every face is found on your phone and the photos are grouped into one page per person.</p>
+          <p>Pick the trip's album or folder. Every face is found on your phone and the photos are grouped into one page per person, with the trip split into days like "Day 2 · Beach".</p>
           <div class="shot"><div class="frame"><img src="screenshots/scanning.jpg" alt="Scanning screen: 48 of 100 photos, 30 faces, about 4 people so far" width="540" height="1114" loading="lazy"></div></div>
         </article>
         <article class="step reveal" style="--d:.1s">
@@ -321,9 +327,29 @@
         <article class="step reveal" style="--d:.2s">
           <div class="n">3</div>
           <h3>Send</h3>
-          <p>Each friend gets exactly the photos they're in, at full quality, straight to their phone.</p>
+          <p>Each friend gets exactly the photos they're in, at full quality, straight to their phone. Watch every file arrive, with speed and time left, and find it all later in History.</p>
           <div class="shot"><div class="frame"><img src="screenshots/send.jpg" alt="Send 12 photos to Ruby: Original quality, nearby phones, no Wi-Fi needed, QR code" width="540" height="1114" loading="lazy"></div></div>
         </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WHEN IT'S UNSURE ============ -->
+  <section id="review" class="problem" aria-labelledby="review-h">
+    <div class="wrap split">
+      <div class="reveal">
+        <span class="kicker">When it's unsure</span>
+        <h2 id="review-h">It asks. <span class="accent">You fix it in a tap.</span></h2>
+        <p class="lead" style="margin-top:16px">Face recognition still gets the odd face wrong, especially babies, twins and tiny faces in the background. ShareBro makes fixing them quick, and your fixes stay put.</p>
+        <ul class="list">
+          <li><svg class="icon"><use href="#i-check"/></svg><span><b>"Is this Maya?"</b> ShareBro asks about faces it's unsure of. Matches it's very sure of (75% or more) are added by themselves.</span></li>
+          <li><svg class="icon"><use href="#i-check"/></svg><span><b>Unmatched faces.</b> Half-turned, partly hidden or blurry faces wait on one screen for you to place by hand.</span></li>
+          <li><svg class="icon"><use href="#i-check"/></svg><span><b>"Not Maya".</b> Remove wrong faces from a person in one tap, and Undo brings them all back.</span></li>
+          <li><svg class="icon"><use href="#i-check"/></svg><span><b>Loose or strict.</b> A slider sets how readily faces are put together, with a live estimate of how many people you'd get. People you named and faces you fixed never change.</span></li>
+        </ul>
+      </div>
+      <div class="review-shot reveal" style="--d:.12s">
+        <div class="device"><div class="screen"><img src="screenshots/review.jpg" alt="Review faces: is this small group the same person as Maya? Different or Same" width="540" height="1114" loading="lazy"></div></div>
       </div>
     </div>
   </section>
@@ -369,7 +395,7 @@
         <article class="feature reveal"><div class="tile t-coral"><svg class="icon"><use href="#i-face"/></svg></div><h3>Face grouping on your phone</h3><p>On-device face recognition (InsightFace MobileFaceNet) keeps people together with or without glasses and at different angles.</p></article>
         <article class="feature reveal" style="--d:.06s"><div class="tile t-green"><svg class="icon"><use href="#i-luggage"/></svg></div><h3>Trip groups</h3><p>Everyone joins with a 4-digit code. Each photo goes only to the friends who are in it, and you're asked when a face is unclear.</p></article>
         <article class="feature reveal" style="--d:.12s"><div class="tile t-amber"><svg class="icon"><use href="#i-qr"/></svg></div><h3>Find my photos</h3><p>Friends scan a QR code and take a selfie in their browser. They get a gallery of just their photos. No app needed.</p></article>
-        <article class="feature reveal"><div class="tile t-violet"><svg class="icon"><use href="#i-send"/></svg></div><h3>LocalSend-compatible</h3><p>Send photos, videos, files, folders, text and apps to any device running the free LocalSend app: Android, iPhone, Windows, Mac or Linux.</p></article>
+        <article class="feature reveal"><div class="tile t-violet"><svg class="icon"><use href="#i-send"/></svg></div><h3>LocalSend-compatible</h3><p>Send photos, videos, files, whole folders (layout kept), text and installed apps to any device running the free LocalSend app: Android, iPhone, Windows, Mac or Linux.</p></article>
         <article class="feature reveal" style="--d:.06s"><div class="tile t-blue"><svg class="icon"><use href="#i-bt"/></svg></div><h3>No network needed</h3><p>ShareBro phones send to each other over Bluetooth and Wi-Fi Direct. Any Wi-Fi or hotspot works too, without internet.</p></article>
         <article class="feature reveal" style="--d:.12s"><div class="tile t-pink"><svg class="icon"><use href="#i-hq"/></svg></div><h3>Full quality</h3><p>Send the originals, originals without location details, or smaller copies that send faster. Your choice per send.</p></article>
         <article class="feature reveal"><div class="tile t-teal"><svg class="icon"><use href="#i-search"/></svg></div><h3>Search like you talk</h3><p>"Maya beach June 2026" or "Kuakata Ruby". Search understands people, places, dates, scenes and more, all offline.</p></article>
@@ -381,6 +407,9 @@
         <article class="feature reveal"><div class="tile t-amber"><svg class="icon"><use href="#i-clock"/></svg></div><h3>Scans by itself</h3><p>New photos in an album you've scanned are picked up automatically, and each photo is only scanned once. On Android, scans keep going with the screen off.</p></article>
         <article class="feature reveal" style="--d:.06s"><div class="tile t-pink"><svg class="icon"><use href="#i-eye-off"/></svg></div><h3>Hide strangers, group friends</h3><p>"Not in our group" hides people in the background of your photos. Save groups like "College friends" to filter People and send to all of them at once.</p></article>
         <article class="feature reveal" style="--d:.12s"><div class="tile t-teal"><svg class="icon"><use href="#i-backup"/></svg></div><h3>Back up and restore</h3><p>Save your names, faces, trips and groups to one file and restore them later. Your photos aren't in it, so it stays small.</p></article>
+        <article class="feature reveal"><div class="tile t-coral"><svg class="icon"><use href="#i-users"/></svg></div><h3>Send to everyone</h3><p>One tap gives every named friend whose phone you've paired the photos they don't have yet. Friends who aren't nearby wait in a queue and get theirs when their phone shows up.</p></article>
+        <article class="feature reveal" style="--d:.06s"><div class="tile t-violet"><svg class="icon"><use href="#i-sparkle"/></svg></div><h3>Smart clean-up</h3><p>The best shot from each burst of group photos, with everyone's eyes open and smiling. Near-duplicates grouped with the best copy kept, and blurry, eyes-closed and screenshot photos found for you.</p></article>
+        <article class="feature reveal" style="--d:.12s"><div class="tile t-blue"><svg class="icon"><use href="#i-inbox"/></svg></div><h3>Receive your way</h3><p>Accept or decline each send, or turn on Quick save. Favourite devices can skip the question, senders can be asked for a PIN, and you choose the folders received photos and files go to.</p></article>
       </div>
     </div>
   </section>
@@ -477,6 +506,16 @@
           </ul>
         </article>
       </div>
+      <div class="desk-extras reveal">
+        <h3>And on the computer itself</h3>
+        <ul>
+          <li><svg class="icon"><use href="#i-face"/></svg><span><b>A 3D face model</b> on each person's page</span></li>
+          <li><svg class="icon"><use href="#i-images"/></svg><span><b>Names on faces</b> in the photo viewer</span></li>
+          <li><svg class="icon"><use href="#i-send"/></svg><span><b>Drag and drop</b> photos to send them, or drag a box to select</span></li>
+          <li><svg class="icon"><use href="#i-radar"/></svg><span><b>Fast scanning</b> on the graphics chip (Windows) or with Core ML (Mac)</span></li>
+          <li><svg class="icon"><use href="#i-download"/></svg><span><b>Updates itself</b> from inside the app</span></li>
+        </ul>
+      </div>
     </div>
   </section>
 
@@ -486,7 +525,7 @@
       <div class="sec-head center reveal">
         <span class="kicker">Find my photos</span>
         <h2 id="find-h">Friends without the app? <span class="accent">Just a QR code and a selfie.</span></h2>
-        <p>Show one code to the whole group. Each friend opens it in their phone's browser, takes a selfie, and lands on a gallery of only the photos they're in. Their face is matched on your phone.</p>
+        <p>Show one code to the whole group. Each friend opens it in their phone's browser, takes a selfie, and lands on a gallery of only the photos they're in. Their face is matched on your phone. Or send anyone a private link: a web gallery with a slideshow and a ZIP download.</p>
       </div>
       <div class="flow">
         <figure class="reveal"><div class="device"><div class="screen"><img src="screenshots/find-my-photos.jpg" alt="Find my photos on ShareBro: a QR code to show the group" width="540" height="1114" loading="lazy"></div></div><figcaption>Show the code<small>On your phone</small></figcaption></figure>
@@ -560,6 +599,7 @@
         <details id="faq-iphone" style="--i:10"><summary><span class="q">Is there an iPhone version?</span><span class="pm" aria-hidden="true"><svg class="icon"><use href="#i-plus"/></svg></span></summary><div class="ans">Yes, as an <b>early preview</b> for iOS 15.5 or newer. It hasn't been tested on an iPhone yet, so please <a href="https://github.com/Yeamin-Talukder/ShareBro/issues" rel="noopener">report anything odd</a>. It isn't on the App Store: download the <a href="https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.1-ios/ShareBro-1.10.1-ios-unsigned.ipa">.ipa</a> from the <a href="https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-ios" rel="noopener">iPhone release</a> and install it with <a href="https://sideloadly.io" rel="noopener">Sideloadly</a> on your computer, signing in with your Apple ID. Then on the iPhone open <b>Settings › General › VPN &amp; Device Management</b> and trust your Apple ID (on iOS 16 or newer, also turn on <b>Developer Mode</b>). With a free Apple ID the app stops opening after 7 days; install it again to renew it, and your people and settings are kept.</div></details>
         <details style="--i:11"><summary><span class="q">Can my computer help scan my phone's photos?</span><span class="pm" aria-hidden="true"><svg class="icon"><use href="#i-plus"/></svg></span></summary><div class="ans">Yes. Pair your phone with ShareBro on your Windows PC or Mac on the same Wi-Fi or hotspot, and choose <b>Scan with my computer</b>. During a scan the computer finds the faces in small copies of your photos and sends back only the results, with live progress on the computer. It keeps those results only if you allow it.</div></details>
         <details style="--i:8"><summary><span class="q">Is there a Windows or Mac version?</span><span class="pm" aria-hidden="true"><svg class="icon"><use href="#i-plus"/></svg></span></summary><div class="ans">Yes, both in preview. ShareBro for Windows 10 and 11 scans a folder of photos on your PC, groups them by face, and sends each friend their photos to their phone over Wi-Fi. ShareBro for Mac (macOS 12 or newer, Apple Silicon or Intel) does the same: get the .dmg from the <a href="https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-macos" rel="noopener">Mac release</a>, and the first time, click <b>Open Anyway</b> in <b>System Settings › Privacy &amp; Security</b>. Get the installer from the <a href="https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-windows" rel="noopener">Windows release</a>. If Windows says "Windows protected your PC", choose <b>More info</b> then <b>Run anyway</b>; the installer isn't signed yet.</div></details>
+        <details style="--i:12"><summary><span class="q">How do I know when photos have arrived?</span><span class="pm" aria-hidden="true"><svg class="icon"><use href="#i-plus"/></svg></span></summary><div class="ans">A pill at the top of the app, the <b>island</b>, shows sending, receiving and scanning, with <b>Accept</b> and <b>Decline</b> right inside it. A live screen shows every file arriving with the speed and time left, and <b>History</b> keeps everything sent and received. On Android you also get notifications with a preview of what came in, buttons to accept or cancel, and progress chips in the status bar on Android 16.</div></details>
         <details style="--i:7"><summary><span class="q">How do I install the APK?</span><span class="pm" aria-hidden="true"><svg class="icon"><use href="#i-plus"/></svg></span></summary><div class="ans">Download the APK on your phone and open it. If Android asks, allow "Install unknown apps" for your browser or file manager. To update later, install the newer APK over the old one; your people, names and settings are kept.</div></details>
       </div>
     </div>
