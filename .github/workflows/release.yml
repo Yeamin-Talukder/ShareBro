@@ -4,11 +4,13 @@
 #   v1.11.0          Android APKs, one per processor type (marked Latest)
 #   v1.11.0-windows  Windows installer (pre-release)
 #   v1.11.0-macos    Mac app as .dmg and .zip (pre-release)
+#   v1.11.0-ios      iPhone app as an unsigned .ipa, installed with a
+#                    sideloading tool such as Sideloadly (pre-release)
 # Each with SHA256SUMS.txt, which the in-app updater checks.
 #
 # To release: bump version in pubspec.yaml, add the notes as
-# docs/release-notes/v<version>.md (and optionally v<version>-windows.md and
-# v<version>-macos.md), push. Pushes that don't change the version stop after
+# docs/release-notes/v<version>.md (and optionally v<version>-windows.md,
+# v<version>-macos.md and v<version>-ios.md), push. Pushes that don't change the version stop after
 # the quick check. If one platform fails, fix it and push again (or "Run
 # workflow" in the Actions tab): only the missing releases are built.
 #
@@ -46,6 +48,7 @@ jobs:
       android: ${{ steps.v.outputs.android }}
       windows: ${{ steps.v.outputs.windows }}
       macos: ${{ steps.v.outputs.macos }}
+      ios: ${{ steps.v.outputs.ios }}
       any: ${{ steps.v.outputs.any }}
     steps:
       - uses: actions/checkout@v5
@@ -58,7 +61,7 @@ jobs:
           if [ -z "$version" ]; then echo "::error::No version in pubspec.yaml"; exit 1; fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           any=false
-          for p in android windows macos; do
+          for p in android windows macos ios; do
             tag="v$version"; [ "$p" != android ] && tag="$tag-$p"
             if gh release view "$tag" >/dev/null 2>&1; then
               echo "$tag already released."
@@ -259,4 +262,67 @@ jobs:
           fi
           gh release create "$TAG" dist/*.dmg dist/*.zip dist/SHA256SUMS.txt \
             --target "$GITHUB_SHA" --title "ShareBro for Mac $VERSION (preview)" \
+            --notes-file "$notes" --prerelease --latest=false
+
+  ios:
+    name: iPhone release
+    needs: [check, test]
+    if: needs.check.outputs.ios == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      TAG: v${{ needs.check.outputs.version }}-ios
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      # ML Kit and TensorFlow Lite come from CocoaPods, whose downloads
+      # sometimes drop halfway; try a few times before giving up.
+      - name: Install pods
+        run: |
+          flutter pub get
+          cd ios
+          for attempt in 1 2 3; do
+            pod install && exit 0
+            echo "pod install failed (attempt $attempt), retrying"
+            sleep 15
+          done
+          echo "::error::pod install failed three times"
+          exit 1
+
+      # Unsigned: there's no Apple developer account yet. People install the
+      # .ipa with Sideloadly or AltStore, which sign it with their Apple ID.
+      - name: Build
+        run: flutter build ios --release --no-codesign
+
+      - name: Package as .ipa
+        run: |
+          app=build/ios/iphoneos/Runner.app
+          built=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$app/Info.plist")
+          echo "Built version $built, $(lipo -archs "$app/Runner")"
+          if [ "$built" != "$VERSION" ]; then
+            echo "::error::The app says version $built, expected $VERSION"
+            exit 1
+          fi
+          mkdir -p stage/Payload dist
+          ditto "$app" stage/Payload/Runner.app
+          (cd stage && zip -qry "../dist/ShareBro-$VERSION-ios-unsigned.ipa" Payload)
+          (cd dist && shasum -a 256 *.ipa > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Publish the release
+        run: |
+          notes="docs/release-notes/$TAG.md"
+          if [ ! -f "$notes" ]; then
+            notes=dist/NOTES.md
+            echo "**ShareBro for iPhone $VERSION** (early preview), for iOS 15.5 or newer. It isn't on the App Store: install the .ipa with [Sideloadly](https://sideloadly.io) or AltStore, then trust your Apple ID in Settings › General › VPN & Device Management. With a free Apple ID, install it again every 7 days; your people and settings are kept." > "$notes"
+          fi
+          gh release create "$TAG" dist/*.ipa dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" --title "ShareBro for iPhone $VERSION (preview)" \
             --notes-file "$notes" --prerelease --latest=false
