@@ -1,0 +1,248 @@
+# Releases ShareBro automatically. On every push to main it reads the version
+# from pubspec.yaml (version: 1.11.0+16 → 1.11.0), and for each release that
+# doesn't exist yet it runs the tests, builds, and publishes:
+#   v1.11.0          Android APKs, one per processor type (marked Latest)
+#   v1.11.0-windows  Windows installer (pre-release)
+#   v1.11.0-macos    Mac app as .dmg and .zip (pre-release)
+# Each with SHA256SUMS.txt, which the in-app updater checks.
+#
+# To release: bump version in pubspec.yaml, add the notes as
+# docs/release-notes/v<version>.md (and optionally v<version>-windows.md and
+# v<version>-macos.md), push. Pushes that don't change the version stop after
+# the quick check. If one platform fails, fix it and push again (or "Run
+# workflow" in the Actions tab): only the missing releases are built.
+#
+# Android signing: ShareBro's APKs have always been signed with one debug
+# key, and phones only accept an update signed with the same key. Add it as a
+# repository secret first (Settings › Secrets and variables › Actions):
+#   ANDROID_DEBUG_KEYSTORE_BASE64   the debug.keystore file, base64-encoded
+# Without it the Android job stops before building, and an APK signed with
+# any other key is never published.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: "3.47.2"
+  # SHA-256 of the certificate every ShareBro APK is signed with.
+  APK_CERT_SHA256: "30b173631885dea51b4a37b0f7d9e3294da62ef9259615833dbe80a1f313a469"
+
+jobs:
+  check:
+    name: Is this a new version?
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      android: ${{ steps.v.outputs.android }}
+      windows: ${{ steps.v.outputs.windows }}
+      macos: ${{ steps.v.outputs.macos }}
+      any: ${{ steps.v.outputs.any }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -nE 's/^version:[[:space:]]*([0-9]+(\.[0-9]+)*).*/\1/p' pubspec.yaml | head -1)
+          if [ -z "$version" ]; then echo "::error::No version in pubspec.yaml"; exit 1; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          any=false
+          for p in android windows macos; do
+            tag="v$version"; [ "$p" != android ] && tag="$tag-$p"
+            if gh release view "$tag" >/dev/null 2>&1; then
+              echo "$tag already released."
+              echo "$p=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "$tag is new: releasing it."
+              echo "$p=true" >> "$GITHUB_OUTPUT"
+              any=true
+            fi
+          done
+          echo "any=$any" >> "$GITHUB_OUTPUT"
+
+  test:
+    name: Analyze and test
+    needs: check
+    if: needs.check.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test
+
+  android:
+    name: Android release
+    needs: [check, test]
+    if: needs.check.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      TAG: v${{ needs.check.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Restore the signing key (runner only, deleted at the end)
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE" ]; then
+            echo "::error::Secret ANDROID_DEBUG_KEYSTORE_BASE64 is missing; see the top of release.yml"
+            exit 1
+          fi
+          mkdir -p ~/.android
+          echo "$KEYSTORE" | base64 -d > ~/.android/debug.keystore
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Build APKs
+        run: flutter build apk --release --split-per-abi --split-debug-info=build/symbols
+
+      - name: Check they're signed with ShareBro's key, and name them
+        run: |
+          signer=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          mkdir -p dist
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            apk="build/app/outputs/flutter-apk/app-$abi-release.apk"
+            cert=$("$signer" verify --print-certs "$apk" | sed -nE 's/^Signer #1 certificate SHA-256 digest: ([0-9a-f]+)$/\1/p')
+            if [ "$cert" != "$APK_CERT_SHA256" ]; then
+              echo "::error::$apk is signed with $cert, not ShareBro's key; phones would refuse it as an update"
+              exit 1
+            fi
+            cp "$apk" "dist/ShareBro-$TAG-$abi.apk"
+          done
+          (cd dist && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Publish the release
+        run: |
+          notes="docs/release-notes/$TAG.md"
+          if [ ! -f "$notes" ]; then
+            notes=dist/NOTES.md
+            echo "**ShareBro $VERSION** for Android 9 or newer. Most phones need the \`arm64-v8a\` APK." > "$notes"
+          fi
+          gh release create "$TAG" dist/*.apk dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" --title "ShareBro $TAG" --notes-file "$notes" --latest
+
+      - name: Remove the key from the runner
+        if: always()
+        run: rm -f ~/.android/debug.keystore
+
+  windows:
+    name: Windows release
+    needs: [check, test]
+    if: needs.check.outputs.windows == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      TAG: v${{ needs.check.outputs.version }}-windows
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Build
+        run: flutter build windows --release
+
+      - name: Build the installer
+        run: |
+          iscc="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          if [ ! -f "$iscc" ]; then choco install innosetup -y --no-progress; fi
+          MSYS_NO_PATHCONV=1 "$iscc" "/DAppVersion=$VERSION" windows/installer/ShareBro.iss
+          mkdir -p dist
+          cp "build/installer/ShareBro-$VERSION-windows-setup.exe" dist/
+          (cd dist && sha256sum *.exe > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Publish the release
+        run: |
+          notes="docs/release-notes/$TAG.md"
+          if [ ! -f "$notes" ]; then
+            notes=dist/NOTES.md
+            echo "**ShareBro for Windows $VERSION** (preview), for Windows 10 and 11. Run the installer; it updates an installed copy and keeps your people and settings." > "$notes"
+          fi
+          gh release create "$TAG" dist/*.exe dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" --title "ShareBro for Windows $VERSION (preview)" \
+            --notes-file "$notes" --prerelease --latest=false
+
+  macos:
+    name: Mac release
+    needs: [check, test]
+    if: needs.check.outputs.macos == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      TAG: v${{ needs.check.outputs.version }}-macos
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Build
+        run: flutter build macos --release
+
+      - name: Package as .zip (for the in-app updater) and .dmg (for downloads)
+        run: |
+          app=build/macos/Build/Products/Release/ShareBro.app
+          codesign --verify --deep --strict "$app"
+          lipo -archs "$app/Contents/MacOS/ShareBro"
+          mkdir -p dist stage
+          ditto -c -k --keepParent "$app" "dist/ShareBro-$VERSION-macos.zip"
+          ditto "$app" stage/ShareBro.app
+          ln -s /Applications stage/Applications
+          hdiutil create -volname "ShareBro $VERSION" -srcfolder stage -fs HFS+ \
+            -format UDZO -imagekey zlib-level=9 -ov "dist/ShareBro-$VERSION-macos.dmg"
+          hdiutil verify "dist/ShareBro-$VERSION-macos.dmg"
+          (cd dist && shasum -a 256 *.dmg *.zip > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Publish the release
+        run: |
+          notes="docs/release-notes/$TAG.md"
+          if [ ! -f "$notes" ]; then
+            notes=dist/NOTES.md
+            echo "**ShareBro for Mac $VERSION** (preview), for macOS 12 or newer on Apple Silicon and Intel. Download the .dmg and drag ShareBro onto Applications. The first time, open it from System Settings › Privacy & Security › Open Anyway." > "$notes"
+          fi
+          gh release create "$TAG" dist/*.dmg dist/*.zip dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" --title "ShareBro for Mac $VERSION (preview)" \
+            --notes-file "$notes" --prerelease --latest=false

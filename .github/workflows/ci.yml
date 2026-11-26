@@ -1,0 +1,131 @@
+# Checks ShareBro on every push and pull request: the analyzer and every unit
+# test, then a release build for Android, Windows and Mac, kept for a week as
+# downloadable artifacts (Actions tab › the run › Artifacts).
+#
+# These builds are only for trying a change. The APKs are signed with the
+# runner's throwaway debug key, so they can't update an installed ShareBro;
+# real releases come from release.yml.
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.47.2"
+
+jobs:
+  test:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Unit tests
+        run: flutter test
+
+  android:
+    name: Android build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Build APKs
+        run: flutter build apk --release --split-per-abi --split-debug-info=build/symbols
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v7
+        with:
+          name: sharebro-android-${{ github.sha }}
+          path: build/app/outputs/flutter-apk/*-release.apk
+          retention-days: 7
+          if-no-files-found: error
+
+  windows:
+    name: Windows build
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Build
+        run: flutter build windows --release
+
+      - name: Upload the app folder
+        uses: actions/upload-artifact@v7
+        with:
+          name: sharebro-windows-${{ github.sha }}
+          path: build/windows/x64/runner/Release/
+          retention-days: 7
+          if-no-files-found: error
+
+  macos:
+    name: Mac build
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Build
+        run: flutter build macos --release
+
+      - name: Zip the app
+        run: ditto -c -k --keepParent build/macos/Build/Products/Release/ShareBro.app ShareBro-macos.zip
+
+      - name: Upload the app
+        uses: actions/upload-artifact@v7
+        with:
+          name: sharebro-macos-${{ github.sha }}
+          path: ShareBro-macos.zip
+          retention-days: 7
+          if-no-files-found: error

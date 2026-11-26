@@ -740,6 +740,32 @@ The APKs are written to `build/app/outputs/flutter-apk/`.
 > - Release builds are signed with the debug key for now. Use your own
 >   signing key before publishing anywhere else.
 
+#### Releasing
+
+GitHub Actions does it ([`.github/workflows/release.yml`](.github/workflows/release.yml)):
+
+1. Bump `version` in `pubspec.yaml` (for example `1.11.0+16`).
+2. Write the release notes as `docs/release-notes/v1.11.0.md`, and
+   optionally `v1.11.0-windows.md` and `v1.11.0-macos.md` (the in-app
+   updater shows the bullets under a "What's new" heading).
+3. Push to `main`.
+
+It runs the tests, then builds and publishes `v1.11.0` (the Android APKs,
+marked Latest), `v1.11.0-windows` (the installer) and `v1.11.0-macos` (the
+.dmg and .zip), each with `SHA256SUMS.txt`. If one fails, fix it and push
+again: only the missing releases are built. Update the download links in
+this README and `docs/` afterwards.
+
+The APKs must be signed with the same key as every earlier ShareBro, or
+phones refuse the update. That key is the `debug.keystore` it was first
+built with, stored as the repository secret `ANDROID_DEBUG_KEYSTORE_BASE64`;
+the workflow checks the signature before publishing.
+
+Every push and pull request also runs
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml): the analyzer, the
+tests, and Android, Windows and Mac builds you can download from the run's
+Artifacts for a week.
+
 #### Building for iPhone and Mac
 
 The project is set up for iOS and macOS. The Mac build is tested and
