@@ -34,7 +34,7 @@ no cloud, no uploads, no account.**
 | 💻 Chromebook or Android emulator (x86) | [ShareBro-v1.10.1-x86_64.apk](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.1/ShareBro-v1.10.1-x86_64.apk) | 104.9 MB | Android 9+ |
 | 🪟 **Windows PC** (preview) | [**ShareBro-1.10.1-windows-setup.exe**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.1-windows/ShareBro-1.10.1-windows-setup.exe) | 56.4 MB | Windows 10 or 11 |
 | 🍏 **Mac** (preview) | [**ShareBro-1.10.1-macos.dmg**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.1-macos/ShareBro-1.10.1-macos.dmg) | 78.9 MB | macOS 12+, Apple Silicon or Intel |
-| 🍎 iPhone or iPad | Coming soon · [build it yourself](#building-for-iphone-and-mac) | | iOS 15.5+ |
+| 🍎 **iPhone or iPad** (early preview) | [**ShareBro-1.10.1-ios-unsigned.ipa**](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.1-ios/ShareBro-1.10.1-ios-unsigned.ipa) · [how to install](#iphone-and-ipad-early-preview) | 63.3 MB | iOS 15.5+, installed with Sideloadly |
 
 <sub>Not sure which Android file? Take <b>arm64-v8a</b>: it fits almost every phone. All files and checksums are on the <a href="https://github.com/Yeamin-Talukder/ShareBro/releases">Releases page</a>. Free, no account.</sub>
 
@@ -50,12 +50,12 @@ no cloud, no uploads, no account.**
 |---|---|
 | **What it is** | An offline photo organizer with face recognition, plus a photo and file sharing app |
 | **Best for** | Sharing trip, wedding, party and event photos with each person in them |
-| **Platform** | Android 9 or newer (phones and tablets) |
+| **Platform** | Android 9 or newer (phones and tablets); Windows, Mac and iPhone in preview |
 | **Price** | Free, no ads, no in-app purchases |
 | **Internet** | Not needed. Face recognition, search and sharing all run on the phone and the local network |
 | **Privacy** | Photos are never uploaded. No account, no analytics |
 | **Works with** | [LocalSend](https://localsend.org) on Android, iPhone, Windows, macOS and Linux, and any web browser |
-| **Get it** | APK from [GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) (not on the Play Store yet); [Windows installer](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-windows) and [Mac app](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-macos) in preview |
+| **Get it** | APK from [GitHub Releases](https://github.com/Yeamin-Talukder/ShareBro/releases/latest) (not on the Play Store yet); [Windows installer](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-windows), [Mac app](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-macos) and [iPhone app](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-ios) in preview |
 | **Website** | [yeamin-talukder.github.io/ShareBro](https://yeamin-talukder.github.io/ShareBro/) |
 
 ---
@@ -506,6 +506,28 @@ The Mac version works like the Windows one: it finds faces with Core ML
 `Downloads/ShareBro`, and it updates itself from Settings › Software
 update.
 
+### iPhone and iPad (early preview)
+
+The iPhone version is built and checked on a Mac but **hasn't been tested
+on an iPhone yet**. It isn't on the App Store or signed by Apple, so you
+install it with a free sideloading tool that signs it with your own Apple ID.
+
+1. Download **[`ShareBro-1.10.1-ios-unsigned.ipa`](https://github.com/Yeamin-Talukder/ShareBro/releases/download/v1.10.1-ios/ShareBro-1.10.1-ios-unsigned.ipa)** (iOS 15.5 or newer)
+   from the [iPhone release](https://github.com/Yeamin-Talukder/ShareBro/releases/tag/v1.10.1-ios).
+2. Install [Sideloadly](https://sideloadly.io) on your Windows PC or Mac
+   ([AltStore](https://altstore.io) works too), connect the iPhone with a
+   cable, drag the `.ipa` in, enter your Apple ID and click **Start**.
+3. On the iPhone, go to **Settings › General › VPN & Device Management**,
+   tap your Apple ID and tap **Trust**. On iOS 16 or newer, also turn on
+   **Settings › Privacy & Security › Developer Mode**.
+4. Open ShareBro and allow **Photos** and **Local Network**.
+
+With a free Apple ID the app stops opening after **7 days**: install it
+again with Sideloadly to renew it (your people and settings are kept).
+Received files that aren't photos go to **Files › On My iPhone ›
+ShareBro**, scanning pauses when you leave the app, and there are no
+in-app updates.
+
 ## FAQ
 
 <details open>
@@ -578,8 +600,11 @@ not the Play Store yet.
 <details>
 <summary><b>Is there an iPhone version?</b></summary>
 
-Not yet; ShareBro is Android only. iPhones can still **receive** photos from
-ShareBro through the LocalSend app or the **Find my photos** browser link.
+Yes, as an **early preview** that hasn't been tested on an iPhone yet. It
+isn't on the App Store, so you install it with Sideloadly: see
+[iPhone and iPad](#iphone-and-ipad-early-preview). iPhones without ShareBro
+can still **receive** photos through the LocalSend app or the **Find my
+photos** browser link.
 </details>
 
 <details>
@@ -769,7 +794,9 @@ Artifacts for a week.
 #### Building for iPhone and Mac
 
 The project is set up for iOS and macOS. The Mac build is tested and
-released; the iPhone build hasn't been run yet. You need a Mac with Xcode
+released; the iPhone build is released as an unsigned preview
+(`flutter build ios --release --no-codesign`) but hasn't been run on a
+phone yet. You need a Mac with Xcode
 and CocoaPods (with macOS's built-in Ruby 2.6, install older versions of a
 few CocoaPods add-ons first, with `gem install --user-install`: `nap 1.1.1`,
 `ffi 1.16.3`, `securerandom 0.3.2`, `drb 2.0.6`, `i18n 1.14.8`,
@@ -990,9 +1017,10 @@ from History.
 
 ## Known limitations
 
-- **Android, plus Windows and Mac in preview.** The iOS and Linux folders
-  aren't tested yet. iPhones can still receive
-  photos (LocalSend or a browser).
+- **Android, plus Windows, Mac and iPhone in preview.** The iPhone version
+  hasn't been tested on a phone yet and needs sideloading (it isn't on the
+  App Store); Linux isn't tested. iPhones without ShareBro can still
+  receive photos (LocalSend or a browser).
 - **Not on the Play Store yet.** Install the APK from GitHub Releases.
 - **Sharing needs the same network.** Nearby sending, links and Find my
   photos work on a shared Wi-Fi or hotspot, not over the internet. ShareBro
