@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 230" width="960" height="460" role="img" aria-label="A phone sends small copies of its photos to a laptop, and the laptop sends back only face results">
+<title>A phone sends small copies of its photos to a laptop, and the laptop sends back only face results</title>
+<style>
+text { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+.t-head { font-size: 12px; font-weight: 800; fill: #f6f3f1; }
+.t-big { font-size: 17px; font-weight: 800; fill: #f6f3f1; letter-spacing: -.01em; }
+.t-name { font-size: 12px; font-weight: 700; fill: #f6f3f1; }
+.t-name.sm { font-size: 11px; }
+.t-small { font-size: 10.5px; fill: #9a93a0; }
+.t-lane { font-size: 11px; font-weight: 700; fill: #b7b0bb; text-anchor: middle; }
+.pkt { animation: pktOut 2.4s linear infinite; }
+.pkt.back { animation-name: pktBack; }
+.pkt.slow { animation-duration: 3s; }
+.bar-fill { transform-box: fill-box; transform-origin: left center; animation: barFill 6s cubic-bezier(.2,.8,.2,1) infinite; }
+@keyframes pktOut { 0% { transform: translateX(0); opacity: 0; } 12%, 82% { opacity: 1; } 100% { transform: translateX(128px); opacity: 0; } }
+@keyframes pktBack { 0% { transform: translateX(0); opacity: 0; } 12%, 82% { opacity: 1; } 100% { transform: translateX(-128px); opacity: 0; } }
+@keyframes barFill { 0% { transform: scaleX(.08); } 85%, 100% { transform: scaleX(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .pkt, .bar-fill { animation: none; }
+  .pkt:not(.back) { transform: translateX(60px); }
+  .pkt.back { transform: translateX(-60px); }
+}
+</style>
+<defs></defs>
+<rect x="1" y="1" width="478" height="228" rx="18" fill="#0b0a0f" stroke="#2b2832" stroke-width="1.5"/>
+<rect x="30" y="15" width="108" height="200" rx="20" fill="#16151a" stroke="#302d36" stroke-width="1.5"/>
+              <rect x="37" y="22" width="94" height="186" rx="14" fill="#0c0b10"/>
+              <text x="46" y="44" class="t-head">Scanning</text>
+              <rect x="46" y="54" width="24" height="24" rx="5" fill="#FFC3B2"/><rect x="74" y="54" width="24" height="24" rx="5" fill="#5A5560"/><rect x="102" y="54" width="24" height="24" rx="5" fill="#FF8A6B"/>
+              <rect x="46" y="82" width="24" height="24" rx="5" fill="#8A8590"/><rect x="74" y="82" width="24" height="24" rx="5" fill="#FDE3DA"/><rect x="102" y="82" width="24" height="24" rx="5" fill="#3A353F"/>
+              <rect x="46" y="110" width="24" height="24" rx="5" fill="#FF8A6B"/><rect x="74" y="110" width="24" height="24" rx="5" fill="#8A8590"/><rect x="102" y="110" width="24" height="24" rx="5" fill="#FFC3B2"/>
+              <rect x="46" y="138" width="24" height="24" rx="5" fill="#3A353F"/><rect x="74" y="138" width="24" height="24" rx="5" fill="#FF8A6B"/><rect x="102" y="138" width="24" height="24" rx="5" fill="#5A5560"/>
+              <rect x="46" y="176" width="80" height="6" rx="3" fill="#2b2832"/><rect class="bar-fill" x="46" y="176" width="80" height="6" rx="3" fill="#ff8a6b"/>
+              <text x="46" y="198" class="t-small">Your phone scans too</text>
+
+              <path d="M150 96H290" stroke="#2b2832" stroke-width="2" stroke-dasharray="3 6" stroke-linecap="round"/>
+              <text x="220" y="80" class="t-lane">small copies</text>
+              <rect class="pkt" x="150" y="90" width="15" height="12" rx="2.5" fill="#FFC3B2"/>
+              <rect class="pkt" style="animation-delay:-.8s" x="150" y="90" width="15" height="12" rx="2.5" fill="#FF8A6B"/>
+              <rect class="pkt" style="animation-delay:-1.6s" x="150" y="90" width="15" height="12" rx="2.5" fill="#8A8590"/>
+              <path d="M150 140H290" stroke="#2b2832" stroke-width="2" stroke-dasharray="3 6" stroke-linecap="round"/>
+              <text x="220" y="166" class="t-lane">face results only</text>
+              <circle class="pkt back" cx="290" cy="140" r="5.5" fill="#34c759"/>
+              <circle class="pkt back" style="animation-delay:-1.2s" cx="290" cy="140" r="5.5" fill="#34c759"/>
+
+              <rect x="300" y="40" width="160" height="108" rx="10" fill="#16151a" stroke="#302d36" stroke-width="1.5"/>
+              <rect x="307" y="47" width="146" height="94" rx="5" fill="#0c0b10"/>
+              <path d="M286 152h188l-9 11H295z" fill="#24222a" stroke="#302d36" stroke-width="1.5" stroke-linejoin="round"/>
+              <text x="316" y="66" class="t-small">Helping your phone</text>
+              <text x="316" y="92" class="t-big">Finding faces</text>
+              <rect x="316" y="104" width="128" height="6" rx="3" fill="#2b2832"/><rect class="bar-fill" style="animation-delay:-1s" x="316" y="104" width="128" height="6" rx="3" fill="#34c759"/>
+              <text x="316" y="128" class="t-small">On the graphics chip</text>
+</svg>

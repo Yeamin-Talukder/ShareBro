@@ -67,6 +67,7 @@ no cloud, no uploads, no account.**
 [See it in action](#see-it-in-action) ·
 [Get started in 5 minutes](#get-started-in-5-minutes) ·
 [Highlights](#highlights) ·
+[Phone + computer](#phone--computer) ·
 [Who it's for](#who-its-for) ·
 [ShareBro vs other apps](#sharebro-vs-other-apps) ·
 [Features in detail](#features-in-detail) ·
@@ -184,6 +185,56 @@ shows the whole flow.</sub>
 | 🗺️ **Places and Journey** | Your photos on a map, and the whole trip replayed like a travel video |
 | 🖼️ **A full gallery** | Photos and videos, albums, favourites, trash, duplicates and best shots |
 | 🔒 **Private by design** | Works fully offline; transfers are encrypted; optional app lock |
+
+## Phone + computer
+
+Open ShareBro on your Windows PC or Mac, on the same Wi‑Fi or hotspot as
+your phone. It can help your phone scan, and it learns everyone you've named.
+([See it on the website](https://yeamin-talukder.github.io/ShareBro/#together).)
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/img/phone-computer-scan.svg" alt="A phone sends small copies of its photos to a laptop, and the laptop sends back only face results" width="100%"></td>
+    <td width="50%"><img src="docs/assets/img/phone-computer-sync.svg" alt="A phone and a laptop swap the people each one has named, in both directions" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>💻 Scan with your computer</b><br><sub>Small copies go out, only face results come back</sub></td>
+    <td align="center"><b>🔄 Sync people between devices</b><br><sub>Names and face fingerprints, both ways, never photos</sub></td>
+  </tr>
+</table>
+
+### 💻 Scan with your computer: big trips scan faster
+
+While your phone scans, it sends small copies of the photos to your
+computer. The computer finds the faces on its graphics chip and sends back
+only the results: where each face is, its fingerprint and a small face
+picture.
+
+- **Both at once.** Your phone keeps scanning too, and carries on by itself
+  if the computer goes away.
+- **Nothing left behind.** Copies are never saved on the computer. Face
+  results are kept only if you allow it, for as long as you choose, and you
+  can delete them any time.
+- **Pair once.** Pick **Scan faster with your computer** where you start a
+  scan. The computer asks first and shows the same code as your phone; once
+  allowed, it won't ask again. It can even join a scan that's already
+  running, with live progress on the computer.
+- **Works where you are.** On the same Wi‑Fi, or over your phone's own
+  hotspot. The computer can turn helping off in **Settings › General**.
+
+### 🔄 Sync people between devices: name everyone once
+
+Open **People › Sync people with another device** and pick your other phone
+or computer. They swap who's who both ways at once, and each recognises
+everyone in its next scans.
+
+- **Never photos.** Only names and face fingerprints, lists of numbers that
+  recognise a face. No photos, file names, dates or places leave the device.
+- **You choose who.** Untick anyone you'd rather keep to yourself, and pick
+  which name to use when the two devices disagree.
+- **Both sides agree.** The other device has to accept, after checking it
+  shows the same code.
+- Both devices need ShareBro 1.8.0 or later.
 
 ## Who it's for
 
