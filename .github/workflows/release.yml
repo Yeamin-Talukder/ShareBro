@@ -132,8 +132,12 @@ jobs:
           mkdir -p dist
           for abi in arm64-v8a armeabi-v7a x86_64; do
             apk="build/app/outputs/flutter-apk/app-$abi-release.apk"
-            cert=$("$signer" verify --print-certs "$apk" | sed -nE 's/^Signer #1 certificate SHA-256 digest: ([0-9a-f]+)$/\1/p')
-            if [ "$cert" != "$APK_CERT_SHA256" ]; then
+            out=$("$signer" verify --print-certs "$apk" 2>&1) || { echo "$out"; echo "::error::apksigner couldn't verify $apk"; exit 1; }
+            certs=$(echo "$out" | grep -oE 'certificate SHA-256 digest: [0-9a-f]{64}' | awk '{print $NF}' | sort -u)
+            echo "$abi: signed by $certs"
+            if [ "$certs" != "$APK_CERT_SHA256" ]; then
+              echo "$out"
+              cert="${certs:-nothing}"
               echo "::error::$apk is signed with $cert, not ShareBro's key; phones would refuse it as an update"
               exit 1
             fi
